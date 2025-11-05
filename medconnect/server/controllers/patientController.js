@@ -604,6 +604,7 @@ export async function getDoctorTimeSlots(req, res) {
       .lean();
 
     // Get all appointments using these slots to check if they're really available
+    // Include ALL appointments (even done) so we can show all slots but mark them as unavailable
     const slotIds = timeSlots.map((slot) => slot._id);
     const appointments = await Appointment.find({
       slotId: { $in: slotIds },
@@ -614,7 +615,7 @@ export async function getDoctorTimeSlots(req, res) {
           "in_progress",
           "done",
           // Exclude cancelled, rejected, no_show, rescheduled
-          // Include "done" to hide completed appointments
+          // Include "done" to show all slots but mark them as unavailable
         ],
       },
     })

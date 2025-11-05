@@ -33,6 +33,7 @@ import {
   HomeOutlined,
   PlusOutlined,
   DeleteOutlined,
+  EditOutlined,
 } from "@ant-design/icons";
 import NavigationBreadcrumb from "../../components/Breadcrumb/NavigationBreadcrumb";
 import { api } from "../../lib/api";
@@ -63,6 +64,7 @@ const MultiSpecializationBooking = () => {
   const [selectedMode, setSelectedMode] = useState("online");
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [appointmentToReplace, setAppointmentToReplace] = useState(null);
 
   // Fetch specializations
   useEffect(() => {
@@ -182,11 +184,25 @@ const MultiSpecializationBooking = () => {
   };
 
   // Step 3: Mở modal chọn bác sĩ và time slot
-  const handleOpenDoctorModal = (spec) => {
+  const handleOpenDoctorModal = (spec, appointmentToReplace = null) => {
     setCurrentSpecialization(spec);
     setSelectedDoctor(null);
     setSelectedSlot(null);
     setShowDoctorModal(true);
+    // Store appointment to replace if provided
+    if (appointmentToReplace) {
+      setAppointmentToReplace(appointmentToReplace);
+      // Pre-select the doctor and mode if replacing
+      if (appointmentToReplace.doctor?._id) {
+        // We'll set the doctor after fetching doctors list
+      }
+      if (appointmentToReplace.mode) {
+        setSelectedMode(appointmentToReplace.mode);
+      }
+    } else {
+      setAppointmentToReplace(null);
+      setSelectedMode("online");
+    }
     fetchAvailableDoctorsAndSlots(spec._id);
   };
 
@@ -203,6 +219,17 @@ const MultiSpecializationBooking = () => {
       if (response?.success || response?.data?.success) {
         const doctors = response?.data?.doctors || response?.doctors || [];
         setAvailableDoctors(doctors);
+        
+        // If replacing appointment, auto-select the same doctor
+        if (appointmentToReplace?.doctor?._id) {
+          const doctorToSelect = doctors.find(d => d._id === appointmentToReplace.doctor._id);
+          if (doctorToSelect) {
+            // Auto-select doctor and fetch slots
+            setTimeout(() => {
+              handleDoctorSelect(doctorToSelect);
+            }, 100);
+          }
+        }
       } else {
         message.error("Không thể tải danh sách bác sĩ");
       }
@@ -225,24 +252,101 @@ const MultiSpecializationBooking = () => {
         `/api/patients/doctors/${doctor._id}/time-slots?date=${visitDate}`
       );
 
-      console.log("Time slots response:", response);
-
       if (response?.success || response?.data?.success) {
         const slots = response?.data?.timeSlots || response?.timeSlots || [];
-        // Update doctor object with slots (include original slot data for saving)
+        
+        // IMPORTANT: Use ALL slots from API (including booked and blocked ones)
+        // Do NOT filter out any slots - we want to show everything
+        let allSlots = [...slots]; // Copy all slots from API response
+        
+        // If replacing appointment, ensure the current slot is visible and selectable
+        if (appointmentToReplace && appointmentToReplace.slotId) {
+          // Check if the current slot is already in the list
+          const currentSlotExists = allSlots.some(s => 
+            s._id?.toString() === appointmentToReplace.slotId?.toString() ||
+            (appointmentToReplace.scheduledStart && 
+             s.startAt && 
+             new Date(s.startAt).getTime() === new Date(appointmentToReplace.scheduledStart).getTime())
+          );
+          
+          // If not found, add it back so user can see the current slot
+          if (!currentSlotExists && appointmentToReplace.scheduledStart) {
+            const currentSlot = {
+              _id: appointmentToReplace.slotId,
+              startAt: appointmentToReplace.scheduledStart,
+              endAt: appointmentToReplace.scheduledEnd,
+              startTime: dayjs(appointmentToReplace.scheduledStart).format("HH:mm"),
+              endTime: dayjs(appointmentToReplace.scheduledEnd).format("HH:mm"),
+              timeRange: `${dayjs(appointmentToReplace.scheduledStart).format("HH:mm")} - ${dayjs(appointmentToReplace.scheduledEnd).format("HH:mm")}`,
+              available: true, // Mark as available since it's being replaced
+              isCurrentSlot: true, // Flag to identify this is the current slot
+              isBlocked: false,
+            };
+            allSlots.push(currentSlot);
+          } else if (currentSlotExists) {
+            // If it exists, mark it as current slot and make it available for re-selection
+            allSlots = allSlots.map(s => 
+              (s._id?.toString() === appointmentToReplace.slotId?.toString() ||
+               (appointmentToReplace.scheduledStart && 
+                s.startAt && 
+                new Date(s.startAt).getTime() === new Date(appointmentToReplace.scheduledStart).getTime()))
+                ? { ...s, isCurrentSlot: true, available: true }
+                : s
+            );
+          }
+        }
+        
+        // Sort all slots by start time to ensure consistent display
+        allSlots.sort((a, b) => {
+          const timeA = new Date(a.startAt || a.startTime).getTime();
+          const timeB = new Date(b.startAt || b.startTime).getTime();
+          return timeA - timeB;
+        });
+        
+        
+        // Prepare the processed slots with all properties preserved
+        const processedSlots = allSlots.map(slot => {
+          // Spread all original properties first, then ensure critical ones are set
+          return {
+            ...slot, // Preserve ALL original properties (timeRange, startTime, endTime, etc.)
+            // Ensure these critical properties are always set (override if needed)
+            available: slot.available !== undefined ? slot.available : true,
+            isBlocked: slot.isBlocked !== undefined ? slot.isBlocked : false,
+            appointmentStatus: slot.appointmentStatus || null,
+            status: slot.status || 'available',
+            leaveReason: slot.leaveReason || null,
+            // Ensure timeRange is set if missing
+            timeRange: slot.timeRange || 
+              (slot.startAt && slot.endAt 
+                ? `${dayjs(slot.startAt).format("HH:mm")} - ${dayjs(slot.endAt).format("HH:mm")}`
+                : slot.startTime && slot.endTime 
+                  ? `${slot.startTime} - ${slot.endTime}`
+                  : ''),
+            // Ensure startTime and endTime are set if missing
+            startTime: slot.startTime || (slot.startAt ? dayjs(slot.startAt).format("HH:mm") : ''),
+            endTime: slot.endTime || (slot.endAt ? dayjs(slot.endAt).format("HH:mm") : ''),
+          };
+        });
+        
+        // Update doctor object with slots (include ALL slots including booked/blocked ones)
+        // Preserve ALL properties from original slot to ensure nothing is lost
         setAvailableDoctors((prev) =>
           prev.map((d) =>
             d._id === doctor._id ? { 
               ...d, 
-              availableSlots: slots.map(slot => ({
-                ...slot,
-                _id: slot._id,
-                startAt: slot.startAt || slot.startAt,
-                endAt: slot.endAt || slot.endAt,
-              }))
+              availableSlots: processedSlots
             } : d
           )
         );
+        
+        // IMPORTANT: Also update selectedDoctor with the slots to ensure it's in sync
+        // This ensures the UI shows slots immediately, even on first selection
+        setSelectedDoctor(prev => {
+          if (prev && prev._id === doctor._id) {
+            return { ...prev, availableSlots: processedSlots };
+          }
+          return { ...doctor, availableSlots: processedSlots };
+        });
       }
     } catch (error) {
       console.error("Error fetching time slots:", error);
@@ -259,13 +363,19 @@ const MultiSpecializationBooking = () => {
       return;
     }
 
-    // Check for conflicts with existing local appointments
-    const hasConflict = appointments.some((apt) => {
+    // Check for conflicts with existing local appointments (exclude the one being replaced)
+    const conflictingAppointment = appointments.find((apt) => {
+      // Skip the appointment being replaced
+      if (appointmentToReplace && apt._id === appointmentToReplace._id) {
+        return false;
+      }
+      
       const aptStart = new Date(apt.scheduledStart);
       const aptEnd = new Date(apt.scheduledEnd);
       const newStart = new Date(selectedSlot.startAt);
       const newEnd = new Date(selectedSlot.endAt);
 
+      // Check if time slots overlap
       return (
         (newStart >= aptStart && newStart < aptEnd) ||
         (newEnd > aptStart && newEnd <= aptEnd) ||
@@ -273,9 +383,49 @@ const MultiSpecializationBooking = () => {
       );
     });
 
+    // Check if slot is available (not booked by others in DB or blocked)
+    if (!selectedSlot.available || selectedSlot.isBlocked) {
+      if (selectedSlot.isBlocked) {
+        message.error({
+          content: `Không thể đặt lịch! Slot này đã bị chặn bởi bác sĩ${selectedSlot.leaveReason ? `: ${selectedSlot.leaveReason}` : ""}. Vui lòng chọn slot khác.`,
+          duration: 5,
+        });
+      } else {
+        message.error({
+          content: `Không thể đặt lịch! Slot này đã được đặt bởi bệnh nhân khác. Vui lòng chọn slot khác.`,
+          duration: 5,
+        });
+      }
+      return; // Don't add the appointment
+    }
+
+    // Check if slot conflicts with existing local appointments
+    if (conflictingAppointment) {
+      const conflictStart = dayjs(conflictingAppointment.scheduledStart).format("HH:mm");
+      const conflictEnd = dayjs(conflictingAppointment.scheduledEnd).format("HH:mm");
+      const newStart = dayjs(selectedSlot.startAt || selectedSlot.startTime).format("HH:mm");
+      const newEnd = dayjs(selectedSlot.endAt || selectedSlot.endTime).format("HH:mm");
+      
+      message.error({
+        content: `Không thể đặt lịch! Slot ${newStart} - ${newEnd} trùng với lịch hẹn đã chọn (${conflictStart} - ${conflictEnd}) với ${conflictingAppointment.doctor?.fullName || "bác sĩ"}. Vui lòng chọn slot khác.`,
+        duration: 5,
+      });
+      return; // Don't add the appointment
+    }
+
+    // Ensure slot has proper date format
+    const slotStartAt = selectedSlot.startAt || 
+      (selectedSlot.startTime && visitDate 
+        ? new Date(`${visitDate}T${selectedSlot.startTime}:00`).toISOString()
+        : null);
+    const slotEndAt = selectedSlot.endAt || 
+      (selectedSlot.endTime && visitDate 
+        ? new Date(`${visitDate}T${selectedSlot.endTime}:00`).toISOString()
+        : null);
+
     // Create local appointment object
     const newAppointment = {
-      _id: `temp-${Date.now()}`, // Temporary ID
+      _id: appointmentToReplace ? appointmentToReplace._id : `temp-${Date.now()}`, // Keep same ID if replacing
       doctor: {
         _id: selectedDoctor._id,
         fullName: selectedDoctor.fullName,
@@ -284,30 +434,40 @@ const MultiSpecializationBooking = () => {
         ratingAvg: selectedDoctor.ratingAvg,
         ratingCount: selectedDoctor.ratingCount,
       },
-      scheduledStart: selectedSlot.startAt,
-      scheduledEnd: selectedSlot.endAt,
+      scheduledStart: slotStartAt,
+      scheduledEnd: slotEndAt,
       status: "draft", // Not saved yet
       mode: selectedMode,
-      reason: `Khám ${currentSpecialization.name}`,
+      reason: appointmentToReplace ? appointmentToReplace.reason : `Khám ${currentSpecialization.name}`,
       // Store original data for saving later
       _tempData: {
         doctorId: selectedDoctor._id,
         slotId: selectedSlot._id,
         mode: selectedMode,
         clinicId: selectedMode === "offline" ? undefined : undefined, // Will be required for offline
-        reason: `Khám ${currentSpecialization.name}`,
+        reason: appointmentToReplace ? appointmentToReplace.reason : `Khám ${currentSpecialization.name}`,
       },
       // Store slot reference for display
       slotId: selectedSlot._id,
     };
 
-    // Add to local appointments
-    setAppointments([...appointments, newAppointment]);
-    message.success(hasConflict ? "Đã thêm lịch hẹn (có xung đột thời gian)" : "Đã thêm lịch hẹn");
+    // If replacing an appointment, replace it in the list
+    if (appointmentToReplace) {
+      setAppointments(appointments.map(apt => 
+        apt._id === appointmentToReplace._id ? newAppointment : apt
+      ));
+      message.success("Đã đổi slot thành công");
+      setAppointmentToReplace(null);
+    } else {
+      // Add to local appointments
+      setAppointments([...appointments, newAppointment]);
+      message.success("Đã thêm lịch hẹn thành công");
+    }
     
     setShowDoctorModal(false);
     setSelectedDoctor(null);
     setSelectedSlot(null);
+    setSelectedMode("online");
   };
 
   // Step 4: Hoàn tất và tạo visit với appointments (status pending_doctor)
@@ -755,17 +915,42 @@ const MultiSpecializationBooking = () => {
                       style={{ marginBottom: 8 }}
                       actions={
                         visitStatus === "draft" ? [
-                          <Button
-                            size="small"
-                            danger
-                            onClick={() => {
-                              // Remove from local appointments
-                              setAppointments(appointments.filter(a => a._id !== apt._id));
-                              message.success("Đã xóa lịch hẹn");
-                            }}
-                          >
-                            Xóa
-                          </Button>,
+                          <Space key="actions" size="small">
+                            <Button
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={() => {
+                                // Find the specialization for this appointment
+                                const aptSpecIds = apt.doctor?.specializationIds || [];
+                                const specForApt = selectedSpecializations.find((s) => {
+                                  return aptSpecIds.some((sid) => {
+                                    const specId = typeof sid === 'object' ? (sid._id || sid) : sid;
+                                    const currentSpecId = s._id || s;
+                                    return specId?.toString() === currentSpecId?.toString();
+                                  });
+                                });
+                                if (specForApt) {
+                                  handleOpenDoctorModal(specForApt, apt);
+                                } else {
+                                  message.warning("Không tìm thấy chuyên khoa cho lịch hẹn này");
+                                }
+                              }}
+                            >
+                              Đổi slot
+                            </Button>,
+                            <Button
+                              size="small"
+                              danger
+                              icon={<DeleteOutlined />}
+                              onClick={() => {
+                                // Remove from local appointments
+                                setAppointments(appointments.filter(a => a._id !== apt._id));
+                                message.success("Đã xóa lịch hẹn");
+                              }}
+                            >
+                              Xóa
+                            </Button>,
+                          </Space>,
                         ] : [
                           <Button
                             size="small"
@@ -867,12 +1052,18 @@ const MultiSpecializationBooking = () => {
 
         {/* Modal for selecting doctor and time slot */}
         <Modal
-          title={`Chọn bác sĩ và khung giờ - ${currentSpecialization?.name}`}
+          title={
+            appointmentToReplace 
+              ? `Đổi slot - ${currentSpecialization?.name}` 
+              : `Chọn bác sĩ và khung giờ - ${currentSpecialization?.name}`
+          }
           open={showDoctorModal}
           onCancel={() => {
             setShowDoctorModal(false);
             setSelectedDoctor(null);
             setSelectedSlot(null);
+            setAppointmentToReplace(null);
+            setSelectedMode("online");
           }}
           footer={null}
           width={800}
@@ -969,23 +1160,122 @@ const MultiSpecializationBooking = () => {
                   {loadingSlots ? (
                     <Spin />
                   ) : selectedDoctor.availableSlots?.length > 0 ? (
-                    <Row gutter={[8, 8]}>
-                      {selectedDoctor.availableSlots.map((slot) => (
-                        <Col xs={12} sm={8} md={6} key={slot._id}>
-                          <Button
-                            type={
-                              selectedSlot?._id === slot._id
-                                ? "primary"
-                                : "default"
+                    <>
+                      <Row gutter={[8, 8]}>
+                        {selectedDoctor.availableSlots.map((slot) => {
+                          // Check if this slot conflicts with existing appointments
+                          const slotStart = new Date(slot.startAt || slot.startTime);
+                          const slotEnd = new Date(slot.endAt || slot.endTime);
+                          
+                          // Check if this is the current slot being replaced
+                          const isCurrentSlot = appointmentToReplace && (
+                            (slot._id && appointmentToReplace.slotId && slot._id.toString() === appointmentToReplace.slotId.toString()) ||
+                            (appointmentToReplace.scheduledStart && 
+                             slot.startAt && 
+                             new Date(slot.startAt).getTime() === new Date(appointmentToReplace.scheduledStart).getTime())
+                          );
+                          
+                          // Check if slot is already used in local appointments
+                          const existingAppointment = appointments.find((apt) => {
+                            // Skip the appointment being replaced
+                            if (appointmentToReplace && apt._id === appointmentToReplace._id) {
+                              return false;
                             }
-                            block
-                            onClick={() => setSelectedSlot(slot)}
-                          >
-                            {slot.timeRange || `${slot.startTime} - ${slot.endTime}`}
-                          </Button>
-                        </Col>
-                      ))}
-                    </Row>
+                            
+                            const aptStart = new Date(apt.scheduledStart);
+                            const aptEnd = new Date(apt.scheduledEnd);
+                            
+                            // Check if slot time overlaps with appointment time
+                            return (
+                              (slotStart >= aptStart && slotStart < aptEnd) ||
+                              (slotEnd > aptStart && slotEnd <= aptEnd) ||
+                              (slotStart <= aptStart && slotEnd >= aptEnd)
+                            );
+                          });
+
+                          // Slot is disabled if:
+                          // 1. It's blocked by doctor
+                          // 2. It's already used in local appointments (and not the current slot being replaced)
+                          // 3. It's not available from API (booked by other patients in DB) - ALWAYS disable these
+                          const isDisabled = slot.isBlocked || 
+                            (existingAppointment && !isCurrentSlot) ||
+                            (slot.available === false && !isCurrentSlot); // Disable if booked by others in DB (explicitly check for false)
+
+                          const slotTimeDisplay = slot.timeRange || 
+                            (slot.startAt && slot.endAt 
+                              ? `${dayjs(slot.startAt).format("HH:mm")} - ${dayjs(slot.endAt).format("HH:mm")}`
+                              : `${slot.startTime} - ${slot.endTime}`);
+
+                          return (
+                            <Col xs={12} sm={8} md={6} key={slot._id || `slot-${slot.startTime}`}>
+                              <Button
+                                type={
+                                  selectedSlot?._id === slot._id ||
+                                  (selectedSlot && slot.startAt && selectedSlot.startAt && 
+                                   new Date(selectedSlot.startAt).getTime() === new Date(slot.startAt).getTime())
+                                    ? "primary"
+                                    : "default"
+                                }
+                                danger={isDisabled && !isCurrentSlot}
+                                disabled={isDisabled}
+                                block
+                                onClick={() => {
+                                  if (!isDisabled) {
+                                    setSelectedSlot(slot);
+                                  } else {
+                                    if (slot.isBlocked) {
+                                      message.warning(`Slot này đã bị chặn bởi bác sĩ${slot.leaveReason ? `: ${slot.leaveReason}` : ""}. Vui lòng chọn slot khác.`);
+                                    } else if (existingAppointment) {
+                                      message.warning(`Slot này đã được chọn cho lịch hẹn với ${existingAppointment.doctor?.fullName || "bác sĩ"}. Vui lòng chọn slot khác.`);
+                                    } else if (!slot.available) {
+                                      message.warning("Slot này đã được đặt bởi bệnh nhân khác. Vui lòng chọn slot khác.");
+                                    } else {
+                                      message.warning("Slot này không khả dụng. Vui lòng chọn slot khác.");
+                                    }
+                                  }
+                                }}
+                                title={
+                                  isCurrentSlot
+                                    ? "Slot hiện tại (đang được đổi)"
+                                    : slot.isBlocked
+                                    ? `Slot bị chặn: ${slot.leaveReason || "Bác sĩ không có mặt"}`
+                                    : existingAppointment
+                                    ? `Slot này đã được chọn cho lịch hẹn với ${existingAppointment.doctor?.fullName || "bác sĩ"}`
+                                    : !slot.available
+                                    ? "Slot này đã được đặt bởi người khác"
+                                    : ""
+                                }
+                              >
+                                {slotTimeDisplay}
+                                {isCurrentSlot && " (Hiện tại)"}
+                                {existingAppointment && !isCurrentSlot && " (Đã chọn)"}
+                                {slot.isBlocked && " (Đã chặn)"}
+                                {!slot.available && !existingAppointment && !slot.isBlocked && " (Đã đặt)"}
+                              </Button>
+                            </Col>
+                          );
+                        })}
+                      </Row>
+                      {appointments.some((apt) => {
+                        const slotStart = new Date(selectedSlot?.startAt || selectedSlot?.startTime);
+                        const slotEnd = new Date(selectedSlot?.endAt || selectedSlot?.endTime);
+                        const aptStart = new Date(apt.scheduledStart);
+                        const aptEnd = new Date(apt.scheduledEnd);
+                        return (
+                          (slotStart >= aptStart && slotStart < aptEnd) ||
+                          (slotEnd > aptStart && slotEnd <= aptEnd) ||
+                          (slotStart <= aptStart && slotEnd >= aptEnd)
+                        );
+                      }) && selectedSlot && (
+                        <Alert
+                          message="Cảnh báo"
+                          description={`Slot ${dayjs(selectedSlot.startAt || selectedSlot.startTime).format("HH:mm")} - ${dayjs(selectedSlot.endAt || selectedSlot.endTime).format("HH:mm")} trùng với một lịch hẹn đã chọn. Vui lòng chọn slot khác.`}
+                          type="warning"
+                          showIcon
+                          style={{ marginTop: 16 }}
+                        />
+                      )}
+                    </>
                   ) : (
                     <Empty description="Không có khung giờ trống" />
                   )}
@@ -998,6 +1288,8 @@ const MultiSpecializationBooking = () => {
                           setShowDoctorModal(false);
                           setSelectedDoctor(null);
                           setSelectedSlot(null);
+                          setAppointmentToReplace(null);
+                          setSelectedMode("online");
                         }}
                       >
                         Hủy
@@ -1008,7 +1300,7 @@ const MultiSpecializationBooking = () => {
                         disabled={!selectedSlot}
                         loading={loading}
                       >
-                        Xác nhận
+                        {appointmentToReplace ? "Đổi slot" : "Xác nhận"}
                       </Button>
                     </Space>
                   </div>
