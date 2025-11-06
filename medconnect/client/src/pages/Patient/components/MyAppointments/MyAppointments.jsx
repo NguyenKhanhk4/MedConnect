@@ -57,17 +57,7 @@ export function MyAppointments() {
         setLoading(true);
         // Fetch all appointments to match StatsCards behavior (no limit or large limit)
         const res = await api.get("/api/patients/me/appointments?limit=1000");
-        console.log("📋 Appointments response:", res);
         if (res.success) {
-          // Debug: Log clinic info for each appointment
-          res.data.appointments?.forEach((apt, index) => {
-            console.log(`Appointment ${index + 1}:`, {
-              id: apt._id,
-              clinicId: apt.clinicId,
-              clinicName: apt.clinicId?.name,
-              mode: apt.mode,
-            });
-          });
           setAppointments(res.data.appointments || []);
         } else {
           message.error("Không thể tải lịch hẹn");
@@ -103,7 +93,6 @@ export function MyAppointments() {
       okType: "danger",
       onOk: async () => {
         try {
-          console.log("Attempting to cancel appointment:", appointmentId);
 
           // Gọi API endpoint mới
           const response = await api.put(
@@ -297,24 +286,6 @@ export function MyAppointments() {
   // Phân chia appointments
   const upcomingAppointments = appointments.filter((appointment) =>
     ["pending_doctor", "accepted"].includes(appointment.status)
-  );
-
-  // Debug: Log appointments to see what statuses we have
-  console.log(
-    "All appointments:",
-    appointments.map((a) => ({
-      id: a._id,
-      status: a.status,
-      doctor: a.doctorId?.fullName,
-    }))
-  );
-  console.log(
-    "Upcoming appointments:",
-    upcomingAppointments.map((a) => ({
-      id: a._id,
-      status: a.status,
-      doctor: a.doctorId?.fullName,
-    }))
   );
   const completedAppointments = appointments.filter(
     (appointment) => appointment.status === "done"

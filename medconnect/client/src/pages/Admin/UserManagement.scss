@@ -32,43 +32,8 @@
     align-items: center;
 
     .search-input-group {
-      display: flex;
-      gap: 8px;
       flex: 1;
       max-width: 500px;
-      align-items: center;
-
-      .search-input {
-        flex: 1;
-
-        .ant-input {
-          border-radius: 8px;
-          border: 1px solid #d9d9d9;
-
-          &:focus {
-            border-color: #1890ff;
-            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
-          }
-        }
-      }
-
-      .search-button {
-        border-radius: 8px;
-        height: 32px;
-        padding: 0 16px;
-        font-weight: 500;
-        white-space: nowrap;
-        min-width: 100px;
-
-        &:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
-        }
-
-        &:active {
-          transform: translateY(0);
-        }
-      }
     }
 
     .role-select {

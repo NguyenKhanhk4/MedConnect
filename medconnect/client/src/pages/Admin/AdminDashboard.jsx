@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Row, Col, List, Avatar, Spin, Alert } from "antd";
+import { Card, Row, Col, List, Avatar, Spin, Alert, Button } from "antd";
 import {
   UserOutlined,
   SafetyCertificateOutlined,
@@ -8,6 +8,8 @@ import {
   DollarOutlined,
   CheckCircleOutlined,
   TeamOutlined,
+  ClockCircleOutlined,
+  WalletOutlined,
 } from "@ant-design/icons";
 import {
   getAdminDashboardStats,
@@ -29,6 +31,13 @@ const AdminDashboard = () => {
   });
   const [recentActivities, setRecentActivities] = useState([]);
   const [systemStatus, setSystemStatus] = useState([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [activitiesPagination, setActivitiesPagination] = useState({
+    total: 0,
+    limit: 10,
+    offset: 0,
+    hasMore: false,
+  });
 
   useEffect(() => {
     fetchDashboardData();
@@ -42,9 +51,8 @@ const AdminDashboard = () => {
       const stats = await getAdminDashboardStats();
       setStatsData(stats.data || stats);
 
-      // Fetch recent activities
-      const activities = await getAdminDashboardActivities();
-      setRecentActivities(activities.data || activities);
+      // Fetch recent activities (initial load - show first 10)
+      await fetchActivities(0, 10);
 
       // Fetch system status
       const status = await getAdminSystemStatus();
@@ -54,6 +62,53 @@ const AdminDashboard = () => {
       setError("Không thể tải dữ liệu dashboard");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchActivities = async (offset = 0, limit = 10, append = false) => {
+    try {
+      setActivitiesLoading(true);
+      const response = await getAdminDashboardActivities({ limit, offset });
+      const newActivities = response.data || response;
+      
+      if (append) {
+        // Load more - append to existing
+        setRecentActivities((prev) => [...prev, ...newActivities]);
+      } else {
+        // First load or refresh
+        setRecentActivities(newActivities);
+      }
+      
+      if (response.pagination) {
+        setActivitiesPagination({
+          ...response.pagination,
+          offset: append ? activitiesPagination.offset + newActivities.length : offset + newActivities.length,
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching activities:", err);
+    } finally {
+      setActivitiesLoading(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    const currentOffset = recentActivities.length;
+    fetchActivities(currentOffset, activitiesPagination.limit, true);
+  };
+
+  const getActivityIcon = (type) => {
+    switch (type) {
+      case "user_registration":
+        return <UserOutlined />;
+      case "doctor_verification":
+        return <SafetyCertificateOutlined />;
+      case "appointment_created":
+        return <CalendarOutlined />;
+      case "payment_completed":
+        return <WalletOutlined />;
+      default:
+        return <CheckCircleOutlined />;
     }
   };
 
@@ -80,9 +135,8 @@ const AdminDashboard = () => {
       path: "/admin/verify-doctors",
     },
     {
-      title: "Lịch hẹn tháng này",
+      title: "Tổng số lịch hẹn",
       value: statsData.monthlyAppointments,
-      change: "Tổng số lịch hẹn trong tháng",
       changeValue: "",
       icon: <CalendarOutlined />,
       color: "#45c3d2",
@@ -92,7 +146,6 @@ const AdminDashboard = () => {
     {
       title: "Tổng doanh thu",
       value: `${statsData.revenue.toLocaleString()} VNĐ`,
-      change: "Tổng số doanh thu từ thanh toán thành công",
       changeValue: "",
       icon: <DollarOutlined />,
       color: "#fa8c16",
@@ -172,19 +225,55 @@ const AdminDashboard = () => {
 
       <Row gutter={[24, 24]} className="content-row">
         <Col xs={24} lg={12}>
-          <Card title="Hoạt động gần đây" className="activity-card">
-            <List
-              dataSource={recentActivities}
-              renderItem={(item) => (
-                <List.Item>
-                  <List.Item.Meta
-                    avatar={<Avatar icon={<CheckCircleOutlined />} />}
-                    title={item.title}
-                    description={item.time}
-                  />
-                </List.Item>
-              )}
-            />
+          <Card 
+            title="Hoạt động gần đây" 
+            className="activity-card"
+            extra={
+              activitiesPagination.total > recentActivities.length && (
+                <span style={{ fontSize: "12px", color: "#8c8c8c" }}>
+                  {recentActivities.length} / {activitiesPagination.total}
+                </span>
+              )
+            }
+          >
+            <div className="activities-scroll-container">
+              <List
+                dataSource={recentActivities}
+                loading={activitiesLoading}
+                renderItem={(item) => (
+                  <List.Item>
+                    <List.Item.Meta
+                      avatar={
+                        <Avatar 
+                          icon={getActivityIcon(item.type)} 
+                          style={{
+                            backgroundColor: 
+                              item.type === "user_registration" ? "#1890ff" :
+                              item.type === "doctor_verification" ? "#52c41a" :
+                              item.type === "appointment_created" ? "#45c3d2" :
+                              item.type === "payment_completed" ? "#fa8c16" :
+                              "#8c8c8c"
+                          }}
+                        />
+                      }
+                      title={item.title}
+                      description={item.time}
+                    />
+                  </List.Item>
+                )}
+              />
+            </div>
+            {activitiesPagination.hasMore && (
+              <div style={{ textAlign: "center", marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #f0f0f0" }}>
+                <Button 
+                  type="link" 
+                  onClick={handleLoadMore}
+                  loading={activitiesLoading}
+                >
+                  Xem thêm ({activitiesPagination.total - recentActivities.length} hoạt động)
+                </Button>
+              </div>
+            )}
           </Card>
         </Col>
 

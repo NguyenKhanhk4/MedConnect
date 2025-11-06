@@ -42,18 +42,9 @@ const App = () => {
     gcTime: 1000 * 60 * 5,
   });
 
-  // Only log in development
-  if (import.meta.env.DEV) {
-    console.log(
-      "API base:",
-      apiBaseFromEnv ?? "(env not set, fallback to http://localhost:3000)"
-    );
-    if (data) {
-      console.log("Users:", data);
-    }
-    if (isError) {
-      console.error("Fetch users error:", error);
-    }
+  // Error handling in development
+  if (import.meta.env.DEV && isError) {
+    console.error("Fetch users error:", error);
   }
 
   return <Layout />;

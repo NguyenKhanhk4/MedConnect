@@ -22,7 +22,6 @@ const ConsultationAdviceSchema = new Schema(
     mode: { type: String, enum: ["online"], default: "online" },
 
 
-
     // 📅 Ngày giờ slot khám
     appointmentDate: { type: Date, required: true },
 

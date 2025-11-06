@@ -29,6 +29,7 @@ export function DoctorSearch() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSpecialty, setSelectedSpecialty] = useState("");
+  const [allDoctors, setAllDoctors] = useState([]); // Store all doctors loaded from API
   const [filteredDoctors, setFilteredDoctors] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [favoriteDoctorIds, setFavoriteDoctorIds] = useState(new Set());
@@ -49,7 +50,7 @@ export function DoctorSearch() {
       setLoading(true);
       try {
         await Promise.all([
-          filterDoctors(true), // Initial load
+          fetchDoctorsFromAPI(true), // Initial load
           fetchSpecializations(),
           fetchLocations(),
         ]);
@@ -58,6 +59,29 @@ export function DoctorSearch() {
       }
     };
     initialLoad();
+  }, []);
+
+  // Prevent form submission that might cause page reload
+  useEffect(() => {
+    const handleFormSubmit = (e) => {
+      // Only prevent if the form contains our search input
+      const form = e.target;
+      const searchInput = form?.querySelector?.('.search-input');
+      if (searchInput) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    };
+
+    // Use capture phase to catch form submissions early
+    document.addEventListener('submit', handleFormSubmit, true);
+
+    return () => {
+      // Cleanup
+      document.removeEventListener('submit', handleFormSubmit, true);
+    };
   }, []);
 
   // Fetch available locations from database
@@ -131,20 +155,16 @@ export function DoctorSearch() {
     }
   }, [user, filteredDoctors]);
 
-  // Search with debounce when searchTerm changes
+  // Filter doctors locally when searchTerm or allDoctors changes (like admin)
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      filterDoctors();
-    }, 300); // Reduce debounce to 300ms for better responsiveness
+    if (allDoctors.length > 0) {
+      applyLocalFilters();
+    }
+  }, [searchTerm, allDoctors]);
 
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, [searchTerm]);
-
-  // Separate useEffect for other filters
+  // Reload doctors from API when other filters change
   useEffect(() => {
-    filterDoctors();
+    fetchDoctorsFromAPI();
   }, [
     selectedSpecialty,
     selectedExperience,
@@ -180,7 +200,6 @@ export function DoctorSearch() {
       }
     } catch (error) {
       // Silently fail if user is not logged in or endpoint doesn't exist
-      console.log("Could not fetch favorite doctors:", error);
     }
   };
 
@@ -268,7 +287,38 @@ export function DoctorSearch() {
     }
   };
 
-  const filterDoctors = async (isInitialLoad = false) => {
+  // Filter doctors locally (like admin) - based on search term
+  const filterDoctorsBySearch = (doctors, searchTerm) => {
+    if (!searchTerm.trim()) return doctors;
+    
+    const term = searchTerm.toLowerCase().trim();
+    return doctors.filter(doctor => {
+      const name = (doctor.userId?.fullName || doctor.fullName || '').toLowerCase();
+      const specialty = (doctor.specializationIds?.[0]?.name || '').toLowerCase();
+      const bio = (doctor.bio || '').toLowerCase();
+      const email = (doctor.userId?.email || '').toLowerCase();
+      const phone = (doctor.userId?.phone || '').toLowerCase();
+      
+      return name.includes(term) || 
+             specialty.includes(term) || 
+             bio.includes(term) ||
+             email.includes(term) ||
+             phone.includes(term);
+    });
+  };
+
+  // Apply filters locally (like admin)
+  const applyLocalFilters = () => {
+    let doctors = [...allDoctors];
+
+    // Filter by search term
+    doctors = filterDoctorsBySearch(doctors, searchTerm);
+
+    setFilteredDoctors(doctors);
+  };
+
+  // Fetch doctors from API (only when filters change, not search term)
+  const fetchDoctorsFromAPI = async (isInitialLoad = false) => {
     try {
       if (!isInitialLoad) {
         setLoading(true);
@@ -284,32 +334,15 @@ export function DoctorSearch() {
       if (selectedLocation) params.append("location", selectedLocation);
       if (selectedAvailability)
         params.append("availability", selectedAvailability);
-      params.append("limit", "50"); // Increase limit to get more data for filtering
+      // Load all doctors (increase limit significantly or remove limit)
+      params.append("limit", "1000"); // Load many doctors for local filtering
 
       const response = await api.get(`/api/doctors?${params.toString()}`);
 
       if (response.success) {
-        let doctors = response.data.doctors || [];
-
-        // Filter by search term locally (like SearchPage)
-        if (searchTerm && searchTerm.trim()) {
-          const searchQuery = searchTerm.trim().toLowerCase();
-          doctors = doctors.filter((doctor) => {
-            const doctorName =
-              (doctor.userId?.fullName || doctor.fullName)?.toLowerCase() || "";
-            const specialty =
-              doctor.specializationIds?.[0]?.name?.toLowerCase() || "";
-            const bio = doctor.bio?.toLowerCase() || "";
-
-            return (
-              doctorName.includes(searchQuery) ||
-              specialty.includes(searchQuery) ||
-              bio.includes(searchQuery)
-            );
-          });
-        }
-
-        setFilteredDoctors(doctors);
+        const doctors = response.data.doctors || [];
+        setAllDoctors(doctors); // Store all doctors
+        // Apply search filter will be triggered by useEffect
       } else {
         message.error("Không thể tải danh sách bác sĩ");
       }
@@ -358,22 +391,24 @@ export function DoctorSearch() {
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
+    // applyLocalFilters() will be called automatically by useEffect
+    // No need to prevent default - onChange doesn't cause page reload
   };
 
   const handleSearch = (value) => {
     setSearchTerm(value);
-    // filterDoctors() will be called by useEffect
+    // applyLocalFilters() will be called by useEffect
   };
 
   const handleKeyPress = (e) => {
     if (e.key === "Enter") {
-      // Clear any pending timeout and search immediately
-      filterDoctors();
+      e.preventDefault(); // Prevent form submission and page reload
+      // Search is already applied via useEffect, no need to call anything
     }
   };
 
-  const applyFilters = () => {
-    filterDoctors();
+  const applyFiltersButton = () => {
+    fetchDoctorsFromAPI(); // Reload from API with new filters
     setShowFilters(false);
   };
 
@@ -429,8 +464,26 @@ export function DoctorSearch() {
               placeholder="Tìm kiếm bác sĩ, chuyên khoa..."
               value={searchTerm}
               onChange={handleSearchChange}
-              onKeyPress={handleKeyPress}
+              onKeyDown={(e) => {
+                // Prevent form submission and page reload on Enter
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // Search is already applied via useEffect
+                  return false; // Additional prevention
+                }
+              }}
+              onKeyPress={(e) => {
+                // Additional prevention for Enter key
+                if (e.key === "Enter" || e.which === 13) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  return false; // Additional prevention
+                }
+              }}
               className="search-input"
+              autoComplete="off"
+              autoFocus={false}
             />
           </div>
 
@@ -563,7 +616,7 @@ export function DoctorSearch() {
               <button className="clear-filters-btn" onClick={clearAllFilters}>
                 Xóa bộ lọc
               </button>
-              <button className="apply-filters-btn" onClick={applyFilters}>
+              <button className="apply-filters-btn" onClick={applyFiltersButton}>
                 Áp dụng
               </button>
             </div>

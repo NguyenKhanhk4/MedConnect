@@ -62,11 +62,11 @@ const getImageUrl = (url) => {
 
 const UserManagement = () => {
   const [searchText, setSearchText] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [users, setUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState([]); // Store all users loaded from API
+  const [users, setUsers] = useState([]); // Filtered users
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -78,36 +78,64 @@ const UserManagement = () => {
   const [specializations, setSpecializations] = useState([]);
   const [clinics, setClinics] = useState([]);
 
-  // Debounce search text
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchQuery(searchText);
-    }, 500); // 500ms delay
-
-    return () => clearTimeout(timer);
-  }, [searchText]);
-
+  // Load users from API (only when roleFilter changes, not search term)
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
 
       const params = {};
-      if (searchQuery) params.search = searchQuery;
       if (roleFilter !== "all") params.role = roleFilter;
 
       const data = await getAdminUsers(params);
-      setUsers(data.data || data);
+      
+      // Handle different response formats
+      let usersData = [];
+      if (data && data.success && data.data) {
+        usersData = Array.isArray(data.data) ? data.data : [];
+      } else if (Array.isArray(data)) {
+        usersData = data;
+      } else if (data && data.data && Array.isArray(data.data)) {
+        usersData = data.data;
+      }
+      
+      setAllUsers(usersData); // Store all users
+      // Filter will be applied by useEffect
     } catch (err) {
       console.error("Error fetching users:", err);
-      setError("Không thể tải danh sách người dùng");
+      setError("Không thể tải danh sách người dùng: " + (err.message || "Lỗi không xác định"));
+      setAllUsers([]);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, roleFilter]);
+  }, [roleFilter]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  // Filter users locally (like VerifyDoctors) - based on search term
+  const filterUsers = (users, searchTerm) => {
+    if (!searchTerm.trim()) return users;
+    
+    const term = searchTerm.toLowerCase().trim();
+    return users.filter(user => {
+      const name = (user.fullName || user.name || '').toLowerCase();
+      const email = (user.email || '').toLowerCase();
+      const phone = (user.phone || '').toLowerCase();
+      
+      return name.includes(term) || 
+             email.includes(term) || 
+             phone.includes(term);
+    });
+  };
+
+  // Apply local filter when searchText or allUsers changes
+  useEffect(() => {
+    const filtered = filterUsers(allUsers, searchText);
+    setUsers(filtered);
+  }, [searchText, allUsers]);
 
   // Load specializations and clinics
   useEffect(() => {
@@ -152,11 +180,13 @@ const UserManagement = () => {
 
   const handleSearchChange = useCallback((e) => {
     setSearchText(e.target.value);
+    // Filter will be applied by useEffect
   }, []);
 
-  const handleManualSearch = useCallback(() => {
-    setSearchQuery(searchText);
-  }, [searchText]);
+  const handleManualSearch = useCallback((value) => {
+    setSearchText(value);
+    // Filter will be applied by useEffect
+  }, []);
 
   const handleRoleChange = useCallback((value) => {
     setRoleFilter(value);
@@ -412,29 +442,23 @@ const UserManagement = () => {
 
       <div className="search-filters">
         <div className="search-input-group">
-          <Input
-            key="search-input"
-            placeholder="Tìm theo tên hoặc email..."
-            prefix={<SearchOutlined />}
+          <Input.Search
+            placeholder="Tìm kiếm người dùng..."
+            allowClear
+            enterButton={<SearchOutlined />}
+            size="large"
             value={searchText}
             onChange={handleSearchChange}
-            className="search-input"
-            onPressEnter={handleManualSearch}
+            onSearch={handleManualSearch}
+            style={{ width: '100%', maxWidth: '500px' }}
           />
-          <Button
-            type="primary"
-            onClick={handleManualSearch}
-            className="search-button"
-            icon={<SearchOutlined />}
-          >
-            Tìm kiếm
-          </Button>
         </div>
         <Select
           value={roleFilter}
           onChange={handleRoleChange}
           options={roleOptions}
           className="role-select"
+          size="large"
         />
       </div>
 
@@ -566,16 +590,21 @@ const UserManagement = () => {
                   <Descriptions.Item label="Dân tộc">
                     {userDetails.roleSpecificData.ethnicity || "Chưa cập nhật"}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Quốc tịch">
-                    {userDetails.roleSpecificData.nationality ||
-                      "Chưa cập nhật"}
-                  </Descriptions.Item>
                   <Descriptions.Item label="CCCD/CMND">
                     {userDetails.roleSpecificData.citizenId || "Chưa cập nhật"}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Phòng khám chính">
-                    {userDetails.roleSpecificData.primaryClinic ||
-                      "Chưa cập nhật"}
+                  <Descriptions.Item label="Dị ứng" span={2}>
+                    {userDetails.roleSpecificData.allergyNotes ||
+                    userDetails.roleSpecificData.allergies
+                      ? userDetails.roleSpecificData.allergyNotes ||
+                        userDetails.roleSpecificData.allergies
+                      : "Không có"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Tiền sử bệnh lý" span={2}>
+                    {userDetails.roleSpecificData.medicalHistory &&
+                    userDetails.roleSpecificData.medicalHistory.length > 0
+                      ? userDetails.roleSpecificData.medicalHistory.join(", ")
+                      : "Không có"}
                   </Descriptions.Item>
                 </Descriptions>
               </>

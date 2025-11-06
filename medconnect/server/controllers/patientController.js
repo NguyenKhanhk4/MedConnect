@@ -8,7 +8,7 @@ import ConsultationSummary from "../models/consultationSummary.model.js";
 import ConsultationAdvice from "../models/consultationAdvice.model.js";
 import Notification from "../models/notification.model.js";
 import PatientFavorite from "../models/patientFavorite.model.js";
-import DoctorRate from "../models/doctor_rates.model.js";
+import EducationLevelPrice from "../models/educationLevelPrice.model.js";
 import {
   createBookingNotification,
   createAppointmentNotification,
@@ -311,6 +311,9 @@ export async function getCurrentPatientProfile(req, res) {
             bloodType: patient.bloodType,
             allergyNotes: patient.allergyNotes,
             medicalHistory: patient.medicalHistory,
+            healthInsurance: patient.healthInsurance,
+            healthInsuranceIssueDate: patient.healthInsuranceIssueDate,
+            healthInsuranceExpiryDate: patient.healthInsuranceExpiryDate,
             // Ghi chú
             notes: patient.notes,
             // Legacy fields
@@ -498,6 +501,16 @@ export async function updatePatientProfile(req, res) {
       bloodType: updateData.bloodType,
       allergyNotes: updateData.allergyNotes,
       medicalHistory: updateData.medicalHistory,
+      // Bảo hiểm y tế (không bắt buộc)
+      ...(updateData.healthInsurance !== undefined && {
+        healthInsurance: updateData.healthInsurance || null,
+      }),
+      ...(updateData.healthInsuranceIssueDate !== undefined && {
+        healthInsuranceIssueDate: updateData.healthInsuranceIssueDate || null,
+      }),
+      ...(updateData.healthInsuranceExpiryDate !== undefined && {
+        healthInsuranceExpiryDate: updateData.healthInsuranceExpiryDate || null,
+      }),
       // Ghi chú
       notes: updateData.notes,
     };
@@ -674,22 +687,53 @@ export async function getDoctorPricing(req, res) {
       return fail(res, 400, ERROR_CODES.INVALID_INPUT, "Doctor ID is required");
     }
 
-    // Verify doctor exists
-    const doctor = await Doctor.findById(doctorId);
+    // Verify doctor exists and get education level
+    const doctor = await Doctor.findById(doctorId).lean();
     if (!doctor) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Doctor not found");
     }
 
-    // Get pricing for this doctor
-    const pricing = await DoctorRate.find({
-      doctorId: doctor._id,
-      isActive: true,
-    })
-      .select("mode weekdayPrice weekendPrice clinicId")
-      .populate("clinicId", "name")
-      .lean();
+    // Get pricing based on doctor's education level
+    const educationLevel = doctor.educationLevel;
+    if (!educationLevel) {
+      return ok(res, {
+        doctorId: doctor._id,
+        pricing: null,
+      });
+    }
 
-    // If no pricing found, return null (frontend can use default pricing)
+    // Get pricing for both online and offline modes
+    const onlinePrice = await EducationLevelPrice.findOne({
+      educationLevel,
+      mode: "online",
+      isActive: true,
+    }).lean();
+
+    const offlinePrice = await EducationLevelPrice.findOne({
+      educationLevel,
+      mode: "offline",
+      isActive: true,
+    }).lean();
+
+    // Format pricing similar to DoctorRate format
+    const pricing = [];
+    if (onlinePrice) {
+      pricing.push({
+        mode: "online",
+        weekdayPrice: onlinePrice.weekdayPrice,
+        weekendPrice: onlinePrice.weekendPrice,
+        clinicId: null,
+      });
+    }
+    if (offlinePrice) {
+      pricing.push({
+        mode: "offline",
+        weekdayPrice: offlinePrice.weekdayPrice,
+        weekendPrice: offlinePrice.weekendPrice,
+        clinicId: doctor.clinicDefaultId || null,
+      });
+    }
+
     return ok(res, {
       doctorId: doctor._id,
       pricing: pricing.length > 0 ? pricing : null,
@@ -978,10 +1022,7 @@ export async function getPatientAppointments(req, res) {
       },
     ];
 
-    // Debug: Log query and count
-    console.log("Patient appointments query:", query);
     const totalCount = await Appointment.countDocuments(query);
-    console.log("Total appointments for patient:", totalCount);
 
     const appointments = await Appointment.find(query)
       .populate({
@@ -1007,25 +1048,19 @@ export async function getPatientAppointments(req, res) {
       .limit(parseInt(limit))
       .lean();
 
-    // Debug: Log returned appointments
-    console.log("Returned appointments count:", appointments.length);
-    console.log(
-      "Appointments details:",
-      appointments.map((apt) => ({
-        id: apt._id,
-        status: apt.status,
-        scheduledStart: apt.scheduledStart,
-        doctor: apt.doctorId?.fullName,
-      }))
-    );
-
     // Ensure new fields have default values for backward compatibility
     // Also ensure patientId is properly populated
     const appointmentsWithDefaults = appointments.map((apt) => {
       // Ensure patientId is properly populated
       let patientId = apt.patientId;
-      if (!patientId || (typeof patientId === 'object' && !patientId.fullName)) {
-        console.warn(`⚠️ Appointment ${apt._id} has invalid patientId:`, patientId);
+      if (
+        !patientId ||
+        (typeof patientId === "object" && !patientId.fullName)
+      ) {
+        console.warn(
+          `⚠️ Appointment ${apt._id} has invalid patientId:`,
+          patientId
+        );
         patientId = {
           _id: apt.patientId?._id || apt.patientId || null,
           fullName: apt.patientId?.fullName || "Không có thông tin",
@@ -1035,14 +1070,20 @@ export async function getPatientAppointments(req, res) {
           relationshipToOwner: apt.patientId?.relationshipToOwner || null,
         };
       }
-      
+
       return {
         ...apt,
         patientId, // Use properly populated patientId
         services: apt.services || [],
-        totalPay: apt.totalPay !== undefined && apt.totalPay !== null ? apt.totalPay : 0,
-        amountPaid: apt.amountPaid !== undefined && apt.amountPaid !== null ? apt.amountPaid : 0,
-        paymentStatus: apt.paymentStatus || 'unpaid',
+        totalPay:
+          apt.totalPay !== undefined && apt.totalPay !== null
+            ? apt.totalPay
+            : 0,
+        amountPaid:
+          apt.amountPaid !== undefined && apt.amountPaid !== null
+            ? apt.amountPaid
+            : 0,
+        paymentStatus: apt.paymentStatus || "unpaid",
       };
     });
 
@@ -1265,8 +1306,11 @@ export async function getAppointmentDetails(req, res) {
 
     // Ensure patientId is properly populated
     let patientId = appointment.patientId;
-    if (!patientId || (typeof patientId === 'object' && !patientId.fullName)) {
-      console.warn(`⚠️ Appointment ${appointment._id} has invalid patientId:`, patientId);
+    if (!patientId || (typeof patientId === "object" && !patientId.fullName)) {
+      console.warn(
+        `⚠️ Appointment ${appointment._id} has invalid patientId:`,
+        patientId
+      );
       patientId = {
         _id: appointment.patientId?._id || appointment.patientId || null,
         fullName: appointment.patientId?.fullName || "Không có thông tin",
@@ -1283,16 +1327,24 @@ export async function getAppointmentDetails(req, res) {
       ...appointment,
       patientId, // Use properly populated patientId
       services: appointment.services || [],
-      totalPay: appointment.totalPay !== undefined && appointment.totalPay !== null ? appointment.totalPay : 0,
-      amountPaid: appointment.amountPaid !== undefined && appointment.amountPaid !== null ? appointment.amountPaid : 0,
-      paymentStatus: appointment.paymentStatus || 'unpaid',
+      totalPay:
+        appointment.totalPay !== undefined && appointment.totalPay !== null
+          ? appointment.totalPay
+          : 0,
+      amountPaid:
+        appointment.amountPaid !== undefined && appointment.amountPaid !== null
+          ? appointment.amountPaid
+          : 0,
+      paymentStatus: appointment.paymentStatus || "unpaid",
     };
 
     console.log("✅ Patient appointment detail fetched:", {
       appointmentId: appointmentWithDefaults._id.toString(),
       status: appointmentWithDefaults.status,
       hasDoctor: !!appointmentWithDefaults.doctorId,
-      doctorName: appointmentWithDefaults.doctorId?.fullName || appointmentWithDefaults.doctorId?.name,
+      doctorName:
+        appointmentWithDefaults.doctorId?.fullName ||
+        appointmentWithDefaults.doctorId?.name,
       hasPatient: !!appointmentWithDefaults.patientId,
       patientName: appointmentWithDefaults.patientId?.fullName,
     });

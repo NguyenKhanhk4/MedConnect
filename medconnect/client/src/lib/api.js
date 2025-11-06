@@ -3,18 +3,15 @@ const BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 // Auth functions
 export async function getCurrentUser() {
   try {
-    console.log(`Fetching current user from: ${BASE}/api/auth/me`);
     const r = await fetch(`${BASE}/api/auth/me`, {
       credentials: "include",
     });
-    console.log(`Response status: ${r.status}`);
     if (!r.ok) {
       const errorText = await r.text();
       console.error(`API Error: ${r.status} - ${errorText}`);
       throw new Error(`API Error: ${r.status} - ${errorText}`);
     }
     const data = await r.json();
-    console.log("Current user data:", data);
     return data;
   } catch (error) {
     console.error("Error in getCurrentUser:", error);
@@ -25,20 +22,15 @@ export async function getCurrentUser() {
 // Get current patient profile with full information
 export async function getCurrentPatientProfile() {
   try {
-    console.log(
-      `Fetching patient profile from: ${BASE}/api/patients/me/profile`
-    );
     const r = await fetch(`${BASE}/api/patients/me/profile`, {
       credentials: "include",
     });
-    console.log(`Response status: ${r.status}`);
     if (!r.ok) {
       const errorText = await r.text();
       console.error(`API Error: ${r.status} - ${errorText}`);
       throw new Error(`API Error: ${r.status} - ${errorText}`);
     }
     const data = await r.json();
-    console.log("Patient profile data:", data);
     return data;
   } catch (error) {
     console.error("Error in getCurrentPatientProfile:", error);
@@ -48,21 +40,18 @@ export async function getCurrentPatientProfile() {
 
 export async function updateCurrentPatientProfile(profileData) {
   try {
-    console.log(`Updating patient profile at: ${BASE}/api/patients/me/profile`);
     const r = await fetch(`${BASE}/api/patients/me/profile`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify(profileData),
     });
-    console.log(`Response status: ${r.status}`);
     if (!r.ok) {
       const errorText = await r.text();
       console.error(`API Error: ${r.status} - ${errorText}`);
       throw new Error(`API Error: ${r.status} - ${errorText}`);
     }
     const data = await r.json();
-    console.log("Patient profile update response:", data);
     return data;
   } catch (error) {
     console.error("Error in updateCurrentPatientProfile:", error);
@@ -318,7 +307,6 @@ export async function getCurrentDoctorProfile() {
   });
   if (!r.ok) {
     const errorText = await r.text();
-    console.log("getCurrentDoctorProfile failed:", r.status, errorText);
     throw new Error(errorText);
   }
   return r.json();
@@ -333,7 +321,6 @@ export async function updateDoctorProfile(profileData) {
   });
   if (!r.ok) {
     const errorText = await r.text();
-    console.log("updateDoctorProfile failed:", r.status, errorText);
     throw new Error(errorText);
   }
   return r.json();
@@ -352,7 +339,6 @@ export async function getDoctorAppointments(params = {}) {
   });
   if (!r.ok) {
     const errorText = await r.text();
-    console.log("getDoctorAppointments failed:", r.status, errorText);
     throw new Error(errorText);
   }
   return r.json();
@@ -383,68 +369,42 @@ export async function getAllAppointments(params = {}) {
 
 // Helper: get doctor appointments with fallback mechanism
 export async function getDoctorAppointmentsWithFallback(params = {}) {
-  console.log(
-    "🔍 getDoctorAppointmentsWithFallback called with params:",
-    params
-  );
-
   try {
     // Try primary endpoint first
-    console.log("🔍 Trying primary endpoint...");
     const response = await getDoctorAppointments(params);
-    console.log("🔍 Primary endpoint response:", response);
 
     const appointments =
       response?.data?.appointments || response?.appointments || response;
     if (appointments && appointments.length > 0) {
-      console.log(
-        "✅ Primary endpoint success, found",
-        appointments.length,
-        "appointments"
-      );
       return { success: true, data: { appointments } };
     }
   } catch (error) {
-    console.log("❌ Primary appointments endpoint failed:", error.message);
+    // Primary endpoint failed, try fallback
   }
 
   try {
     // Fallback: get appointments from public endpoint using doctor ID
-    console.log("🔍 Trying fallback endpoint...");
     const doctor = await getDoctorProfileWithFallback();
-    console.log("🔍 Found doctor:", doctor);
 
     if (doctor && doctor._id) {
       // Get all appointments and filter by doctor ID
       const allAppointments = await getAllAppointments({ limit: 1000 });
-      console.log("🔍 All appointments response:", allAppointments);
 
       const appointmentsList =
         allAppointments?.data?.appointments ||
         allAppointments?.appointments ||
         [];
-      console.log(
-        "🔍 Appointments list:",
-        appointmentsList.length,
-        "total appointments"
-      );
 
       const doctorAppointments = appointmentsList.filter(
         (apt) => apt.doctorId === doctor._id || apt.doctorId?._id === doctor._id
-      );
-      console.log(
-        "✅ Fallback success, found",
-        doctorAppointments.length,
-        "appointments for doctor"
       );
 
       return { success: true, data: { appointments: doctorAppointments } };
     }
   } catch (error) {
-    console.log("❌ Fallback appointments failed:", error.message);
+    // Fallback failed
   }
 
-  console.log("❌ Both endpoints failed, returning empty array");
   return { success: true, data: { appointments: [] } };
 }
 
@@ -454,7 +414,6 @@ export async function getDoctorDashboardStats() {
   });
   if (!r.ok) {
     const errorText = await r.text();
-    console.log("getDoctorDashboardStats failed:", r.status, errorText);
     throw new Error(errorText);
   }
   return r.json();
@@ -486,7 +445,6 @@ export async function getDoctorDashboardStatsWithFallback() {
       };
     }
   } catch (error) {
-    console.log("🔍 Primary dashboard stats endpoint failed:", error);
     // Primary dashboard stats endpoint failed, using fallback
   }
 
@@ -562,7 +520,6 @@ export async function getDoctorDashboardStatsWithFallback() {
 
     return fallbackStats;
   } catch (error) {
-    console.log("🔍 Fallback dashboard stats failed:", error);
     // Fallback dashboard stats failed
     return {
       todayAppointmentsCount: 0,
@@ -593,7 +550,6 @@ export async function updateAppointmentStatus(
 
 // Doctor time slot functions
 export async function getDoctorTimeSlots(params = {}) {
-  console.log("🔍 getDoctorTimeSlots params:", params);
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null) {
@@ -601,7 +557,6 @@ export async function getDoctorTimeSlots(params = {}) {
     }
   });
   const url = `${BASE}/api/doctors/me/time-slots?${searchParams}`;
-  console.log("🔍 getDoctorTimeSlots URL:", url);
   const r = await fetch(url, {
     credentials: "include",
   });
@@ -1028,7 +983,6 @@ export async function getDoctorProfileWithFallback() {
       return doctor;
     }
   } catch (error) {
-    console.log("🔍 Primary doctor profile failed:", error.message);
     // Primary endpoint failed, trying fallback
   }
 
@@ -1038,15 +992,13 @@ export async function getDoctorProfileWithFallback() {
     const userId = patientProfile?.data?.user?._id || patientProfile?.user?._id;
 
     if (userId) {
-      console.log("🔍 Fallback - Found userId:", userId);
       const found = await findDoctorByUserId(userId);
       if (found) {
-        console.log("🔍 Fallback - Found doctor:", found.fullName);
         return found;
       }
     }
   } catch (error) {
-    console.log("🔍 Fallback failed:", error.message);
+    // Fallback failed
   }
 
   return null;
@@ -1086,8 +1038,26 @@ export async function getAdminDashboardStats() {
   return r.json();
 }
 
-export async function getAdminDashboardActivities() {
-  const r = await fetch(`${BASE}/api/admin/dashboard/activities`, {
+export async function getAdminStatistics(params = {}) {
+  const { period = "today", startDate, endDate } = params;
+  let url = `${BASE}/api/admin/statistics?period=${period}`;
+  if (startDate) url += `&startDate=${startDate}`;
+  if (endDate) url += `&endDate=${endDate}`;
+  const r = await fetch(url, {
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getAdminDashboardActivities(params = {}) {
+  const { limit = 50, offset = 0 } = params;
+  const queryParams = new URLSearchParams();
+  if (limit) queryParams.append("limit", limit);
+  if (offset) queryParams.append("offset", offset);
+  
+  const url = `${BASE}/api/admin/dashboard/activities${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+  const r = await fetch(url, {
     credentials: "include",
   });
   if (!r.ok) throw new Error(await r.text());

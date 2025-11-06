@@ -5,7 +5,6 @@ import Appointment from "../models/appointment.model.js";
 import Patient from "../models/patient.model.js";
 import User from "../models/user.model.js";
 import DoctorScheduleRule from "../models/doctor_schedule_rules.model.js";
-import DoctorRate from "../models/doctor_rates.model.js";
 import Clinic from "../models/clinic.model.js";
 import EducationLevelPrice from "../models/educationLevelPrice.model.js";
 import Payment from "../models/payment.model.js";
@@ -19,7 +18,7 @@ import { sendMail } from "../utils/email.js";
 
 /**
  * Check if doctor has all required information to be active
- * Required fields: yearsExperience > 0, bio (non-empty), and at least one DoctorRate
+ * Required fields: yearsExperience > 0, bio (non-empty), and educationLevel
  */
 async function checkDoctorCanBeActive(doctorId) {
   try {
@@ -97,7 +96,7 @@ export async function getAllDoctorsForManager(req, res) {
       .populate("specializationIds", "name")
       .populate("clinicDefaultId", "name address phone")
       .select(
-        "fullName avatarUrl specializationIds ratingAvg ratingCount isVerified clinicDefaultId"
+        "fullName avatarUrl specializationIds ratingAvg ratingCount isVerified clinicDefaultId educationLevel"
       )
       .sort({ fullName: 1 })
       .lean();
@@ -1968,222 +1967,6 @@ export async function deleteManagerInvoice(req, res) {
   }
 }
 
-/**
- * Get doctor pricing for a specific doctor
- * Manager can view pricing for any doctor
- */
-export async function getDoctorPricingForManager(req, res) {
-  try {
-    const { doctorId } = req.params;
-
-    if (!doctorId) {
-      return fail(res, 400, ERROR_CODES.INVALID_INPUT, "Doctor ID is required");
-    }
-
-    // Verify doctor exists
-    const doctor = await Doctor.findById(doctorId);
-    if (!doctor) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Doctor not found");
-    }
-
-    // Get all pricing for this doctor
-    const pricingList = await DoctorRate.find({
-      doctorId: doctor._id,
-      isActive: true,
-    })
-      .populate("clinicId", "name address")
-      .sort({ mode: 1, createdAt: -1 })
-      .lean();
-
-    return ok(res, {
-      doctor: {
-        _id: doctor._id,
-        fullName: doctor.fullName,
-      },
-      pricing: pricingList,
-    });
-  } catch (error) {
-    console.error("❌ getDoctorPricingForManager error:", error);
-    return fail(
-      res,
-      500,
-      ERROR_CODES.SERVER_ERROR,
-      error.message || String(error)
-    );
-  }
-}
-
-/**
- * Create or update doctor pricing
- * Manager can set pricing for any doctor
- */
-export async function setDoctorPricingForManager(req, res) {
-  try {
-    const { doctorId } = req.params;
-    const { mode, clinicId, weekdayPrice, weekendPrice, isActive } = req.body;
-
-    if (!doctorId) {
-      return fail(res, 400, ERROR_CODES.INVALID_INPUT, "Doctor ID is required");
-    }
-
-    if (!mode || !weekdayPrice || !weekendPrice) {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        "Mode, weekdayPrice, and weekendPrice are required"
-      );
-    }
-
-    if (mode !== "online" && mode !== "offline") {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        "Mode must be 'online' or 'offline'"
-      );
-    }
-
-    if (mode === "offline" && !clinicId) {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        "Clinic ID is required for offline mode"
-      );
-    }
-
-    // Verify doctor exists
-    const doctor = await Doctor.findById(doctorId);
-    if (!doctor) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Doctor not found");
-    }
-
-    // Verify clinic exists if offline mode
-    if (mode === "offline") {
-      const clinic = await Clinic.findById(clinicId);
-      if (!clinic) {
-        return fail(res, 404, ERROR_CODES.NOT_FOUND, "Clinic not found");
-      }
-    }
-
-    // Check if pricing already exists
-    const existingPricing = await DoctorRate.findOne({
-      doctorId: doctor._id,
-      mode: mode,
-      ...(mode === "offline" && { clinicId: clinicId }),
-      ...(mode === "online" && { clinicId: { $exists: false } }),
-    });
-
-    let pricing;
-    if (existingPricing) {
-      // Update existing pricing
-      existingPricing.weekdayPrice = weekdayPrice;
-      existingPricing.weekendPrice = weekendPrice;
-      if (isActive !== undefined) {
-        existingPricing.isActive = isActive;
-      }
-      await existingPricing.save();
-      pricing = existingPricing;
-      console.log(`✅ Updated pricing for doctor ${doctor.fullName}`);
-    } else {
-      // Create new pricing
-      pricing = await DoctorRate.create({
-        doctorId: doctor._id,
-        mode: mode,
-        ...(mode === "offline" && { clinicId: clinicId }),
-        weekdayPrice: weekdayPrice,
-        weekendPrice: weekendPrice,
-        isActive: isActive !== undefined ? isActive : true,
-      });
-      console.log(`✅ Created new pricing for doctor ${doctor.fullName}`);
-    }
-
-    // If doctor is verified but not active, check if they can now be active
-    // (they might have just set their pricing)
-    if (doctor.isVerified && !doctor.isActive) {
-      const activeCheck = await checkDoctorCanBeActive(doctor._id);
-      if (activeCheck.canBeActive) {
-        doctor.isActive = true;
-        await doctor.save();
-        console.log(
-          `✅ Doctor ${doctor.fullName} (ID: ${doctor._id}) is now active after setting pricing`
-        );
-      }
-    }
-
-    return ok(res, {
-      message: existingPricing
-        ? "Pricing updated successfully"
-        : "Pricing created successfully",
-      pricing: pricing,
-    });
-  } catch (error) {
-    console.error("❌ setDoctorPricingForManager error:", error);
-    return fail(
-      res,
-      500,
-      ERROR_CODES.SERVER_ERROR,
-      error.message || String(error)
-    );
-  }
-}
-
-/**
- * Delete doctor pricing
- * Manager can delete pricing for any doctor
- */
-export async function deleteDoctorPricingForManager(req, res) {
-  try {
-    const { doctorId, pricingId } = req.params;
-
-    if (!doctorId || !pricingId) {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        "Doctor ID and Pricing ID are required"
-      );
-    }
-
-    // Verify doctor exists
-    const doctor = await Doctor.findById(doctorId);
-    if (!doctor) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Doctor not found");
-    }
-
-    // Find and delete pricing
-    const pricing = await DoctorRate.findOneAndDelete({
-      _id: pricingId,
-      doctorId: doctor._id,
-    });
-
-    if (!pricing) {
-      return fail(
-        res,
-        404,
-        ERROR_CODES.NOT_FOUND,
-        "Pricing not found or does not belong to this doctor"
-      );
-    }
-
-    console.log(`✅ Deleted pricing for doctor ${doctor.fullName}`);
-
-    return ok(res, {
-      message: "Pricing deleted successfully",
-      deletedPricingId: pricingId,
-    });
-  } catch (error) {
-    console.error("❌ deleteDoctorPricingForManager error:", error);
-    return fail(
-      res,
-      500,
-      ERROR_CODES.SERVER_ERROR,
-      error.message || String(error)
-    );
-  }
-}
-
 // ================== EDUCATION LEVEL PRICE MANAGEMENT ==================
 
 /**
@@ -2370,7 +2153,7 @@ export async function getPendingServicePayments(req, res) {
     if (status) {
       // Nếu status có dấu phẩy, tách thành mảng
       if (status.includes(",")) {
-        statusFilter = { $in: status.split(",").map(s => s.trim()) };
+        statusFilter = { $in: status.split(",").map((s) => s.trim()) };
       } else {
         statusFilter = status;
       }
@@ -2378,7 +2161,7 @@ export async function getPendingServicePayments(req, res) {
       // Mặc định: hiển thị cả pending_manager và initiated
       statusFilter = { $in: ["pending_manager", "initiated"] };
     }
-    
+
     const query = {
       status: statusFilter,
     };
@@ -2546,27 +2329,46 @@ export async function createBookingPaymentByManager(req, res) {
       });
       await patient.save();
     } else {
-      return fail(res, 400, ERROR_CODES.INVALID_INPUT, "Patient information is required");
+      return fail(
+        res,
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        "Patient information is required"
+      );
     }
 
-    // Find doctor offline pricing for this clinic
-    const rate = await DoctorRate.findOne({
-      doctorId: doctor._id,
-      mode: "offline",
-      clinicId: clinicId,
-      isActive: true,
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+    // Get doctor's education level to find pricing
+    if (!doctor.educationLevel) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        "Doctor does not have education level configured"
+      );
+    }
 
-    if (!rate) {
-      return fail(res, 400, ERROR_CODES.INVALID_INPUT, "Offline pricing not configured for this doctor/clinic");
+    // Find offline pricing based on education level
+    const educationLevelPrice = await EducationLevelPrice.findOne({
+      educationLevel: doctor.educationLevel,
+      mode: "offline",
+      isActive: true,
+    }).lean();
+
+    if (!educationLevelPrice) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        "Offline pricing not configured for this doctor's education level"
+      );
     }
 
     // Calculate price based on weekday/weekend
     const start = new Date(scheduledStart);
     const isWeekend = [0, 6].includes(start.getDay());
-    const unitPrice = isWeekend ? rate.weekendPrice : rate.weekdayPrice;
+    const unitPrice = isWeekend
+      ? educationLevelPrice.weekendPrice
+      : educationLevelPrice.weekdayPrice;
 
     // Verify clinic exists
     const clinic = await Clinic.findById(clinicId);
@@ -2594,16 +2396,21 @@ export async function createBookingPaymentByManager(req, res) {
 
       if (existingAppointment) {
         // If existing appointment is unpaid, delete it to allow re-booking
-        if (existingAppointment.paymentStatus === "unpaid" || !existingAppointment.paymentStatus) {
-          console.log(`🗑️ Deleting unpaid appointment ${existingAppointment._id} to allow re-booking`);
-          
+        if (
+          existingAppointment.paymentStatus === "unpaid" ||
+          !existingAppointment.paymentStatus
+        ) {
+          console.log(
+            `🗑️ Deleting unpaid appointment ${existingAppointment._id} to allow re-booking`
+          );
+
           // Delete associated payment if exists
           await Payment.deleteMany({
             appointmentId: existingAppointment._id,
             invoiceType: "booking",
             status: { $in: ["pending_manager", "initiated"] },
           });
-          
+
           // Delete the unpaid appointment
           await Appointment.findByIdAndDelete(existingAppointment._id);
           console.log(`✅ Deleted unpaid appointment, allowing new booking`);
@@ -2622,7 +2429,7 @@ export async function createBookingPaymentByManager(req, res) {
     const orderCode = Number(String(Date.now()).slice(-10));
     const invoiceNumber = `INV-BOOKING-${orderCode}`;
 
-    // Create TEMPORARY appointment with status "pending_doctor" 
+    // Create TEMPORARY appointment with status "pending_doctor"
     // This appointment will be "activated" after payment success
     // Slot will NOT be marked as "booked" until payment succeeds
     const scheduledStartDate = new Date(scheduledStart);
@@ -2689,9 +2496,10 @@ export async function createBookingPaymentByManager(req, res) {
 
     // DO NOT mark slot as "booked" yet - only after payment success
 
-    return ok(res, { 
-      payment, 
-      message: "Booking payment created. Appointment will be created after payment success." 
+    return ok(res, {
+      payment,
+      message:
+        "Booking payment created. Appointment will be created after payment success.",
     });
   } catch (error) {
     console.error("❌ Error creating booking payment:", error);
@@ -2829,28 +2637,37 @@ export async function processCashPayment(req, res) {
           if (Number(amountPaid) >= payment.total) {
             appointment.paymentStatus = "paid";
             appointment.paymentId = payment._id;
-            
+
             // Mark slot as "booked" after payment success
             if (appointment.slotId) {
               await DoctorTimeSlot.findByIdAndUpdate(appointment.slotId, {
                 status: "booked",
                 appointmentId: appointment._id,
               });
-              console.log(`✅ Slot ${appointment.slotId} marked as booked after cash payment success`);
+              console.log(
+                `✅ Slot ${appointment.slotId} marked as booked after cash payment success`
+              );
             }
-            
+
             await appointment.save();
-            console.log(`✅ Booking payment completed. Appointment ${appointment._id} activated.`);
-            
+            console.log(
+              `✅ Booking payment completed. Appointment ${appointment._id} activated.`
+            );
+
             // Gửi notification cho doctor về lịch hẹn mới (sau khi thanh toán thành công)
             try {
               await createBookingNotification(appointment._id, {
                 createdByManager: true,
                 paymentCompleted: true,
               });
-              console.log(`📬 Booking notification sent to doctor for appointment ${appointment._id}`);
+              console.log(
+                `📬 Booking notification sent to doctor for appointment ${appointment._id}`
+              );
             } catch (notificationError) {
-              console.error("❌ Error sending booking notification to doctor:", notificationError);
+              console.error(
+                "❌ Error sending booking notification to doctor:",
+                notificationError
+              );
             }
           } else {
             appointment.paymentStatus = "unpaid";
@@ -3088,10 +2905,11 @@ export async function createBankTransferPayment(req, res) {
       const orderCode = Number(String(Date.now()).slice(-10));
       // Use different description based on invoiceType to help webhook distinguish
       // PayOS requires description max 25 characters
-      const description = payment.invoiceType === "booking" 
-        ? `MC Booking ${String(orderCode).slice(-6)}`
-        : `MC Service ${String(orderCode).slice(-6)}`;
-      
+      const description =
+        payment.invoiceType === "booking"
+          ? `MC Booking ${String(orderCode).slice(-6)}`
+          : `MC Service ${String(orderCode).slice(-6)}`;
+
       const payosPaymentData = {
         orderCode,
         amount: payment.total,

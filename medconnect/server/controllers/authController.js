@@ -11,7 +11,6 @@ import Patient from "../models/patient.model.js";
 import Doctor from "../models/doctor.model.js";
 import AuthProvider from "../models/auth_providers.model.js";
 import PasswordReset from "../models/passwordReset.model.js";
-import DoctorRate from "../models/doctor_rates.model.js";
 import EducationLevelPrice from "../models/educationLevelPrice.model.js";
 import { ok, fail } from "../utils/response.js";
 import {
@@ -701,6 +700,7 @@ export async function register(req, res) {
     const customToken = await admin.auth().createCustomToken(uid, {
       app_user_id: String(userDoc._id),
       role: userDoc.role,
+      email: userDoc.email, // Thêm email vào custom claims
     });
 
     console.log("[register] success for user:", userDoc._id);
@@ -719,7 +719,8 @@ export async function register(req, res) {
       console.warn("Failed to create AuthProvider record:", e.message || e);
     }
 
-    // Send welcome email if role is patient
+    // For patients: send welcome email
+    // Frontend will handle auto-login using the customToken
     if ((role || "patient").toLowerCase() === "patient") {
       try {
         await sendPatientWelcomeEmail(userDoc);
@@ -881,6 +882,30 @@ export async function googleRegister(req, res) {
     );
 
     console.log("[GG-REG] SUCCESS userId:", String(userDoc._id));
+    
+    // For patients: automatically create session cookie to auto-login
+    if (normalizedRole === "patient") {
+      try {
+        // Create session cookie using the idToken from Google
+        const sessionCookie = await admin.auth().createSessionCookie(idToken, {
+          expiresIn: SESSION_EXPIRES_IN,
+        });
+
+        res.cookie(COOKIE_NAME, sessionCookie, {
+          maxAge: SESSION_EXPIRES_IN,
+          httpOnly: true,
+          secure: isProd,
+          sameSite: "lax",
+          path: "/",
+        });
+
+        console.log("✅ Auto-login session created for patient after Google registration");
+      } catch (sessionError) {
+        console.warn("Failed to create session cookie for Google registration:", sessionError.message);
+        // Continue anyway - frontend might handle it
+      }
+    }
+
     return ok(res, {
       role: userDoc.role,
       user: {

@@ -1,5 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
-import { Star, MessageSquare, Reply, Calendar, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Star,
+  MessageSquare,
+  Reply,
+  Calendar,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { useDoctorReviews } from "../../../hooks/useDoctor";
@@ -9,7 +17,9 @@ import "./Feedback.scss";
 // eslint-disable-next-line react/prop-types
 const Spin = ({ size, tip }) => (
   <div className="feedback-spin">
-    <div className={`feedback-spinner ${size === 'large' ? 'large' : ''}`}></div>
+    <div
+      className={`feedback-spinner ${size === "large" ? "large" : ""}`}
+    ></div>
     {tip && <div className="feedback-spin-tip">{tip}</div>}
   </div>
 );
@@ -27,43 +37,28 @@ export default function Feedback() {
   const itemsPerPage = 10;
 
   // Memoize params to prevent unnecessary re-renders
-  const reviewParams = useMemo(() => ({
-    page: currentPage,
-    limit: itemsPerPage,
-    rating: ratingFilter !== "all" ? ratingFilter : undefined,
-    sortBy: sortBy,
-  }), [currentPage, ratingFilter, sortBy, itemsPerPage]);
+  const reviewParams = useMemo(
+    () => ({
+      page: currentPage,
+      limit: itemsPerPage,
+      rating: ratingFilter !== "all" ? ratingFilter : undefined,
+      sortBy: sortBy,
+    }),
+    [currentPage, ratingFilter, sortBy, itemsPerPage]
+  );
 
-  const { reviews, loading, error, pagination, respondToReview, refetch } = useDoctorReviews(reviewParams);
+  const { reviews, loading, error, pagination, respondToReview, refetch } =
+    useDoctorReviews(reviewParams);
 
-  // Debug: Log reviews data to see structure
   useEffect(() => {
-    if (reviews && reviews.length > 0) {
-      console.log("🔍 Feedback - Reviews data:", reviews);
-      console.log("🔍 Feedback - First review structure:", {
-        _id: reviews[0]._id,
-        rating: reviews[0].rating,
-        comment: reviews[0].comment,
-        patientId: reviews[0].patientId,
-        appointmentId: reviews[0].appointmentId,
-        doctorResponse: reviews[0].doctorResponse,
-        doctorResponseAt: reviews[0].doctorResponseAt
-      });
-    } else if (reviews && reviews.length === 0) {
-      console.log("🔍 Feedback - Reviews array is empty");
-    } else {
-      console.log("🔍 Feedback - Reviews is null/undefined");
-    }
-    console.log("🔍 Feedback - Pagination:", pagination);
+    // Reviews data loaded
   }, [reviews, pagination]);
 
   const renderStars = (rating) => {
     return Array.from({ length: 5 }, (_, index) => (
       <Star
         key={index}
-        className={`feedback-star ${
-          index < rating ? "filled" : "empty"
-        }`}
+        className={`feedback-star ${index < rating ? "filled" : "empty"}`}
       />
     ));
   };
@@ -102,12 +97,15 @@ export default function Feedback() {
   };
 
   // Filter reviews based on response status
-  const filteredReviews = reviews?.filter((review) => {
-    if (filter === "all") return true;
-    if (filter === "responded") return review.doctorResponse && review.doctorResponse.trim() !== "";
-    if (filter === "pending") return !review.doctorResponse || review.doctorResponse.trim() === "";
-    return true;
-  }) || [];
+  const filteredReviews =
+    reviews?.filter((review) => {
+      if (filter === "all") return true;
+      if (filter === "responded")
+        return review.doctorResponse && review.doctorResponse.trim() !== "";
+      if (filter === "pending")
+        return !review.doctorResponse || review.doctorResponse.trim() === "";
+      return true;
+    }) || [];
 
   const averageRating =
     reviews?.length > 0
@@ -119,9 +117,14 @@ export default function Feedback() {
 
   // Get total from pagination if available, otherwise use current reviews count
   const totalReviews = pagination?.total || reviews?.length || 0;
-  const pendingCount = reviews?.filter((r) => !r.doctorResponse || r.doctorResponse.trim() === "").length || 0;
-  const respondedCount = reviews?.filter((r) => r.doctorResponse && r.doctorResponse.trim() !== "").length || 0;
-  const totalPages = pagination?.pages || Math.ceil(totalReviews / itemsPerPage);
+  const pendingCount =
+    reviews?.filter((r) => !r.doctorResponse || r.doctorResponse.trim() === "")
+      .length || 0;
+  const respondedCount =
+    reviews?.filter((r) => r.doctorResponse && r.doctorResponse.trim() !== "")
+      .length || 0;
+  const totalPages =
+    pagination?.pages || Math.ceil(totalReviews / itemsPerPage);
 
   const handleSubmitResponse = async (reviewId) => {
     if (!responseText.trim()) return;
@@ -181,7 +184,9 @@ export default function Feedback() {
           <h2 className="feedback-title">Đánh giá & Phản hồi</h2>
         </div>
         <div className="feedback-error">
-          <div className="error-text">Có lỗi xảy ra khi tải đánh giá: {error}</div>
+          <div className="error-text">
+            Có lỗi xảy ra khi tải đánh giá: {error}
+          </div>
           <Button onClick={() => refetch()} className="feedback-retry-btn">
             Thử lại
           </Button>
@@ -195,7 +200,9 @@ export default function Feedback() {
       <div className="feedback-header">
         <div>
           <h2 className="feedback-title">Đánh giá & Phản hồi</h2>
-          <p className="feedback-subtitle">Quản lý và phản hồi các đánh giá từ bệnh nhân</p>
+          <p className="feedback-subtitle">
+            Quản lý và phản hồi các đánh giá từ bệnh nhân
+          </p>
         </div>
       </div>
 
@@ -203,7 +210,9 @@ export default function Feedback() {
       <div className="feedback-stats-grid">
         <Card className="feedback-stat-card">
           <div className="feedback-stat-value">{averageRating}</div>
-          <div className="feedback-stat-stars">{renderStars(Math.round(parseFloat(averageRating)))}</div>
+          <div className="feedback-stat-stars">
+            {renderStars(Math.round(parseFloat(averageRating)))}
+          </div>
           <div className="feedback-stat-label">Đánh giá trung bình</div>
         </Card>
 
@@ -226,19 +235,25 @@ export default function Feedback() {
       {/* Quick Filter Buttons */}
       <div className="feedback-quick-filters">
         <button
-          className={`feedback-quick-filter-btn ${filter === "all" ? "active" : ""}`}
+          className={`feedback-quick-filter-btn ${
+            filter === "all" ? "active" : ""
+          }`}
           onClick={() => handleFilterChange("all")}
         >
           Tất cả
         </button>
         <button
-          className={`feedback-quick-filter-btn ${filter === "pending" ? "active" : ""}`}
+          className={`feedback-quick-filter-btn ${
+            filter === "pending" ? "active" : ""
+          }`}
           onClick={() => handleFilterChange("pending")}
         >
           Chờ phản hồi ({pendingCount})
         </button>
         <button
-          className={`feedback-quick-filter-btn ${filter === "responded" ? "active" : ""}`}
+          className={`feedback-quick-filter-btn ${
+            filter === "responded" ? "active" : ""
+          }`}
           onClick={() => handleFilterChange("responded")}
         >
           Đã phản hồi ({respondedCount})
@@ -264,19 +279,25 @@ export default function Feedback() {
               <label>Trạng thái phản hồi:</label>
               <div className="feedback-filter-buttons">
                 <button
-                  className={`feedback-filter-btn-small ${filter === "all" ? "active" : ""}`}
+                  className={`feedback-filter-btn-small ${
+                    filter === "all" ? "active" : ""
+                  }`}
                   onClick={() => handleFilterChange("all")}
                 >
                   Tất cả
                 </button>
                 <button
-                  className={`feedback-filter-btn-small ${filter === "pending" ? "active" : ""}`}
+                  className={`feedback-filter-btn-small ${
+                    filter === "pending" ? "active" : ""
+                  }`}
                   onClick={() => handleFilterChange("pending")}
                 >
                   Chờ phản hồi
                 </button>
                 <button
-                  className={`feedback-filter-btn-small ${filter === "responded" ? "active" : ""}`}
+                  className={`feedback-filter-btn-small ${
+                    filter === "responded" ? "active" : ""
+                  }`}
                   onClick={() => handleFilterChange("responded")}
                 >
                   Đã phản hồi
@@ -288,7 +309,9 @@ export default function Feedback() {
               <label>Đánh giá sao:</label>
               <div className="feedback-filter-buttons">
                 <button
-                  className={`feedback-filter-btn-small ${ratingFilter === "all" ? "active" : ""}`}
+                  className={`feedback-filter-btn-small ${
+                    ratingFilter === "all" ? "active" : ""
+                  }`}
                   onClick={() => handleRatingFilterChange("all")}
                 >
                   Tất cả
@@ -296,7 +319,9 @@ export default function Feedback() {
                 {[5, 4, 3, 2, 1].map((rating) => (
                   <button
                     key={rating}
-                    className={`feedback-filter-btn-small ${ratingFilter === String(rating) ? "active" : ""}`}
+                    className={`feedback-filter-btn-small ${
+                      ratingFilter === String(rating) ? "active" : ""
+                    }`}
                     onClick={() => handleRatingFilterChange(String(rating))}
                   >
                     {rating} sao
@@ -309,25 +334,33 @@ export default function Feedback() {
               <label>Sắp xếp theo:</label>
               <div className="feedback-filter-buttons">
                 <button
-                  className={`feedback-filter-btn-small ${sortBy === "newest" ? "active" : ""}`}
+                  className={`feedback-filter-btn-small ${
+                    sortBy === "newest" ? "active" : ""
+                  }`}
                   onClick={() => handleSortChange("newest")}
                 >
                   Mới nhất
                 </button>
                 <button
-                  className={`feedback-filter-btn-small ${sortBy === "oldest" ? "active" : ""}`}
+                  className={`feedback-filter-btn-small ${
+                    sortBy === "oldest" ? "active" : ""
+                  }`}
                   onClick={() => handleSortChange("oldest")}
                 >
                   Cũ nhất
                 </button>
                 <button
-                  className={`feedback-filter-btn-small ${sortBy === "highest" ? "active" : ""}`}
+                  className={`feedback-filter-btn-small ${
+                    sortBy === "highest" ? "active" : ""
+                  }`}
                   onClick={() => handleSortChange("highest")}
                 >
                   Đánh giá cao nhất
                 </button>
                 <button
-                  className={`feedback-filter-btn-small ${sortBy === "lowest" ? "active" : ""}`}
+                  className={`feedback-filter-btn-small ${
+                    sortBy === "lowest" ? "active" : ""
+                  }`}
                   onClick={() => handleSortChange("lowest")}
                 >
                   Đánh giá thấp nhất
@@ -353,9 +386,7 @@ export default function Feedback() {
               <Card key={review._id} className="feedback-review-item">
                 <div className="feedback-review-header">
                   <div className="feedback-review-patient-info">
-                    <h3 className="feedback-review-patient-name">
-                      Bệnh nhân
-                    </h3>
+                    <h3 className="feedback-review-patient-name">Bệnh nhân</h3>
                     <div className="feedback-review-meta">
                       <div className="feedback-review-rating">
                         {renderStars(review.rating || 0)}
@@ -386,12 +417,16 @@ export default function Feedback() {
                   <div className="feedback-review-response">
                     <div className="feedback-review-response-header">
                       <Reply className="w-4 h-4" />
-                      <span className="feedback-review-response-title">Phản hồi của bác sĩ:</span>
+                      <span className="feedback-review-response-title">
+                        Phản hồi của bác sĩ:
+                      </span>
                       <span className="feedback-review-response-date">
                         {formatDateTime(review.doctorResponseAt)}
                       </span>
                     </div>
-                    <p className="feedback-review-response-text">{review.doctorResponse}</p>
+                    <p className="feedback-review-response-text">
+                      {review.doctorResponse}
+                    </p>
                   </div>
                 ) : (
                   <div className="feedback-review-response-form-container">

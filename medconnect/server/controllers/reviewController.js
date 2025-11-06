@@ -23,12 +23,6 @@ export const createReview = async (req, res) => {
     const userEmail = req.user?.email;
     console.log("🔍 User email from token:", userEmail);
 
-    // Debug: Log thông tin user từ token
-    console.log("🔍 Debug User Info:");
-    console.log("- req.user:", req.user);
-    console.log("- req.user.uid:", req.user.uid);
-    console.log("- req.user.email:", req.user.email);
-
     // Kiểm tra dữ liệu đầu vào
     if (!appointmentId || !doctorId || !rating || !comment) {
       return fail(res, 400, {}, "Thiếu thông tin bắt buộc");
@@ -62,10 +56,6 @@ export const createReview = async (req, res) => {
       return fail(res, 404, {}, "Không tìm thấy lịch hẹn");
     }
 
-    // Debug: Log thông tin để kiểm tra
-    console.log("🔍 Debug Review Creation:");
-    console.log("- user._id:", user._id);
-    console.log("- appointment.patientId:", appointment.patientId);
     console.log(
       "- appointment.patientId.userId:",
       appointment.patientId.userId

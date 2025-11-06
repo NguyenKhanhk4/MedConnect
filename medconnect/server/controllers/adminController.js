@@ -7,7 +7,6 @@ import Clinic from "../models/clinic.model.js";
 import Payment from "../models/payment.model.js";
 import DoctorTimeSlot from "../models/doctorTimeSlot.model.js";
 import DoctorScheduleRule from "../models/doctor_schedule_rules.model.js";
-import DoctorRate from "../models/doctor_rates.model.js";
 import Review from "../models/review.model.js";
 import EducationLevelPrice from "../models/educationLevelPrice.model.js";
 import Prescription from "../models/prescription.model.js";
@@ -18,76 +17,10 @@ import PatientFavorite from "../models/patientFavorite.model.js";
 import RescheduleRequest from "../models/rescheduleRequest.model.js";
 import Notification from "../models/notification.model.js";
 import { runCleanupNow } from "../services/appointmentCleanupService.js";
+import fs from "fs";
+import path from "path";
 
 // ================== HELPER FUNCTIONS ==================
-
-/**
- * Helper function to create/update DoctorRate based on educationLevel
- * This will create rates for both online and offline modes based on EducationLevelPrice
- */
-async function syncDoctorRatesFromEducationLevel(doctorId, educationLevel) {
-  try {
-    if (!educationLevel || !doctorId) {
-      return { success: false, message: "Missing doctorId or educationLevel" };
-    }
-
-    const doctor = await Doctor.findById(doctorId).lean();
-    if (!doctor) {
-      return { success: false, message: "Doctor not found" };
-    }
-
-    // Get education level prices for both modes
-    const onlinePrice = await EducationLevelPrice.findOne({
-      educationLevel,
-      mode: "online",
-      isActive: true,
-    }).lean();
-
-    const offlinePrice = await EducationLevelPrice.findOne({
-      educationLevel,
-      mode: "offline",
-      isActive: true,
-    }).lean();
-
-    // Create or update online rate
-    if (onlinePrice) {
-      await DoctorRate.findOneAndUpdate(
-        { doctorId, mode: "online", clinicId: { $exists: false } },
-        {
-          doctorId,
-          mode: "online",
-          weekdayPrice: onlinePrice.weekdayPrice,
-          weekendPrice: onlinePrice.weekendPrice,
-          currency: onlinePrice.currency || "VND",
-          isActive: true,
-        },
-        { upsert: true, new: true }
-      );
-    }
-
-    // Create or update offline rate (if doctor has clinic)
-    if (offlinePrice && doctor.clinicDefaultId) {
-      await DoctorRate.findOneAndUpdate(
-        { doctorId, mode: "offline", clinicId: doctor.clinicDefaultId },
-        {
-          doctorId,
-          mode: "offline",
-          clinicId: doctor.clinicDefaultId,
-          weekdayPrice: offlinePrice.weekdayPrice,
-          weekendPrice: offlinePrice.weekendPrice,
-          currency: offlinePrice.currency || "VND",
-          isActive: true,
-        },
-        { upsert: true, new: true }
-      );
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error syncing doctor rates from education level:", error);
-    return { success: false, message: error.message };
-  }
-}
 
 /**
  * Check if doctor has all required information to be active
@@ -188,33 +121,46 @@ export const getDashboardStats = async (req, res) => {
     const verifiedDoctors = await Doctor.countDocuments({ isVerified: true });
     const pendingDoctors = await Doctor.countDocuments({ isVerified: false });
 
-    // Get current month appointments
-    const currentMonth = new Date();
-    currentMonth.setDate(1);
-    currentMonth.setHours(0, 0, 0, 0);
-
-    const monthlyAppointments = await Appointment.countDocuments({
-      createdAt: { $gte: currentMonth },
-    });
-
-    // Revenue calculation based on successful payments - get actual revenue from Payment collection
+    // Get total appointments (all time)
+    const totalAppointments = await Appointment.countDocuments({});
+    
+    // Revenue calculation using MongoDB aggregation for accurate and efficient calculation
     // Calculate total revenue from all successful payments (captured or authorized status)
-    const successfulPayments = await Payment.find({
-      status: { $in: ["captured", "authorized"] },
-    });
-
-    // Calculate total revenue: sum of all successful payments minus refunds
-    const revenue = successfulPayments.reduce((total, payment) => {
-      // Total revenue = payment.total - refundAmount (if any)
-      const netRevenue = payment.total - (payment.refundAmount || 0);
-      return total + netRevenue;
-    }, 0);
+    // Total revenue = sum of (payment.total - refundAmount) for all successful payments
+    const revenueResult = await Payment.aggregate([
+      {
+        $match: {
+          status: { $in: ['captured', 'authorized'] }
+        }
+      },
+      {
+        $project: {
+          netRevenue: {
+            $subtract: [
+              { $ifNull: ['$total', 0] },
+              { $ifNull: ['$refundAmount', 0] }
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: '$netRevenue' }
+        }
+      }
+    ]);
+    
+    // Extract revenue from aggregation result, default to 0 if no payments found
+    const revenue = revenueResult.length > 0 && revenueResult[0].totalRevenue 
+      ? revenueResult[0].totalRevenue 
+      : 0;
 
     const stats = {
       totalUsers,
       verifiedDoctors,
       pendingDoctors,
-      monthlyAppointments,
+      monthlyAppointments: totalAppointments, // Using totalAppointments for "Tổng số lịch hẹn"
       revenue,
     };
 
@@ -256,15 +202,19 @@ export const getDashboardActivities = async (req, res) => {
 
     // Add user registrations
     recentUsers.forEach((user) => {
-      if (user && user.createdAt) {
-        const roleText = user.role === "doctor" ? "bác sĩ" : "bệnh nhân";
-        activities.push({
-          title: `${
-            user.fullName || "Người dùng"
-          } đã đăng ký tài khoản ${roleText}`,
-          time: getTimeAgo(user.createdAt),
-          createdAt: user.createdAt, // Store original date for sorting
-        });
+      try {
+        if (user && user.createdAt) {
+          const roleText = user.role === "doctor" ? "bác sĩ" : "bệnh nhân";
+          activities.push({
+            title: `${
+              user.fullName || "Người dùng"
+            } đã đăng ký tài khoản ${roleText}`,
+            time: getTimeAgo(user.createdAt),
+            createdAt: user.createdAt, // Store original date for sorting
+          });
+        }
+      } catch (err) {
+        console.error("Error processing user activity:", err);
       }
     });
 
@@ -451,12 +401,22 @@ export const getPendingDoctors = async (req, res) => {
       .lean(); // Use lean() to convert to plain objects
 
     // Format doctors data - license image comes from licenseNo field
+    const doctorUploadDir = path.resolve('uploads/doctors');
+    
     const formattedDoctors = pendingDoctors.map((doctor) => {
       try {
         // Build license image URL - if licenseNo exists, it's a filename in uploads/doctors/
-        const licenseImageUrl = doctor.licenseNo
-          ? `/server-uploads/doctors/${doctor.licenseNo}`
-          : null;
+        // Check if file actually exists before returning URL
+        let licenseImageUrl = null;
+        if (doctor.licenseNo) {
+          const filePath = path.join(doctorUploadDir, doctor.licenseNo);
+          if (fs.existsSync(filePath)) {
+            licenseImageUrl = `/server-uploads/doctors/${doctor.licenseNo}`;
+          } else {
+            console.warn(`⚠️ License file not found for doctor ${doctor._id}: ${doctor.licenseNo}`);
+            // Don't return licenseImageUrl if file doesn't exist
+          }
+        }
 
         // Format specialty - handle null, undefined, or empty array
         let specialty = "Chưa chọn chuyên khoa";
@@ -1256,18 +1216,14 @@ export const getAllUsers = async (req, res) => {
       .select("fullName email role status createdAt updatedAt")
       .sort({ createdAt: -1 });
 
-    // Filter out unverified doctors if role is "all" or not specified
+    console.log(`📊 getAllUsers: Found ${users.length} users from database (role filter: ${role || 'all'})`);
+
+    // For admin user management page, show ALL users including unverified doctors
+    // Only filter when specifically filtering by "doctor" role (which should show verified doctors)
     let filteredUsers = users;
-    if ((role === "all" || !role) && verifiedDoctorUserIds) {
-      filteredUsers = users.filter((user) => {
-        // If user is a doctor, only include if verified
-        if (user.role === "doctor") {
-          return verifiedDoctorUserIds.has(user._id.toString());
-        }
-        // Include all non-doctor users
-        return true;
-      });
-    }
+    // Remove the filter for unverified doctors - admin should see all users
+    // Admin needs to see ALL users for management purposes
+    console.log(`📊 getAllUsers: After filtering, ${filteredUsers.length} users will be returned`);
 
     // Fetch avatars for all users in parallel
     const formattedUsers = await Promise.all(
@@ -1383,6 +1339,8 @@ export const getAllUsers = async (req, res) => {
       })
     );
 
+    console.log(`📊 getAllUsers: Returning ${formattedUsers.length} formatted users`);
+    
     res.json({
       success: true,
       data: formattedUsers,
@@ -1738,21 +1696,7 @@ export const updateUser = async (req, res) => {
               `Doctor profile not found for user ${id}, but user update succeeded`
             );
           } else {
-            // If educationLevel was updated, sync DoctorRate from EducationLevelPrice
-            if (educationLevel !== undefined && educationLevel) {
-              try {
-                await syncDoctorRatesFromEducationLevel(
-                  doctor._id,
-                  educationLevel
-                );
-                console.log(
-                  `✅ Synced DoctorRate for doctor ${doctor._id} with educationLevel ${educationLevel}`
-                );
-              } catch (rateError) {
-                console.error("Error syncing doctor rates:", rateError);
-                // Don't fail the update if rate sync fails, just log it
-              }
-            }
+            // Education level is now used directly from EducationLevelPrice, no sync needed
 
             // If doctor is verified but not active, check if they can now be active
             // (doctor might have just filled in required fields: yearsExperience, bio, educationLevel)
@@ -1902,8 +1846,7 @@ export const deleteUser = async (req, res) => {
 
         // Step 3: Delete doctor-specific records and appointments
         await Promise.all([
-          // Delete doctor-specific records
-          DoctorRate.deleteMany({ doctorId }),
+          // Delete doctor-specific records (DoctorRate no longer exists - using EducationLevelPrice)
           DoctorScheduleRule.deleteMany({ doctorId }),
           DoctorTimeSlot.deleteMany({ doctorId }),
 
@@ -2367,11 +2310,17 @@ export const getAllAppointments = async (req, res) => {
     // Also ensure patientId is properly populated
     const appointmentsWithDefaults = appointments.map((apt) => {
       const aptObj = apt.toObject();
-      
+
       // Ensure patientId is properly populated
       let patientId = aptObj.patientId;
-      if (!patientId || (typeof patientId === 'object' && !patientId.fullName)) {
-        console.warn(`⚠️ Appointment ${aptObj._id} has invalid patientId:`, patientId);
+      if (
+        !patientId ||
+        (typeof patientId === "object" && !patientId.fullName)
+      ) {
+        console.warn(
+          `⚠️ Appointment ${aptObj._id} has invalid patientId:`,
+          patientId
+        );
         patientId = {
           _id: aptObj.patientId?._id || aptObj.patientId || null,
           fullName: aptObj.patientId?.fullName || "Không có thông tin",
@@ -2380,71 +2329,79 @@ export const getAllAppointments = async (req, res) => {
           userId: aptObj.patientId?.userId || null,
         };
       }
-      
+
       return {
         ...aptObj,
         patientId, // Use properly populated patientId
         services: aptObj.services || [],
-        totalPay: aptObj.totalPay !== undefined && aptObj.totalPay !== null ? aptObj.totalPay : 0,
-        amountPaid: aptObj.amountPaid !== undefined && aptObj.amountPaid !== null ? aptObj.amountPaid : 0,
-        paymentStatus: aptObj.paymentStatus || 'unpaid',
+        totalPay:
+          aptObj.totalPay !== undefined && aptObj.totalPay !== null
+            ? aptObj.totalPay
+            : 0,
+        amountPaid:
+          aptObj.amountPaid !== undefined && aptObj.amountPaid !== null
+            ? aptObj.amountPaid
+            : 0,
+        paymentStatus: aptObj.paymentStatus || "unpaid",
       };
     });
 
-    const formattedAppointments = appointmentsWithDefaults.map((appointment, index) => {
-      const patient = appointment.patientId;
-      const doctor = appointment.doctorId;
-      const specializations = appointment.doctorId?.specializationIds;
-      const clinic = appointment.clinicId;
+    const formattedAppointments = appointmentsWithDefaults.map(
+      (appointment, index) => {
+        const patient = appointment.patientId;
+        const doctor = appointment.doctorId;
+        const specializations = appointment.doctorId?.specializationIds;
+        const clinic = appointment.clinicId;
 
-      return {
-        id: appointment._id,
-        sequentialId: index + 1, // ID bắt đầu từ 1
+        return {
+          id: appointment._id,
+          sequentialId: index + 1, // ID bắt đầu từ 1
 
-        // Thông tin bệnh nhân
-        patientName: patient?.fullName || "Chưa có tên",
-        patientEmail: patient?.userId?.email || "Chưa có email",
-        patientPhone: patient?.phone || null,
-        patientAddress: patient?.address || null,
+          // Thông tin bệnh nhân
+          patientName: patient?.fullName || "Chưa có tên",
+          patientEmail: patient?.userId?.email || "Chưa có email",
+          patientPhone: patient?.phone || null,
+          patientAddress: patient?.address || null,
 
-        // Thông tin bác sĩ
-        doctorName:
-          doctor?.fullName || doctor?.userId?.fullName || "Chưa có tên",
-        doctorEmail: doctor?.userId?.email || "Chưa có email",
-        doctorSpecialty:
-          specializations?.map((s) => s.name).join(", ") ||
-          "Chưa chọn chuyên khoa",
-        doctorLicense: doctor?.licenseNo || null,
-        doctorBio: doctor?.bio || null,
+          // Thông tin bác sĩ
+          doctorName:
+            doctor?.fullName || doctor?.userId?.fullName || "Chưa có tên",
+          doctorEmail: doctor?.userId?.email || "Chưa có email",
+          doctorSpecialty:
+            specializations?.map((s) => s.name).join(", ") ||
+            "Chưa chọn chuyên khoa",
+          doctorLicense: doctor?.licenseNo || null,
+          doctorBio: doctor?.bio || null,
 
-        // Thông tin phòng khám
-        clinicName: clinic?.name || null,
+          // Thông tin phòng khám
+          clinicName: clinic?.name || null,
 
-        // Thông tin lịch hẹn
-        appointmentDate: formatDate(appointment.scheduledStart),
-        appointmentTime: formatTime(appointment.scheduledStart),
-        scheduledStart: appointment.scheduledStart,
-        scheduledEnd: appointment.scheduledEnd,
-        status: appointment.status,
-        mode: appointment.mode,
-        reason: appointment.reason || "Không có lý do",
-        
-        // Thông tin thanh toán mới
-        services: appointment.services || [],
-        totalPay: appointment.totalPay || 0,
-        amountPaid: appointment.amountPaid || 0,
-        paymentStatus: appointment.paymentStatus || 'unpaid',
+          // Thông tin lịch hẹn
+          appointmentDate: formatDate(appointment.scheduledStart),
+          appointmentTime: formatTime(appointment.scheduledStart),
+          scheduledStart: appointment.scheduledStart,
+          scheduledEnd: appointment.scheduledEnd,
+          status: appointment.status,
+          mode: appointment.mode,
+          reason: appointment.reason || "Không có lý do",
 
-        // Thông tin hủy lịch
-        cancelledAt: appointment.cancelledAt,
-        cancelledBy: appointment.cancelledBy,
-        cancelReason: appointment.cancelReason,
+          // Thông tin thanh toán mới
+          services: appointment.services || [],
+          totalPay: appointment.totalPay || 0,
+          amountPaid: appointment.amountPaid || 0,
+          paymentStatus: appointment.paymentStatus || "unpaid",
 
-        // Thông tin hệ thống
-        createdAt: appointment.createdAt,
-        updatedAt: appointment.updatedAt,
-      };
-    });
+          // Thông tin hủy lịch
+          cancelledAt: appointment.cancelledAt,
+          cancelledBy: appointment.cancelledBy,
+          cancelReason: appointment.cancelReason,
+
+          // Thông tin hệ thống
+          createdAt: appointment.createdAt,
+          updatedAt: appointment.updatedAt,
+        };
+      }
+    );
 
     res.json({
       success: true,
@@ -2925,6 +2882,629 @@ export const getAdminInvoices = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Lỗi khi tải danh sách hóa đơn",
+    });
+  }
+};
+
+/**
+ * GET /api/admin/statistics
+ * Get comprehensive statistics for statistics page
+ */
+export const getStatistics = async (req, res) => {
+  try {
+    let { period = 'today', startDate: startDateParam, endDate: endDateParam } = req.query;
+    
+    // Map frontend period keys to backend keys
+    const periodMap = {
+      'week': 'thisWeek',
+      'month': 'thisMonth',
+      'year': 'thisYear',
+      'today': 'today'
+    };
+    const originalPeriod = period;
+    period = periodMap[period] || period;
+    
+    let startDate, endDate;
+    
+    if (originalPeriod === 'custom' && startDateParam && endDateParam) {
+      startDate = new Date(startDateParam);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(endDateParam);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      const range = getDateRange(period, req);
+      startDate = range.startDate;
+      endDate = range.endDate;
+      // Ensure dates are set correctly for year period to get complete data
+      if (period === 'thisYear' || originalPeriod === 'year') {
+        const today = new Date();
+        // Start from beginning of year
+        startDate = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0);
+        // End at end of today
+        endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+      }
+    }
+
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    // 1. Tổng Bác Sĩ - So với tháng trước
+    const totalDoctors = await Doctor.countDocuments({ isVerified: true });
+    
+    // Count doctors created before this month
+    const previousMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
+    
+    const previousTotalDoctors = await Doctor.countDocuments({ 
+      isVerified: true,
+      createdAt: { $lte: previousMonthEnd }
+    });
+    const doctorsChange = totalDoctors - previousTotalDoctors;
+
+    // 2. Tổng Bệnh Nhân - So với tuần trước
+    const totalPatients = await User.countDocuments({ role: 'patient' });
+    
+    // User Distribution by Role
+    const totalUsers = await User.countDocuments({});
+    const adminCount = await User.countDocuments({ role: 'admin' });
+    const doctorUserCount = await User.countDocuments({ role: 'doctor' });
+    const patientUserCount = await User.countDocuments({ role: 'patient' });
+    const managerCount = await User.countDocuments({ role: 'manager' });
+    
+    // Count patients created before this week
+    const currentWeekStart = new Date(todayStart);
+    currentWeekStart.setDate(todayStart.getDate() - todayStart.getDay()); // Start of this week
+    const previousWeekEnd = new Date(currentWeekStart);
+    previousWeekEnd.setDate(previousWeekEnd.getDate() - 1);
+    
+    const previousTotalPatients = await User.countDocuments({ 
+      role: 'patient',
+      createdAt: { $lte: previousWeekEnd }
+    });
+    const patientsChange = totalPatients - previousTotalPatients;
+
+    // 3. Lịch Hẹn - Appointments based on selected period (count all appointments regardless of status)
+    // For year period, include appointments scheduled in the current year (even if in future)
+    let appointmentQuery = {};
+    if (originalPeriod === 'year') {
+      // For year, count all appointments scheduled in the current year (including future dates)
+      const yearStart = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0);
+      const yearEnd = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+      appointmentQuery = {
+        scheduledStart: { $gte: yearStart, $lte: yearEnd }
+      };
+    } else {
+      // For other periods, use the calculated startDate and endDate
+      appointmentQuery = {
+        scheduledStart: { $gte: startDate, $lte: endDate }
+      };
+    }
+    
+    const periodAppointments = await Appointment.countDocuments(appointmentQuery);
+
+    // Calculate previous period appointments for comparison
+    let previousPeriodAppointmentsStart, previousPeriodAppointmentsEnd;
+    const periodDurationMs = endDate - startDate;
+    
+    if (originalPeriod === 'year') {
+      // Compare with previous year
+      previousPeriodAppointmentsStart = new Date(today.getFullYear() - 1, 0, 1, 0, 0, 0, 0);
+      previousPeriodAppointmentsEnd = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate(), 23, 59, 59, 999);
+    } else if (originalPeriod === 'month') {
+      // Compare with previous month
+      previousPeriodAppointmentsStart = new Date(today.getFullYear(), today.getMonth() - 1, 1, 0, 0, 0, 0);
+      previousPeriodAppointmentsEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
+    } else if (originalPeriod === 'week') {
+      // Compare with previous week
+      const weekStart = new Date(startDate);
+      previousPeriodAppointmentsEnd = new Date(weekStart);
+      previousPeriodAppointmentsEnd.setDate(previousPeriodAppointmentsEnd.getDate() - 1);
+      previousPeriodAppointmentsEnd.setHours(23, 59, 59, 999);
+      previousPeriodAppointmentsStart = new Date(previousPeriodAppointmentsEnd);
+      previousPeriodAppointmentsStart.setDate(previousPeriodAppointmentsStart.getDate() - 6);
+      previousPeriodAppointmentsStart.setHours(0, 0, 0, 0);
+    } else if (originalPeriod === 'today') {
+      // Compare with yesterday
+      previousPeriodAppointmentsStart = new Date(startDate);
+      previousPeriodAppointmentsStart.setDate(previousPeriodAppointmentsStart.getDate() - 1);
+      previousPeriodAppointmentsEnd = new Date(previousPeriodAppointmentsStart);
+      previousPeriodAppointmentsEnd.setHours(23, 59, 59, 999);
+      previousPeriodAppointmentsStart.setHours(0, 0, 0, 0);
+    } else if (originalPeriod === 'custom') {
+      // Compare with same duration before the custom period
+      previousPeriodAppointmentsEnd = new Date(startDate);
+      previousPeriodAppointmentsEnd.setDate(previousPeriodAppointmentsEnd.getDate() - 1);
+      previousPeriodAppointmentsEnd.setHours(23, 59, 59, 999);
+      previousPeriodAppointmentsStart = new Date(previousPeriodAppointmentsEnd.getTime() - periodDurationMs);
+      previousPeriodAppointmentsStart.setHours(0, 0, 0, 0);
+    } else {
+      // Default: compare with yesterday
+      previousPeriodAppointmentsStart = new Date(startDate);
+      previousPeriodAppointmentsStart.setDate(previousPeriodAppointmentsStart.getDate() - 1);
+      previousPeriodAppointmentsEnd = new Date(previousPeriodAppointmentsStart);
+      previousPeriodAppointmentsEnd.setHours(23, 59, 59, 999);
+      previousPeriodAppointmentsStart.setHours(0, 0, 0, 0);
+    }
+    
+    const previousPeriodAppointments = await Appointment.countDocuments({
+      scheduledStart: { $gte: previousPeriodAppointmentsStart, $lte: previousPeriodAppointmentsEnd }
+    });
+    
+    const appointmentsChange = previousPeriodAppointments > 0 
+      ? periodAppointments - previousPeriodAppointments 
+      : periodAppointments;
+
+    // 4. Doanh Thu - Revenue based on selected period
+    // Calculate revenue for the selected period (startDate to endDate)
+    const periodPayments = await Payment.find({
+      status: { $in: ['captured', 'authorized'] },
+      createdAt: { $gte: startDate, $lte: endDate }
+    });
+    
+    const periodRevenue = periodPayments.reduce((sum, payment) => {
+      return sum + (payment.total - (payment.refundAmount || 0));
+    }, 0);
+
+    // Calculate previous period revenue for comparison
+    let previousPeriodStart, previousPeriodEnd;
+    const periodDuration = endDate - startDate; // Duration in milliseconds
+    
+    if (originalPeriod === 'year') {
+      // Compare with previous year
+      previousPeriodStart = new Date(today.getFullYear() - 1, 0, 1, 0, 0, 0, 0);
+      previousPeriodEnd = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate(), 23, 59, 59, 999);
+    } else if (originalPeriod === 'month') {
+      // Compare with previous month
+      previousPeriodStart = new Date(today.getFullYear(), today.getMonth() - 1, 1, 0, 0, 0, 0);
+      previousPeriodEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
+    } else if (originalPeriod === 'week') {
+      // Compare with previous week
+      const weekStart = new Date(startDate);
+      previousPeriodEnd = new Date(weekStart);
+      previousPeriodEnd.setDate(previousPeriodEnd.getDate() - 1);
+      previousPeriodEnd.setHours(23, 59, 59, 999);
+      previousPeriodStart = new Date(previousPeriodEnd);
+      previousPeriodStart.setDate(previousPeriodStart.getDate() - 6);
+      previousPeriodStart.setHours(0, 0, 0, 0);
+    } else if (originalPeriod === 'today') {
+      // Compare with yesterday
+      previousPeriodStart = new Date(startDate);
+      previousPeriodStart.setDate(previousPeriodStart.getDate() - 1);
+      previousPeriodEnd = new Date(previousPeriodStart);
+      previousPeriodEnd.setHours(23, 59, 59, 999);
+      previousPeriodStart.setHours(0, 0, 0, 0);
+    } else if (originalPeriod === 'custom') {
+      // Compare with same duration before the custom period
+      previousPeriodEnd = new Date(startDate);
+      previousPeriodEnd.setDate(previousPeriodEnd.getDate() - 1);
+      previousPeriodEnd.setHours(23, 59, 59, 999);
+      previousPeriodStart = new Date(previousPeriodEnd.getTime() - periodDuration);
+      previousPeriodStart.setHours(0, 0, 0, 0);
+    } else {
+      // Default: compare with previous month
+      previousPeriodStart = new Date(today.getFullYear(), today.getMonth() - 1, 1, 0, 0, 0, 0);
+      previousPeriodEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
+    }
+    
+    const previousPeriodPayments = await Payment.find({
+      status: { $in: ['captured', 'authorized'] },
+      createdAt: { $gte: previousPeriodStart, $lte: previousPeriodEnd }
+    });
+    const previousPeriodRevenue = previousPeriodPayments.reduce((sum, payment) => {
+      return sum + (payment.total - (payment.refundAmount || 0));
+    }, 0);
+    const revenueChangePercent = previousPeriodRevenue > 0 
+      ? Math.round(((periodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100)
+      : (periodRevenue > 0 ? 100 : 0);
+
+    // 5. Top 3 Bác Sĩ Khám Online Nhiều Nhất
+    const onlineAppointments = await Appointment.aggregate([
+      {
+        $match: {
+          mode: 'online',
+          scheduledStart: { $gte: startDate, $lte: endDate },
+          status: { $in: ['accepted', 'in_progress', 'done'] }
+        }
+      },
+      {
+        $group: {
+          _id: '$doctorId',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      },
+      {
+        $limit: 3
+      },
+      {
+        $lookup: {
+          from: 'Doctors',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'doctor'
+        }
+      },
+      {
+        $unwind: '$doctor'
+      },
+      {
+        $lookup: {
+          from: 'Users',
+          localField: 'doctor.userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $unwind: '$user'
+      },
+      {
+        $project: {
+          doctorId: '$_id',
+          name: '$user.fullName',
+          count: 1
+        }
+      }
+    ]);
+
+    // 6. Top 3 Bác Sĩ Khám Offline Nhiều Nhất
+    const offlineAppointments = await Appointment.aggregate([
+      {
+        $match: {
+          mode: 'offline',
+          scheduledStart: { $gte: startDate, $lte: endDate },
+          status: { $in: ['accepted', 'in_progress', 'done'] }
+        }
+      },
+      {
+        $group: {
+          _id: '$doctorId',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      },
+      {
+        $limit: 3
+      },
+      {
+        $lookup: {
+          from: 'Doctors',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'doctor'
+        }
+      },
+      {
+        $unwind: '$doctor'
+      },
+      {
+        $lookup: {
+          from: 'Users',
+          localField: 'doctor.userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $unwind: '$user'
+      },
+      {
+        $project: {
+          doctorId: '$_id',
+          name: '$user.fullName',
+          count: 1
+        }
+      }
+    ]);
+
+    // 7. Top 3 Bệnh Nhân Đến Khám Nhiều Nhất
+    // First, get appointments in period and collect appointment IDs
+    const appointmentsInPeriod = await Appointment.find({
+      scheduledStart: { $gte: startDate, $lte: endDate },
+      status: { $in: ['accepted', 'in_progress', 'done'] }
+    }).select('_id patientId scheduledStart').lean();
+
+    // Get payments for these appointments
+    const appointmentIds = appointmentsInPeriod.map(apt => apt._id);
+    const paymentsInPeriod = await Payment.find({
+      appointmentId: { $in: appointmentIds },
+      status: 'captured'
+    }).lean();
+
+    // Create a map of appointmentId -> payment amount
+    const paymentMap = new Map();
+    paymentsInPeriod.forEach(payment => {
+      const amount = payment.total - (payment.refundAmount || 0);
+      const existing = paymentMap.get(payment.appointmentId.toString()) || 0;
+      paymentMap.set(payment.appointmentId.toString(), existing + amount);
+    });
+
+    // Group appointments by patient
+    const patientMap = new Map();
+    appointmentsInPeriod.forEach(apt => {
+      const patientId = apt.patientId.toString();
+      if (!patientMap.has(patientId)) {
+        patientMap.set(patientId, {
+          patientId: apt.patientId,
+          visitCount: 0,
+          lastVisit: apt.scheduledStart,
+          appointmentIds: [],
+          totalSpending: 0
+        });
+      }
+      const patient = patientMap.get(patientId);
+      patient.visitCount += 1;
+      if (apt.scheduledStart > patient.lastVisit) {
+        patient.lastVisit = apt.scheduledStart;
+      }
+      patient.appointmentIds.push(apt._id);
+      const paymentAmount = paymentMap.get(apt._id.toString()) || 0;
+      patient.totalSpending += paymentAmount;
+    });
+
+    // Get top 3 patients
+    const topPatientsArray = Array.from(patientMap.values())
+      .sort((a, b) => b.visitCount - a.visitCount)
+      .slice(0, 3);
+
+    // Populate patient and user info
+    const topPatients = await Promise.all(
+      topPatientsArray.map(async (patient) => {
+        const patientDoc = await Patient.findById(patient.patientId).lean();
+        if (!patientDoc) return null;
+        const user = await User.findById(patientDoc.userId).lean();
+        if (!user) return null;
+        return {
+          patientId: patient.patientId,
+          name: user.fullName || `Bệnh nhân`,
+          visitCount: patient.visitCount,
+          lastVisit: patient.lastVisit,
+          totalSpending: patient.totalSpending
+        };
+      })
+    );
+
+    // Filter out nulls and map to final format
+    const topPatientsFinal = topPatients
+      .filter(p => p !== null)
+      .map((item, index) => ({
+        rank: index + 1,
+        name: item.name,
+        visitCount: item.visitCount,
+        lastVisit: item.lastVisit,
+        totalSpending: item.totalSpending || 0
+      }));
+
+    // 8. Tỷ Lệ Loại Khám (Online vs Offline) - Use same query as periodAppointments for consistency
+    let appointmentRatioQuery = {};
+    if (originalPeriod === 'year') {
+      // For year, use same logic as periodAppointments
+      const yearStart = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0);
+      const yearEnd = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+      appointmentRatioQuery = {
+        scheduledStart: { $gte: yearStart, $lte: yearEnd }
+      };
+    } else {
+      appointmentRatioQuery = {
+        scheduledStart: { $gte: startDate, $lte: endDate }
+      };
+    }
+    
+    const totalAppointmentsInPeriod = await Appointment.countDocuments(appointmentRatioQuery);
+    const onlineCount = await Appointment.countDocuments({
+      ...appointmentRatioQuery,
+      mode: 'online'
+    });
+    const offlineCount = await Appointment.countDocuments({
+      ...appointmentRatioQuery,
+      mode: 'offline'
+    });
+    
+    const onlinePercent = totalAppointmentsInPeriod > 0 
+      ? Math.round((onlineCount / totalAppointmentsInPeriod) * 100)
+      : 0;
+    const offlinePercent = totalAppointmentsInPeriod > 0 
+      ? Math.round((offlineCount / totalAppointmentsInPeriod) * 100)
+      : 0;
+
+    // 9. Revenue Trend (Daily for week/month/year, hourly for today)
+    const revenueTrend = [];
+    const daysDiff = Math.ceil(periodDurationMs / (1000 * 60 * 60 * 24));
+    
+    if (originalPeriod === 'today') {
+      // Hourly trend for today
+      for (let hour = 0; hour < 24; hour++) {
+        const hourStart = new Date(startDate);
+        hourStart.setHours(hour, 0, 0, 0);
+        const hourEnd = new Date(startDate);
+        hourEnd.setHours(hour, 59, 59, 999);
+        
+        const hourPayments = await Payment.find({
+          status: { $in: ['captured', 'authorized'] },
+          createdAt: { $gte: hourStart, $lte: hourEnd }
+        }).populate('appointmentId', 'mode');
+        
+        let onlineRevenue = 0;
+        let offlineRevenue = 0;
+        
+        hourPayments.forEach(payment => {
+          const netAmount = payment.total - (payment.refundAmount || 0);
+          if (payment.appointmentId?.mode === 'online') {
+            onlineRevenue += netAmount;
+          } else if (payment.appointmentId?.mode === 'offline') {
+            offlineRevenue += netAmount;
+          }
+        });
+        
+        revenueTrend.push({
+          date: `${hour.toString().padStart(2, '0')}:00`,
+          online: onlineRevenue,
+          offline: offlineRevenue,
+          total: onlineRevenue + offlineRevenue
+        });
+      }
+    } else if (daysDiff <= 7) {
+      // Daily trend for week
+      const currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        const dayStart = new Date(currentDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(currentDate);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        const dayPayments = await Payment.find({
+          status: { $in: ['captured', 'authorized'] },
+          createdAt: { $gte: dayStart, $lte: dayEnd }
+        }).populate('appointmentId', 'mode');
+        
+        let onlineRevenue = 0;
+        let offlineRevenue = 0;
+        
+        dayPayments.forEach(payment => {
+          const netAmount = payment.total - (payment.refundAmount || 0);
+          if (payment.appointmentId?.mode === 'online') {
+            onlineRevenue += netAmount;
+          } else if (payment.appointmentId?.mode === 'offline') {
+            offlineRevenue += netAmount;
+          }
+        });
+        
+        const dateStr = `${currentDate.getDate().toString().padStart(2, '0')}/${(currentDate.getMonth() + 1).toString().padStart(2, '0')}`;
+        revenueTrend.push({
+          date: dateStr,
+          online: onlineRevenue,
+          offline: offlineRevenue,
+          total: onlineRevenue + offlineRevenue
+        });
+        
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    } else {
+      // Monthly trend for month/year
+      const currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
+        
+        const monthPayments = await Payment.find({
+          status: { $in: ['captured', 'authorized'] },
+          createdAt: { $gte: monthStart, $lte: monthEnd }
+        }).populate('appointmentId', 'mode');
+        
+        let onlineRevenue = 0;
+        let offlineRevenue = 0;
+        
+        monthPayments.forEach(payment => {
+          const netAmount = payment.total - (payment.refundAmount || 0);
+          if (payment.appointmentId?.mode === 'online') {
+            onlineRevenue += netAmount;
+          } else if (payment.appointmentId?.mode === 'offline') {
+            offlineRevenue += netAmount;
+          }
+        });
+        
+        revenueTrend.push({
+          date: `Th${currentDate.getMonth() + 1}/${currentDate.getFullYear()}`,
+          online: onlineRevenue,
+          offline: offlineRevenue,
+          total: onlineRevenue + offlineRevenue
+        });
+        
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+    }
+
+    const statistics = {
+      totalDoctors: {
+        value: totalDoctors,
+        change: doctorsChange,
+        changeLabel: doctorsChange >= 0 
+          ? `+${doctorsChange} so với tháng trước`
+          : `${doctorsChange} so với tháng trước`
+      },
+      totalPatients: {
+        value: totalPatients,
+        change: patientsChange,
+        changeLabel: patientsChange >= 0 
+          ? `+${patientsChange} so với tuần trước`
+          : `${patientsChange} so với tuần trước`
+      },
+      todayAppointments: {
+        value: periodAppointments,
+        change: appointmentsChange,
+        changeLabel: (() => {
+          let periodLabel = 'hôm qua';
+          if (originalPeriod === 'year') periodLabel = 'năm trước';
+          else if (originalPeriod === 'month') periodLabel = 'tháng trước';
+          else if (originalPeriod === 'week') periodLabel = 'tuần trước';
+          else if (originalPeriod === 'today') periodLabel = 'hôm qua';
+          else if (originalPeriod === 'custom') periodLabel = 'kỳ trước';
+          
+          return appointmentsChange >= 0 
+            ? `+${appointmentsChange} so với ${periodLabel}`
+            : `${appointmentsChange} so với ${periodLabel}`;
+        })()
+      },
+      monthRevenue: {
+        value: periodRevenue,
+        changePercent: revenueChangePercent,
+        changeLabel: (() => {
+          let periodLabel = 'tháng trước';
+          if (originalPeriod === 'year') periodLabel = 'năm trước';
+          else if (originalPeriod === 'month') periodLabel = 'tháng trước';
+          else if (originalPeriod === 'week') periodLabel = 'tuần trước';
+          else if (originalPeriod === 'today') periodLabel = 'hôm qua';
+          else if (originalPeriod === 'custom') periodLabel = 'kỳ trước';
+          
+          return revenueChangePercent >= 0 
+            ? `+${revenueChangePercent}% so với ${periodLabel}`
+            : `${revenueChangePercent}% so với ${periodLabel}`;
+        })()
+      },
+      topDoctorsOnline: onlineAppointments.map((item, index) => ({
+        rank: index + 1,
+        name: item.name || `Dr. ${index + 1}`,
+        count: item.count
+      })),
+      topDoctorsOffline: offlineAppointments.map((item, index) => ({
+        rank: index + 1,
+        name: item.name || `Dr. ${index + 1}`,
+        count: item.count
+      })),
+      topPatients: topPatientsFinal,
+      appointmentRatio: {
+        online: onlinePercent,
+        offline: offlinePercent,
+        onlineCount: onlineCount,
+        offlineCount: offlineCount,
+        total: totalAppointmentsInPeriod
+      },
+      userDistribution: {
+        total: totalUsers,
+        admin: adminCount,
+        doctor: doctorUserCount,
+        patient: patientUserCount,
+        manager: managerCount || 0,
+        adminPercent: totalUsers > 0 ? Math.round((adminCount / totalUsers) * 100) : 0,
+        doctorPercent: totalUsers > 0 ? Math.round((doctorUserCount / totalUsers) * 100) : 0,
+        patientPercent: totalUsers > 0 ? Math.round((patientUserCount / totalUsers) * 100) : 0,
+        managerPercent: totalUsers > 0 ? Math.round(((managerCount || 0) / totalUsers) * 100) : 0
+      },
+      revenueTrend: revenueTrend
+    };
+
+    res.json({
+      success: true,
+      data: statistics
+    });
+  } catch (error) {
+    console.error("Error fetching statistics:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi tải thống kê"
     });
   }
 };

@@ -8,6 +8,7 @@ import {
   ClockCircleOutlined,
   ArrowRightOutlined,
   HomeOutlined,
+  AppstoreOutlined,
 } from "@ant-design/icons";
 import NavigationBreadcrumb from "../../components/Breadcrumb/NavigationBreadcrumb";
 import "./AppointmentBookingHome.css";
@@ -19,6 +20,10 @@ const AppointmentBookingHome = () => {
 
   const handleStartBooking = () => {
     navigate("/dat-lich/chon-chuyen-khoa");
+  };
+
+  const handleStartMultiSpecializationBooking = () => {
+    navigate("/dat-lich-nhieu-chuyen-khoa");
   };
 
   const steps = [
@@ -76,28 +81,57 @@ const AppointmentBookingHome = () => {
 
         {/* Main CTA */}
         <div className="main-cta-section">
-          <Card className="main-cta-card">
-            <div className="cta-content">
-              <div className="cta-icon">
-                <CalendarOutlined />
-              </div>
-              <div className="cta-text">
-                <Title level={2}>Bắt đầu đặt lịch khám</Title>
-                <Paragraph>
-                  Chọn chuyên khoa, bác sĩ và thời gian phù hợp với bạn
-                </Paragraph>
-              </div>
-              <Button
-                type="primary"
-                size="large"
-                icon={<ArrowRightOutlined />}
-                onClick={handleStartBooking}
-                className="cta-button"
-              >
-                Đặt lịch ngay
-              </Button>
-            </div>
-          </Card>
+          <Row gutter={[24, 24]}>
+            <Col xs={24} lg={12}>
+              <Card className="main-cta-card">
+                <div className="cta-content">
+                  <div className="cta-icon">
+                    <CalendarOutlined />
+                  </div>
+                  <div className="cta-text">
+                    <Title level={2}>Đặt lịch đơn lẻ</Title>
+                    <Paragraph>
+                      Đặt lịch khám một chuyên khoa, một bác sĩ trong một lần
+                    </Paragraph>
+                  </div>
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<ArrowRightOutlined />}
+                    onClick={handleStartBooking}
+                    className="cta-button"
+                  >
+                    Đặt lịch ngay
+                  </Button>
+                </div>
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card className="main-cta-card" style={{ background: "#f0f7ff" }}>
+                <div className="cta-content">
+                  <div className="cta-icon">
+                    <AppstoreOutlined />
+                  </div>
+                  <div className="cta-text">
+                    <Title level={2}>Đặt lịch nhiều chuyên khoa</Title>
+                    <Paragraph>
+                      Đặt nhiều lịch khám trong cùng một ngày, gom thành một phiên khám
+                    </Paragraph>
+                  </div>
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<AppstoreOutlined />}
+                    onClick={handleStartMultiSpecializationBooking}
+                    className="cta-button"
+                    style={{ background: "#1890ff", borderColor: "#1890ff" }}
+                  >
+                    Đặt nhiều lịch
+                  </Button>
+                </div>
+              </Card>
+            </Col>
+          </Row>
         </div>
 
         {/* Steps */}

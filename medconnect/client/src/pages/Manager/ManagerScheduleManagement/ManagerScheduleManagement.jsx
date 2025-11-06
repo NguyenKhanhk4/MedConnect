@@ -1,4 +1,4 @@
- import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Clock,
@@ -8,7 +8,6 @@ import {
   User,
   Search,
   Trash2,
-  DollarSign,
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
@@ -29,6 +28,7 @@ import {
   api,
   rescheduleAppointmentByManager,
   getManagerPatients,
+  getEducationLevelPrices,
 } from "../../../lib/api";
 import { RescheduleModal } from "../../../components/RescheduleModal/RescheduleModal";
 import "./ManagerScheduleManagement.scss";
@@ -101,23 +101,19 @@ export default function ManagerScheduleManagement() {
   // Reschedule modal states
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
 
-  // Pricing management states
-  const [showPricingDialog, setShowPricingDialog] = useState(false);
-  const [pricingData, setPricingData] = useState({
-    online: { weekday: 5000, weekend: 250000 },
-    offline: { weekday: 6000, weekend: 350000 },
-  });
-  const [loadingPricing, setLoadingPricing] = useState(false);
+  // Education level prices state
+  const [educationLevelPrices, setEducationLevelPrices] = useState({});
 
   // Load specializations on mount
   useEffect(() => {
     loadSpecializations();
+    loadEducationLevelPrices();
   }, []);
 
-  // Load pricing when doctor is selected
+  // Reload education level prices when doctor changes (to ensure latest prices)
   useEffect(() => {
     if (selectedDoctorId) {
-      loadDoctorPricing();
+      loadEducationLevelPrices();
     }
   }, [selectedDoctorId]);
 
@@ -127,7 +123,8 @@ export default function ManagerScheduleManagement() {
   useEffect(() => {
     if (!selectedDoctorId) return;
     const doctor = doctors.find((d) => d._id === selectedDoctorId);
-    const defaultClinicId = doctor?.clinicDefaultId?._id || doctor?.clinicDefaultId || null;
+    const defaultClinicId =
+      doctor?.clinicDefaultId?._id || doctor?.clinicDefaultId || null;
     setBookingData((prev) => ({
       ...prev,
       mode: "offline",
@@ -214,16 +211,9 @@ export default function ManagerScheduleManagement() {
       }
 
       const url = `/api/managers/doctors?${params.toString()}`;
-      console.log("[Manager] Loading doctors with URL:", url);
-      console.log("[Manager] Search name:", searchName);
-      console.log("[Manager] Specialization ID:", selectedSpecializationId);
 
       const response = await api.get(url);
       if (response.success) {
-        console.log(
-          "[Manager] Received doctors:",
-          response.data.doctors?.length || 0
-        );
         setDoctors(response.data.doctors || []);
       } else {
         console.error("[Manager] Failed to load doctors:", response);
@@ -382,11 +372,9 @@ export default function ManagerScheduleManagement() {
 
     try {
       setGenerating(true);
-      console.log("🔍 Generating time slots for doctor:", selectedDoctorId);
       const response = await api.post(
         `/api/managers/doctors/${selectedDoctorId}/generate-slots`
       );
-      console.log("🔍 Generate response:", response);
       if (response.success) {
         const createdCount = response.data.createdSlots || 0;
         const totalSlots = response.data.totalFutureSlots || 0;
@@ -424,98 +412,32 @@ export default function ManagerScheduleManagement() {
     }
   };
 
-  const loadDoctorPricing = async () => {
-    if (!selectedDoctorId) return;
-
+  const loadEducationLevelPrices = async () => {
     try {
-      const response = await api.get(
-        `/api/managers/doctors/${selectedDoctorId}/pricing`
-      );
+      const response = await getEducationLevelPrices();
 
-      if (response.success && response.data.pricing) {
-        const pricing = response.data.pricing;
-        const onlinePricing = pricing.find((p) => p.mode === "online");
-        const offlinePricing = pricing.find((p) => p.mode === "offline");
+      // Check both response.data.prices and response.prices (for different response formats)
+      const pricesData = response.data?.prices || response.prices || {};
 
-        setPricingData({
-          online: {
-            weekday: onlinePricing?.weekdayPrice || 5000,
-            weekend: onlinePricing?.weekendPrice || 6000,
-          },
-          offline: {
-            weekday: offlinePricing?.weekdayPrice || 300000,
-            weekend: offlinePricing?.weekendPrice || 350000,
-          },
-        });
+      if (response.success && pricesData) {
+        setEducationLevelPrices(pricesData);
       }
     } catch (error) {
-      console.error("Error loading pricing:", error);
-      // Keep default pricing
+      console.error("Error loading education level prices:", error);
     }
   };
 
-  const saveDoctorPricing = async () => {
-    if (!selectedDoctorId) return;
+  // Helper function to get price for doctor based on education level
+  const getPriceForDoctor = (mode, isWeekend) => {
+    if (!selectedDoctorId) return null;
 
-    // Validation: Check if all prices are filled and > 0
-    if (
-      !pricingData.online.weekday ||
-      pricingData.online.weekday <= 0 ||
-      !pricingData.online.weekend ||
-      pricingData.online.weekend <= 0 ||
-      !pricingData.offline.weekday ||
-      pricingData.offline.weekday <= 0 ||
-      !pricingData.offline.weekend ||
-      pricingData.offline.weekend <= 0
-    ) {
-      alert("❌ Vui lòng điền đầy đủ tất cả các giá và giá phải lớn hơn 0!");
-      return;
-    }
-
-    // Get selected doctor to access clinicDefaultId
     const doctor = doctors.find((d) => d._id === selectedDoctorId);
-    if (!doctor) {
-      alert("❌ Không tìm thấy thông tin bác sĩ");
-      return;
-    }
+    if (!doctor || !doctor.educationLevel) return null;
 
-    // Get clinic ID for offline pricing
-    const clinicId = doctor.clinicDefaultId?._id || doctor.clinicDefaultId;
-    if (!clinicId) {
-      alert(
-        "❌ Bác sĩ chưa có phòng khám mặc định. Vui lòng cập nhật thông tin bác sĩ trước."
-      );
-      return;
-    }
+    const prices = educationLevelPrices[doctor.educationLevel];
+    if (!prices || !prices[mode]) return null;
 
-    try {
-      setLoadingPricing(true);
-
-      // Save online pricing
-      await api.post(`/api/managers/doctors/${selectedDoctorId}/pricing`, {
-        mode: "online",
-        weekdayPrice: pricingData.online.weekday,
-        weekendPrice: pricingData.online.weekend,
-        isActive: true,
-      });
-
-      // Save offline pricing with clinicId
-      await api.post(`/api/managers/doctors/${selectedDoctorId}/pricing`, {
-        mode: "offline",
-        clinicId: clinicId,
-        weekdayPrice: pricingData.offline.weekday,
-        weekendPrice: pricingData.offline.weekend,
-        isActive: true,
-      });
-
-      alert("✅ Đã lưu bảng giá thành công!");
-      setShowPricingDialog(false);
-    } catch (error) {
-      console.error("Error saving pricing:", error);
-      alert("❌ Lỗi khi lưu bảng giá: " + error.message);
-    } finally {
-      setLoadingPricing(false);
-    }
+    return isWeekend ? prices[mode].weekendPrice : prices[mode].weekdayPrice;
   };
 
   // Process slots similar to ScheduleManagement
@@ -565,42 +487,17 @@ export default function ManagerScheduleManagement() {
 
         // Nếu slot mới có appointment và slot cũ không có, thay thế
         if (newHasAppointment && !existingHasAppointment) {
-          console.log(
-            `🔄 Replacing slot at ${slotTime} for date ${slotDate} (new has appointment)`
-          );
           slotsMap[slotDate][slotTime] = mappedSlot;
         } else if (!newHasAppointment && existingHasAppointment) {
-          console.log(
-            `⏭️ Keeping existing slot at ${slotTime} for date ${slotDate} (existing has appointment)`
-          );
           // Giữ slot cũ
         } else {
           // Cả hai đều có hoặc không có appointment, giữ slot đầu tiên
-          console.log(
-            `⚠️ Duplicate slot time found: ${slotTime} for date: ${slotDate}, keeping first`
-          );
         }
       } else {
         // Chưa có slot, thêm mới
         slotsMap[slotDate][slotTime] = mappedSlot;
 
-        // Log for booked slots
-        if (
-          slot.status === "booked" ||
-          slot.status === "pending" ||
-          slot.status === "confirmed" ||
-          slot.status === "completed" ||
-          slot.status === "in_progress"
-        ) {
-          console.log("✅ Booked slot mapped:", {
-            slotId: slot._id,
-            date: slotDate,
-            time: slotTime,
-            patientName: mappedSlot.patientName,
-            mode: mappedSlot.mode,
-            status: mappedSlot.status,
-          });
-        }
+        // Booked slots are mapped
       }
     });
 
@@ -871,7 +768,7 @@ export default function ManagerScheduleManagement() {
     }
 
     // Calculate age
-    const age = today.getFullYear() - birthDate.getFullYear();
+    let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
     if (
       monthDiff < 0 ||
@@ -1011,7 +908,8 @@ export default function ManagerScheduleManagement() {
     if (!bookingData.clinicId) {
       const selectedDoctor = doctors.find((d) => d._id === selectedDoctorId);
       if (!selectedDoctor?.clinicDefaultId) {
-        errors.clinicId = "Bác sĩ chưa có phòng khám mặc định. Vui lòng cập nhật thông tin bác sĩ.";
+        errors.clinicId =
+          "Bác sĩ chưa có phòng khám mặc định. Vui lòng cập nhật thông tin bác sĩ.";
       }
     }
 
@@ -1099,10 +997,15 @@ export default function ManagerScheduleManagement() {
 
       // Ensure clinicId is set from doctor's default clinic
       const selectedDoctor = doctors.find((d) => d._id === selectedDoctorId);
-      const defaultClinicId = selectedDoctor?.clinicDefaultId?._id || selectedDoctor?.clinicDefaultId || bookingData.clinicId;
-      
+      const defaultClinicId =
+        selectedDoctor?.clinicDefaultId?._id ||
+        selectedDoctor?.clinicDefaultId ||
+        bookingData.clinicId;
+
       if (!defaultClinicId) {
-        alert("Bác sĩ chưa có phòng khám mặc định. Vui lòng cập nhật thông tin bác sĩ trước.");
+        alert(
+          "Bác sĩ chưa có phòng khám mặc định. Vui lòng cập nhật thông tin bác sĩ trước."
+        );
         return;
       }
 
@@ -1135,12 +1038,15 @@ export default function ManagerScheduleManagement() {
         appointmentData.allergyNotes = bookingData.allergyNotes || "";
       }
 
-      console.log("📤 [Frontend] Creating booking payment (appointment will be created after payment success):", {
-        ...appointmentData,
-        dob: appointmentData.dob || "N/A",
-        scheduledStart: appointmentData.scheduledStart,
-        scheduledEnd: appointmentData.scheduledEnd,
-      });
+      console.log(
+        "📤 [Frontend] Creating booking payment (appointment will be created after payment success):",
+        {
+          ...appointmentData,
+          dob: appointmentData.dob || "N/A",
+          scheduledStart: appointmentData.scheduledStart,
+          scheduledEnd: appointmentData.scheduledEnd,
+        }
+      );
 
       // Create booking payment FIRST (appointment will be created but slot not booked until payment success)
       const response = await api.post(
@@ -1149,7 +1055,9 @@ export default function ManagerScheduleManagement() {
       );
 
       if (response.success) {
-        alert("Đã gửi yêu cầu thanh toán đặt lịch. Vui lòng thanh toán để hoàn tất đặt lịch.");
+        alert(
+          "Đã gửi yêu cầu thanh toán đặt lịch. Vui lòng thanh toán để hoàn tất đặt lịch."
+        );
         // Close form and reset
         setShowBookSlot(false);
         setBookingData({
@@ -1233,7 +1141,6 @@ export default function ManagerScheduleManagement() {
     }
 
     try {
-      console.log("🗑️ Deleting slot:", slotId);
       const response = await api.delete(
         `/api/managers/doctors/${selectedDoctorId}/time-slots/${slotId}`
       );
@@ -1473,14 +1380,6 @@ export default function ManagerScheduleManagement() {
             <div className="header-right">
               <div className="action-buttons">
                 <Button
-                  onClick={() => setShowPricingDialog(true)}
-                  className="pricing-btn"
-                  variant="outline"
-                >
-                  <DollarSign size={16} />
-                  Quản lý giá
-                </Button>
-                <Button
                   onClick={handleGenerateSlots}
                   className="auto-generate-btn"
                   disabled={generating}
@@ -1499,6 +1398,108 @@ export default function ManagerScheduleManagement() {
               </div>
             </div>
           </div>
+
+          {/* Doctor Pricing Information */}
+          {selectedDoctor && (
+            <div className="doctor-pricing-info">
+              <div className="pricing-card">
+                <h3
+                  style={{
+                    marginBottom: "12px",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "#374151",
+                  }}
+                >
+                  💰 Bảng giá khám
+                </h3>
+                <div className="pricing-grid">
+                  {/* Online Pricing */}
+                  <div className="pricing-item">
+                    <div className="pricing-mode">Khám Online</div>
+                    <div className="pricing-details">
+                      <div className="pricing-row">
+                        <span className="pricing-label">Thứ 2-6:</span>
+                        <span className="pricing-value">
+                          {(() => {
+                            const price = getPriceForDoctor("online", false);
+                            return price
+                              ? new Intl.NumberFormat("vi-VN", {
+                                  style: "currency",
+                                  currency: "VND",
+                                }).format(price)
+                              : "Chưa có giá";
+                          })()}
+                        </span>
+                      </div>
+                      <div className="pricing-row">
+                        <span className="pricing-label">Thứ 7-CN:</span>
+                        <span className="pricing-value">
+                          {(() => {
+                            const price = getPriceForDoctor("online", true);
+                            return price
+                              ? new Intl.NumberFormat("vi-VN", {
+                                  style: "currency",
+                                  currency: "VND",
+                                }).format(price)
+                              : "Chưa có giá";
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Offline Pricing */}
+                  <div className="pricing-item">
+                    <div className="pricing-mode">Khám tại phòng khám</div>
+                    <div className="pricing-details">
+                      <div className="pricing-row">
+                        <span className="pricing-label">Thứ 2-6:</span>
+                        <span className="pricing-value">
+                          {(() => {
+                            const price = getPriceForDoctor("offline", false);
+                            return price
+                              ? new Intl.NumberFormat("vi-VN", {
+                                  style: "currency",
+                                  currency: "VND",
+                                }).format(price)
+                              : "Chưa có giá";
+                          })()}
+                        </span>
+                      </div>
+                      <div className="pricing-row">
+                        <span className="pricing-label">Thứ 7-CN:</span>
+                        <span className="pricing-value">
+                          {(() => {
+                            const price = getPriceForDoctor("offline", true);
+                            return price
+                              ? new Intl.NumberFormat("vi-VN", {
+                                  style: "currency",
+                                  currency: "VND",
+                                }).format(price)
+                              : "Chưa có giá";
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {selectedDoctor.educationLevel && (
+                  <div
+                    className="pricing-note"
+                    style={{
+                      marginTop: "8px",
+                      fontSize: "12px",
+                      color: "#6b7280",
+                    }}
+                  >
+                    Giá theo trình độ:{" "}
+                    <strong>{selectedDoctor.educationLevel}</strong>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="schedule-content">
             {loading && (
@@ -1718,139 +1719,6 @@ export default function ManagerScheduleManagement() {
         </>
       )}
 
-      {/* Pricing Management Dialog */}
-      <Dialog open={showPricingDialog} onOpenChange={setShowPricingDialog}>
-        <DialogContent className="pricing-dialog" style={{ maxWidth: "600px" }}>
-          <DialogHeader>
-            <DialogTitle>💰 Quản lý bảng giá</DialogTitle>
-          </DialogHeader>
-          <div className="pricing-content">
-            <p style={{ marginBottom: "24px", color: "#666" }}>
-              Thiết lập giá khám cho bác sĩ:{" "}
-              <strong>{selectedDoctor?.fullName}</strong>
-            </p>
-
-            {/* Online Pricing */}
-            <div className="pricing-section">
-              <h3
-                style={{
-                  marginBottom: "16px",
-                  fontSize: "16px",
-                  fontWeight: 600,
-                }}
-              >
-                Khám online
-              </h3>
-              <div className="pricing-row">
-                <div className="pricing-field">
-                  <label>Thứ 2-6 (VND):</label>
-                  <Input
-                    type="number"
-                    value={pricingData.online.weekday || ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setPricingData({
-                        ...pricingData,
-                        online: {
-                          ...pricingData.online,
-                          weekday: value === "" ? 0 : parseInt(value),
-                        },
-                      });
-                    }}
-                    placeholder="200000"
-                  />
-                </div>
-                <div className="pricing-field">
-                  <label>Thứ 7-CN (VND):</label>
-                  <Input
-                    type="number"
-                    value={pricingData.online.weekend || ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setPricingData({
-                        ...pricingData,
-                        online: {
-                          ...pricingData.online,
-                          weekend: value === "" ? 0 : parseInt(value),
-                        },
-                      });
-                    }}
-                    placeholder="250000"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Offline Pricing */}
-            <div className="pricing-section">
-              <h3
-                style={{
-                  marginBottom: "16px",
-                  fontSize: "16px",
-                  fontWeight: 600,
-                }}
-              >
-                Khám tại phòng khám
-              </h3>
-              <div className="pricing-row">
-                <div className="pricing-field">
-                  <label>Thứ 2-6 (VND):</label>
-                  <Input
-                    type="number"
-                    value={pricingData.offline.weekday || ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setPricingData({
-                        ...pricingData,
-                        offline: {
-                          ...pricingData.offline,
-                          weekday: value === "" ? 0 : parseInt(value),
-                        },
-                      });
-                    }}
-                    placeholder="300000"
-                  />
-                </div>
-                <div className="pricing-field">
-                  <label>Thứ 7-CN (VND):</label>
-                  <Input
-                    type="number"
-                    value={pricingData.offline.weekend || ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setPricingData({
-                        ...pricingData,
-                        offline: {
-                          ...pricingData.offline,
-                          weekend: value === "" ? 0 : parseInt(value),
-                        },
-                      });
-                    }}
-                    placeholder="350000"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="dialog-actions" style={{ marginTop: "24px" }}>
-              <Button
-                variant="outline"
-                onClick={() => setShowPricingDialog(false)}
-              >
-                Hủy
-              </Button>
-              <Button
-                variant="primary"
-                onClick={saveDoctorPricing}
-                disabled={loadingPricing}
-              >
-                {loadingPricing ? "Đang lưu..." : "Lưu bảng giá"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Block Detail Dialog - Hiển thị lý do nghỉ (chỉ xem, không đăng ký) */}
       <Dialog
         open={showBlockDetailDialog}
@@ -1902,7 +1770,7 @@ export default function ManagerScheduleManagement() {
           <div className="form-group" style={{ position: "relative" }}>
             <label>Chọn bệnh nhân:</label>
             <div className="patient-search-wrapper">
-            <Input
+              <Input
                 value={patientSearchTerm}
                 onChange={(e) => {
                   setPatientSearchTerm(e.target.value);
@@ -2035,7 +1903,7 @@ export default function ManagerScheduleManagement() {
                     </label>
                     <Input
                       data-field="patientName"
-              value={bookingData.patientName}
+                      value={bookingData.patientName}
                       onChange={(e) => {
                         setBookingData({
                           ...bookingData,
@@ -2075,7 +1943,7 @@ export default function ManagerScheduleManagement() {
                         {validationErrors.patientName}
                       </span>
                     )}
-          </div>
+                  </div>
                   <div>
                     <label
                       style={{
@@ -2087,10 +1955,10 @@ export default function ManagerScheduleManagement() {
                     >
                       Số điện thoại <span style={{ color: "red" }}>*</span>
                     </label>
-            <Input
+                    <Input
                       data-field="patientPhone"
                       type="tel"
-              value={bookingData.patientPhone}
+                      value={bookingData.patientPhone}
                       onChange={(e) => {
                         // Chỉ cho phép số
                         const value = e.target.value.replace(/\D/g, "");
@@ -2541,7 +2409,7 @@ export default function ManagerScheduleManagement() {
                     </label>
                     <textarea
                       value={bookingData.allergyNotes}
-              onChange={(e) =>
+                      onChange={(e) =>
                         setBookingData({
                           ...bookingData,
                           allergyNotes: e.target.value,
@@ -2620,82 +2488,88 @@ export default function ManagerScheduleManagement() {
                 }
                 if (dateToCheck) {
                   const isWeekend = [0, 6].includes(dateToCheck.getDay());
-                  const p = isWeekend
-                    ? pricingData.offline.weekend
-                    : pricingData.offline.weekday;
-                  if (p && p > 0) {
-                    price = p;
-                  }
+                  price = getPriceForDoctor("offline", isWeekend);
                 }
               } catch (e) {}
               return price ? (
                 <div style={{ marginTop: "8px", color: "#0f766e" }}>
-                  Giá khám tại phòng: <strong>{new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(price)}</strong>
+                  Giá khám tại phòng:{" "}
+                  <strong>
+                    {new Intl.NumberFormat("vi-VN", {
+                      style: "currency",
+                      currency: "VND",
+                    }).format(price)}
+                  </strong>
                 </div>
               ) : null;
             })()}
 
             <div style={{ marginTop: "12px" }} data-field="clinicId">
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                  }}
-                >
-                  Phòng khám
-                </label>
-                {(() => {
-                  const selectedDoctor = doctors.find((d) => d._id === selectedDoctorId);
-                  const clinic = selectedDoctor?.clinicDefaultId;
-                  
-                  if (!selectedDoctor) {
-                    return (
-                      <div style={{ padding: "12px", color: "#6b7280" }}>
-                        Vui lòng chọn bác sĩ trước
-                      </div>
-                    );
-                  }
-                  
-                  if (!clinic) {
-                    return (
-                      <div style={{ padding: "12px", color: "#ef4444" }}>
-                        Bác sĩ chưa có phòng khám mặc định. Vui lòng cập nhật thông tin bác sĩ.
-                      </div>
-                    );
-                  }
-                  
-                  const clinicName = clinic.name || "N/A";
-                  const clinicAddress = clinic.address ? ` - ${clinic.address}` : "";
-                  
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                }}
+              >
+                Phòng khám
+              </label>
+              {(() => {
+                const selectedDoctor = doctors.find(
+                  (d) => d._id === selectedDoctorId
+                );
+                const clinic = selectedDoctor?.clinicDefaultId;
+
+                if (!selectedDoctor) {
                   return (
-                    <div
-                      style={{
-                        padding: "12px",
-                        backgroundColor: "#f3f4f6",
-                        borderRadius: "6px",
-                        border: "1px solid #e5e7eb",
-                        color: "#374151",
-                      }}
-                    >
-                      <strong>{clinicName}</strong>
-                      {clinicAddress && <span>{clinicAddress}</span>}
+                    <div style={{ padding: "12px", color: "#6b7280" }}>
+                      Vui lòng chọn bác sĩ trước
                     </div>
                   );
-                })()}
-                {validationErrors.clinicId && (
-                  <span
+                }
+
+                if (!clinic) {
+                  return (
+                    <div style={{ padding: "12px", color: "#ef4444" }}>
+                      Bác sĩ chưa có phòng khám mặc định. Vui lòng cập nhật
+                      thông tin bác sĩ.
+                    </div>
+                  );
+                }
+
+                const clinicName = clinic.name || "N/A";
+                const clinicAddress = clinic.address
+                  ? ` - ${clinic.address}`
+                  : "";
+
+                return (
+                  <div
                     style={{
-                      color: "#ef4444",
-                      fontSize: "12px",
-                      marginTop: "4px",
-                      display: "block",
+                      padding: "12px",
+                      backgroundColor: "#f3f4f6",
+                      borderRadius: "6px",
+                      border: "1px solid #e5e7eb",
+                      color: "#374151",
                     }}
                   >
-                    {validationErrors.clinicId}
-                  </span>
-                )}
+                    <strong>{clinicName}</strong>
+                    {clinicAddress && <span>{clinicAddress}</span>}
+                  </div>
+                );
+              })()}
+              {validationErrors.clinicId && (
+                <span
+                  style={{
+                    color: "#ef4444",
+                    fontSize: "12px",
+                    marginTop: "4px",
+                    display: "block",
+                  }}
+                >
+                  {validationErrors.clinicId}
+                </span>
+              )}
             </div>
           </div>
           <div className="dialog-actions">

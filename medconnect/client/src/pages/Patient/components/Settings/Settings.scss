@@ -175,11 +175,29 @@ main.main-content {
 }
 
 /* Form */
+.form-section {
+  margin-bottom: 2.5rem;
+  padding: 2rem;
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.form-section > h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #f1f5f9;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2rem;
-  margin-bottom: 2rem;
+  margin-bottom: 0;
   pointer-events: auto;
   width: 100%;
   max-width: 100%;
@@ -252,6 +270,11 @@ main.main-content {
   font-size: 0.75rem;
   margin-top: 0.25rem;
   line-height: 1.4;
+}
+
+/* Form Select Small */
+.form-select-small {
+  max-width: 200px !important;
 }
 
 .form-textarea {

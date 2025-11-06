@@ -48,16 +48,9 @@ export default function EducationLevelPriceManagement() {
     try {
       setLoading(true);
       const response = await getEducationLevelPrices();
-      console.log("Education level prices response:", response);
       if (response.success) {
         // Response format: { success: true, data: { prices: {...}, allPrices: [...] } }
         const pricesData = response.data?.prices || response.prices || {};
-        console.log("Prices data:", pricesData);
-        console.log("Prices data keys:", Object.keys(pricesData));
-        // Log each level
-        educationLevels.forEach((level) => {
-          console.log(`${level}:`, pricesData[level]);
-        });
         setPrices(pricesData);
       } else {
         message.error(response.message || "Không thể tải danh sách giá");
@@ -110,9 +103,7 @@ export default function EducationLevelPriceManagement() {
         weekdayPrice: Number(values.weekdayPrice),
         weekendPrice: Number(values.weekendPrice),
       };
-      console.log("Saving price data:", priceData);
       const response = await setEducationLevelPrice(priceData);
-      console.log("Save price response:", response);
 
       // Check if response has success property (wrapped in data)
       const success = response.success || response.data?.success;
@@ -178,12 +169,6 @@ export default function EducationLevelPriceManagement() {
   const tableData = educationLevels.map((level) => {
     const onlinePrice = prices[level]?.online;
     const offlinePrice = prices[level]?.offline;
-
-    console.log(`Level: ${level}`, {
-      online: onlinePrice,
-      offline: offlinePrice,
-      pricesForLevel: prices[level],
-    });
 
     return {
       key: level,
@@ -337,7 +322,7 @@ export default function EducationLevelPriceManagement() {
         <div className="page-header">
           <div>
             <h1>
-              <DollarOutlined /> Quản lý giá theo trình độ học vấn
+              <DollarOutlined /> Quản lý giá khám
             </h1>
             <p>Quản lý giá khám theo trình độ học vấn của bác sĩ</p>
           </div>

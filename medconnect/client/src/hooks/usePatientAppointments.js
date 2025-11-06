@@ -36,57 +36,6 @@ export function usePatientAppointments() {
           ["pending_doctor", "accepted"].includes(appointment.status)
         );
 
-        console.log("=== APPOINTMENT DEBUG (Same as MyAppointments) ===");
-        console.log("All appointments from API:", allAppointments.length);
-        console.log(
-          "All appointments details:",
-          allAppointments.map((apt) => ({
-            id: apt._id,
-            status: apt.status,
-            doctor: apt.doctorId?.fullName,
-            scheduledStart: apt.scheduledStart,
-            scheduledEnd: apt.scheduledEnd,
-          }))
-        );
-
-        console.log(
-          "Filtered appointments (accepted + pending_doctor):",
-          filteredAppointments.length
-        );
-        console.log(
-          "Filtered appointments details:",
-          filteredAppointments.map((apt) => ({
-            id: apt._id,
-            status: apt.status,
-            doctor: apt.doctorId?.fullName,
-            scheduledStart: apt.scheduledStart,
-          }))
-        );
-
-        console.log(
-          "Appointments by status:",
-          allAppointments.reduce((acc, apt) => {
-            acc[apt.status] = (acc[apt.status] || 0) + 1;
-            return acc;
-          }, {})
-        );
-
-        // Check each appointment individually
-        console.log("=== INDIVIDUAL APPOINTMENT CHECK ===");
-        allAppointments.forEach((apt, index) => {
-          const hasCorrectStatus = ["pending_doctor", "accepted"].includes(
-            apt.status
-          );
-          console.log(`Appointment ${index + 1}:`, {
-            id: apt._id,
-            status: apt.status,
-            doctor: apt.doctorId?.fullName,
-            scheduledStart: apt.scheduledStart,
-            hasCorrectStatus,
-            willShow: hasCorrectStatus,
-          });
-        });
-
         setAppointments(filteredAppointments);
       } else {
         throw new Error(response.message || "Failed to fetch appointments");
@@ -104,48 +53,13 @@ export function usePatientAppointments() {
     fetchAppointments();
   };
 
-  // Function to fetch all appointments without any filtering for debugging
+  // Function to fetch all appointments without any filtering
   const fetchAllAppointments = async () => {
     try {
-      console.log("=== FETCHING ALL APPOINTMENTS FOR DEBUG ===");
       const response = await api.get("/api/patients/me/appointments?limit=100");
-      console.log("All appointments response:", response);
 
       if (response.success) {
         const allAppts = response.data.appointments || [];
-        console.log("Total appointments in database:", allAppts.length);
-        console.log(
-          "All appointments details:",
-          allAppts.map((apt) => ({
-            id: apt._id,
-            status: apt.status,
-            doctor: apt.doctorId?.fullName,
-            scheduledStart: apt.scheduledStart,
-            scheduledEnd: apt.scheduledEnd,
-          }))
-        );
-
-        // Check status distribution
-        const statusCount = allAppts.reduce((acc, apt) => {
-          acc[apt.status] = (acc[apt.status] || 0) + 1;
-          return acc;
-        }, {});
-        console.log("Status distribution:", statusCount);
-
-        // Check which ones should show
-        const shouldShow = allAppts.filter((apt) =>
-          ["pending_doctor", "accepted"].includes(apt.status)
-        );
-        console.log("Should show appointments:", shouldShow.length);
-        console.log(
-          "Should show details:",
-          shouldShow.map((apt) => ({
-            id: apt._id,
-            status: apt.status,
-            doctor: apt.doctorId?.fullName,
-            scheduledStart: apt.scheduledStart,
-          }))
-        );
       }
     } catch (err) {
       console.error("Error fetching all appointments:", err);

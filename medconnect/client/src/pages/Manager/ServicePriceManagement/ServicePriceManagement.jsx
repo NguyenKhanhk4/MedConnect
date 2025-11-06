@@ -23,13 +23,37 @@ export default function ServicePriceManagement() {
   const [formData, setFormData] = useState({
     serviceName: "",
     price: "",
+    isActive: true,
   });
   const [filterActive, setFilterActive] = useState("all"); // all, active, inactive
   const [searchTerm, setSearchTerm] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
 
   useEffect(() => {
     loadServicePrices();
   }, [filterActive, searchTerm, page]);
+
+  useEffect(() => {
+    // Load suggestions for autocomplete
+    const loadSuggestions = async () => {
+      if (searchTerm.trim().length > 0) {
+        try {
+          const response = await api.get(
+            `/api/managers/service-prices?search=${encodeURIComponent(searchTerm.trim())}&limit=5`
+          );
+          if (response.success) {
+            setSuggestions(response.data.servicePrices || []);
+          }
+        } catch (error) {
+          console.error("Error loading suggestions:", error);
+        }
+      } else {
+        setSuggestions([]);
+      }
+    };
+    loadSuggestions();
+  }, [searchTerm]);
 
   const loadServicePrices = async () => {
     try {
@@ -72,6 +96,7 @@ export default function ServicePriceManagement() {
     setFormData({
       serviceName: service.serviceName,
       price: service.price.toString(),
+      isActive: !!service.isActive,
     });
     setSelectedService(service);
     setShowEditDialog(true);
@@ -99,6 +124,7 @@ export default function ServicePriceManagement() {
       const response = await api.post("/api/managers/service-prices", {
         serviceName: formData.serviceName.trim(),
         price: parseInt(formData.price),
+        // new services default to active; backend defaults true as well
       });
 
       if (response.success) {
@@ -153,6 +179,7 @@ export default function ServicePriceManagement() {
         {
           serviceName: formData.serviceName.trim(),
           price: parseInt(formData.price),
+          isActive: formData.isActive,
         }
       );
 
@@ -335,8 +362,9 @@ export default function ServicePriceManagement() {
           Chưa có dịch vụ nào. Hãy thêm dịch vụ mới.
         </div>
       ) : (
-        <div className="service-price-management-table">
-          <table>
+        <div className="service-price-management-table-scroll">
+          <div className="service-price-management-table">
+            <table>
             <thead>
               <tr>
                 <th>STT</th>
@@ -394,7 +422,13 @@ export default function ServicePriceManagement() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
+          {servicePrices.length === 0 && (
+            <div className="empty-state" style={{ padding: 16 }}>
+              Không tìm thấy dịch vụ phù hợp.
+            </div>
+          )}
         </div>
       )}
 

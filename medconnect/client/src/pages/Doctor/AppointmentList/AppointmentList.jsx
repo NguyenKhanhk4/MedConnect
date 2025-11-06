@@ -92,7 +92,7 @@ export default function AppointmentList() {
   useEffect(() => {
     fetchAppointments();
   }, [location.pathname, location.state?.timestamp]);
-  
+
   // Reload appointments when coming back from payment result page
   useEffect(() => {
     if (location.state?.shouldReload) {
@@ -180,25 +180,25 @@ export default function AppointmentList() {
       // Get current date (today) - set time to midnight for date comparison
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       // Get appointment dates
       const aDate = new Date(a.scheduledStart);
       const bDate = new Date(b.scheduledStart);
-      
+
       // Set time to midnight for date comparison
       const aDateOnly = new Date(aDate);
       aDateOnly.setHours(0, 0, 0, 0);
       const bDateOnly = new Date(bDate);
       bDateOnly.setHours(0, 0, 0, 0);
-      
+
       // Check if appointments are today
       const aIsToday = aDateOnly.getTime() === today.getTime();
       const bIsToday = bDateOnly.getTime() === today.getTime();
-      
+
       // If sortBy is not scheduledStart, use original sorting logic
       if (sortBy !== "scheduledStart") {
         let aValue, bValue;
-        
+
         switch (sortBy) {
           case "patientName":
             aValue = a.patientId?.fullName || a.patient?.fullName || "";
@@ -212,14 +212,14 @@ export default function AppointmentList() {
             aValue = new Date(a.scheduledStart);
             bValue = new Date(b.scheduledStart);
         }
-        
+
         if (sortOrder === "asc") {
           return aValue > bValue ? 1 : -1;
         } else {
           return aValue < bValue ? 1 : -1;
         }
       }
-      
+
       // For scheduledStart sorting: prioritize today's appointments, then sort by time
       if (aIsToday && !bIsToday) {
         // a is today, b is not - a comes first
@@ -239,10 +239,6 @@ export default function AppointmentList() {
         }
       }
     });
-
-  console.log("📊 Appointments debug:");
-  console.log("- Total appointments:", appointments.length);
-  console.log("- Filtered appointments:", filteredAppointments.length);
 
   const getStatusIcon = (status) => {
     const icons = {
@@ -525,7 +521,7 @@ export default function AppointmentList() {
     setUpdatingAppointments((prev) => new Set(prev).add(appointment._id));
     try {
       await updateAppointmentStatus(appointment._id, "done");
-      
+
       // Cập nhật trạng thái ngay lập tức trong UI
       setAppointments((prevAppointments) =>
         prevAppointments.map((apt) =>
@@ -1047,47 +1043,48 @@ export default function AppointmentList() {
                           </>
                         )}
                         {/* Nút "Lưu hồ sơ" chỉ hiển thị khi chưa lưu hồ sơ */}
-                        {apt.status === "in_progress" && !apt.hasConsultationRecord && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleComplete(apt)}
-                            disabled={updatingAppointments.has(apt._id)}
-                          >
-                            {updatingAppointments.has(apt._id)
-                              ? "Đang xử lý..."
-                              : "Lưu hồ sơ"}
-                          </Button>
-                        )}
-                        {/* Offline: Chỉ hiển thị 2 nút sau khi đã lưu hồ sơ, nhưng chưa hoàn thành */}
-                        {apt.mode === "offline" && 
-                         apt.hasConsultationRecord &&
-                         apt.status === "in_progress" && (
-                          <>
+                        {apt.status === "in_progress" &&
+                          !apt.hasConsultationRecord && (
                             <Button
                               size="sm"
                               variant="secondary"
-                              onClick={() => {
-                                setSelectedInvoiceAppointment(apt);
-                                setShowServiceInvoice(true);
-                              }}
-                            >
-                              <FileText className="w-4 h-4" />
-                              Hóa đơn dịch vụ
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleNoService(apt)}
+                              onClick={() => handleComplete(apt)}
                               disabled={updatingAppointments.has(apt._id)}
-                              className="ml-2"
                             >
                               {updatingAppointments.has(apt._id)
                                 ? "Đang xử lý..."
-                                : "Không dịch vụ"}
+                                : "Lưu hồ sơ"}
                             </Button>
-                          </>
-                        )}
+                          )}
+                        {/* Offline: Chỉ hiển thị 2 nút sau khi đã lưu hồ sơ, nhưng chưa hoàn thành */}
+                        {apt.mode === "offline" &&
+                          apt.hasConsultationRecord &&
+                          apt.status === "in_progress" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                  setSelectedInvoiceAppointment(apt);
+                                  setShowServiceInvoice(true);
+                                }}
+                              >
+                                <FileText className="w-4 h-4" />
+                                Hóa đơn dịch vụ
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleNoService(apt)}
+                                disabled={updatingAppointments.has(apt._id)}
+                                className="ml-2"
+                              >
+                                {updatingAppointments.has(apt._id)
+                                  ? "Đang xử lý..."
+                                  : "Không dịch vụ"}
+                              </Button>
+                            </>
+                          )}
                         {(apt.status === "rejected" ||
                           apt.status === "cancelled" ||
                           apt.status === "no_show") && (
@@ -1325,7 +1322,9 @@ export default function AppointmentList() {
                                   "no_show",
                                   "Bệnh nhân không đến khám"
                                 );
-                                alert(`Đã đánh dấu ${patientName} là không đến khám`);
+                                alert(
+                                  `Đã đánh dấu ${patientName} là không đến khám`
+                                );
                                 setIsDetailDialogOpen(false);
                                 // Refresh appointments
                                 const updatedAppointments =

@@ -8,7 +8,6 @@ const { Schema, model } = mongoose;
 
 const SpecializationSchema = new Schema(
   {
-    // code: { type: String, unique: true, sparse: true },
     name: { type: String, required: true },
     description: String,
     avatar: {
@@ -26,5 +25,3 @@ const SpecializationSchema = new Schema(
 );
 
 export default model("Specialization", SpecializationSchema);
-
-//Thanh co sua lai database 

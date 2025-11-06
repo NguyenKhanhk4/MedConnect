@@ -10,7 +10,6 @@ import ConsultationAdvice from "../models/consultationAdvice.model.js";
 import Prescription from "../models/prescription.model.js";
 import DoctorTimeSlot from "../models/doctorTimeSlot.model.js";
 import DoctorScheduleRule from "../models/doctor_schedule_rules.model.js";
-import DoctorRate from "../models/doctor_rates.model.js";
 import Review from "../models/review.model.js";
 import AuthProvider from "../models/auth_providers.model.js";
 import EducationLevelPrice from "../models/educationLevelPrice.model.js";
@@ -18,74 +17,6 @@ import { createAppointmentNotification } from "../services/notificationService.j
 import { ok, fail } from "../utils/response.js";
 import { ERROR_CODES } from "../constants/index.js";
 import { sendMail } from "../utils/email.js";
-
-/**
- * Helper function to create/update DoctorRate based on educationLevel
- * This will create rates for both online and offline modes based on EducationLevelPrice
- */
-async function syncDoctorRatesFromEducationLevel(doctorId, educationLevel) {
-  try {
-    if (!educationLevel || !doctorId) {
-      return { success: false, message: "Missing doctorId or educationLevel" };
-    }
-
-    const doctor = await Doctor.findById(doctorId).lean();
-    if (!doctor) {
-      return { success: false, message: "Doctor not found" };
-    }
-
-    // Get education level prices for both modes
-    const onlinePrice = await EducationLevelPrice.findOne({
-      educationLevel,
-      mode: "online",
-      isActive: true,
-    }).lean();
-
-    const offlinePrice = await EducationLevelPrice.findOne({
-      educationLevel,
-      mode: "offline",
-      isActive: true,
-    }).lean();
-
-    // Create or update online rate
-    if (onlinePrice) {
-      await DoctorRate.findOneAndUpdate(
-        { doctorId, mode: "online", clinicId: { $exists: false } },
-        {
-          doctorId,
-          mode: "online",
-          weekdayPrice: onlinePrice.weekdayPrice,
-          weekendPrice: onlinePrice.weekendPrice,
-          currency: onlinePrice.currency || "VND",
-          isActive: true,
-        },
-        { upsert: true, new: true }
-      );
-    }
-
-    // Create or update offline rate (if doctor has clinic)
-    if (offlinePrice && doctor.clinicDefaultId) {
-      await DoctorRate.findOneAndUpdate(
-        { doctorId, mode: "offline", clinicId: doctor.clinicDefaultId },
-        {
-          doctorId,
-          mode: "offline",
-          clinicId: doctor.clinicDefaultId,
-          weekdayPrice: offlinePrice.weekdayPrice,
-          weekendPrice: offlinePrice.weekendPrice,
-          currency: offlinePrice.currency || "VND",
-          isActive: true,
-        },
-        { upsert: true, new: true }
-      );
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error syncing doctor rates from education level:", error);
-    return { success: false, message: error.message };
-  }
-}
 
 /**
  * Check if doctor has all required information to be active
@@ -282,18 +213,7 @@ export async function updateDoctorProfile(req, res) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Doctor profile not found");
     }
 
-    // If educationLevel was updated, sync DoctorRate from EducationLevelPrice
-    if (educationLevel !== undefined && educationLevel) {
-      try {
-        await syncDoctorRatesFromEducationLevel(doctor._id, educationLevel);
-        console.log(
-          `✅ Synced DoctorRate for doctor ${doctor._id} with educationLevel ${educationLevel}`
-        );
-      } catch (rateError) {
-        console.error("Error syncing doctor rates:", rateError);
-        // Don't fail the update if rate sync fails, just log it
-      }
-    }
+    // Education level is now used directly from EducationLevelPrice, no sync needed
 
     // Note: Doctors cannot update their profile themselves.
     // Only manager/admin can update doctor information via updateUser endpoint.
@@ -382,41 +302,54 @@ export async function getDoctorAppointments(req, res) {
       .limit(parseInt(limit))
       .lean();
 
-    // Debug: Log appointments with patientId issues
-    console.log(`🔍 Found ${appointments.length} appointments for doctor ${doctor._id}`);
     const appointmentsWithMissingPatients = appointments.filter(
-      apt => !apt.patientId || (typeof apt.patientId === 'object' && !apt.patientId.fullName)
+      (apt) =>
+        !apt.patientId ||
+        (typeof apt.patientId === "object" && !apt.patientId.fullName)
     );
     if (appointmentsWithMissingPatients.length > 0) {
-      console.warn(`⚠️ Found ${appointmentsWithMissingPatients.length} appointments with missing or invalid patientId`);
-      
+      console.warn(
+        `⚠️ Found ${appointmentsWithMissingPatients.length} appointments with missing or invalid patientId`
+      );
+
       // Try to manually populate patientId for these appointments
       for (const apt of appointmentsWithMissingPatients) {
         const originalPatientId = apt.patientId;
         let patientIdValue = null;
-        
+
         if (originalPatientId) {
           // Get patientId value (could be ObjectId or string)
-          patientIdValue = typeof originalPatientId === 'string' 
-            ? originalPatientId 
-            : (originalPatientId._id?.toString() || originalPatientId.toString());
-          
+          patientIdValue =
+            typeof originalPatientId === "string"
+              ? originalPatientId
+              : originalPatientId._id?.toString() ||
+                originalPatientId.toString();
+
           try {
             // Try to fetch patient manually
             const patient = await Patient.findById(patientIdValue)
-              .select("fullName dob gender phone email relationshipToOwner representativeName representativeRelation representativePhone representativeCitizenId userId")
+              .select(
+                "fullName dob gender phone email relationshipToOwner representativeName representativeRelation representativePhone representativeCitizenId userId"
+              )
               .populate("userId", "fullName email phone")
               .lean();
-            
+
             if (patient) {
               // Successfully fetched patient - replace the invalid patientId
               apt.patientId = patient;
-              console.log(`✅ Manually populated patientId for appointment ${apt._id}: ${patient.fullName}`);
+              console.log(
+                `✅ Manually populated patientId for appointment ${apt._id}: ${patient.fullName}`
+              );
             } else {
-              console.warn(`  - Appointment ${apt._id}: Patient document not found for patientId: ${patientIdValue}`);
+              console.warn(
+                `  - Appointment ${apt._id}: Patient document not found for patientId: ${patientIdValue}`
+              );
             }
           } catch (error) {
-            console.error(`  - Error fetching patient for appointment ${apt._id}:`, error.message);
+            console.error(
+              `  - Error fetching patient for appointment ${apt._id}:`,
+              error.message
+            );
           }
         } else {
           console.warn(`  - Appointment ${apt._id}: patientId is null`);
@@ -428,11 +361,15 @@ export async function getDoctorAppointments(req, res) {
     const appointmentIds = appointments.map((apt) => apt._id);
     const consultationSummaries = await ConsultationSummary.find({
       appointmentId: { $in: appointmentIds },
-    }).select("appointmentId").lean();
-    
+    })
+      .select("appointmentId")
+      .lean();
+
     const consultationAdvices = await ConsultationAdvice.find({
       appointmentId: { $in: appointmentIds },
-    }).select("appointmentId").lean();
+    })
+      .select("appointmentId")
+      .lean();
 
     const summaryAppointmentIds = new Set(
       consultationSummaries.map((s) => s.appointmentId.toString())
@@ -446,13 +383,13 @@ export async function getDoctorAppointments(req, res) {
     // Ensure patientId is properly populated
     const appointmentsWithFlags = appointments.map((apt) => {
       const aptIdStr = apt._id.toString();
-      const hasConsultationRecord = 
-        summaryAppointmentIds.has(aptIdStr) || 
+      const hasConsultationRecord =
+        summaryAppointmentIds.has(aptIdStr) ||
         adviceAppointmentIds.has(aptIdStr);
-      
+
       // Ensure patientId is properly populated - if null, try to manually populate
       let patientId = apt.patientId;
-      
+
       // Check if patientId is properly populated
       if (!patientId) {
         // patientId is null - this should not happen but handle it
@@ -465,11 +402,20 @@ export async function getDoctorAppointments(req, res) {
           gender: null,
           userId: null,
         };
-      } else if (typeof patientId === 'string' || (patientId._id && !patientId.fullName)) {
+      } else if (
+        typeof patientId === "string" ||
+        (patientId._id && !patientId.fullName)
+      ) {
         // patientId is an ObjectId string or ObjectId - not populated properly
-        console.warn(`⚠️ Appointment ${aptIdStr} patientId not populated:`, patientId);
+        console.warn(
+          `⚠️ Appointment ${aptIdStr} patientId not populated:`,
+          patientId
+        );
         // Try to fetch patient manually
-        const patientIdValue = typeof patientId === 'string' ? patientId : (patientId._id?.toString() || patientId.toString());
+        const patientIdValue =
+          typeof patientId === "string"
+            ? patientId
+            : patientId._id?.toString() || patientId.toString();
         patientId = {
           _id: patientIdValue,
           fullName: "Đang tải...",
@@ -478,9 +424,15 @@ export async function getDoctorAppointments(req, res) {
           gender: null,
           userId: null,
         };
-      } else if (typeof patientId === 'object' && (!patientId.fullName || typeof patientId.fullName !== 'string')) {
+      } else if (
+        typeof patientId === "object" &&
+        (!patientId.fullName || typeof patientId.fullName !== "string")
+      ) {
         // patientId is an object but missing fullName or fullName is invalid
-        console.warn(`⚠️ Appointment ${aptIdStr} patientId missing fullName:`, patientId);
+        console.warn(
+          `⚠️ Appointment ${aptIdStr} patientId missing fullName:`,
+          patientId
+        );
         patientId = {
           _id: patientId._id || patientId,
           fullName: patientId.fullName || "Không có thông tin",
@@ -496,16 +448,22 @@ export async function getDoctorAppointments(req, res) {
           representativeCitizenId: patientId.representativeCitizenId || null,
         };
       }
-      
+
       // Ensure new fields have default values for backward compatibility
       return {
         ...apt,
         patientId, // Use properly populated patientId
         hasConsultationRecord,
         services: apt.services || [],
-        totalPay: apt.totalPay !== undefined && apt.totalPay !== null ? apt.totalPay : 0,
-        amountPaid: apt.amountPaid !== undefined && apt.amountPaid !== null ? apt.amountPaid : 0,
-        paymentStatus: apt.paymentStatus || 'unpaid',
+        totalPay:
+          apt.totalPay !== undefined && apt.totalPay !== null
+            ? apt.totalPay
+            : 0,
+        amountPaid:
+          apt.amountPaid !== undefined && apt.amountPaid !== null
+            ? apt.amountPaid
+            : 0,
+        paymentStatus: apt.paymentStatus || "unpaid",
       };
     });
 
@@ -696,8 +654,11 @@ export async function getDoctorAppointmentDetail(req, res) {
 
     // Ensure patientId is properly populated
     let patientId = appointment.patientId;
-    if (!patientId || (typeof patientId === 'object' && !patientId.fullName)) {
-      console.warn(`⚠️ Appointment ${appointment._id} has invalid patientId:`, patientId);
+    if (!patientId || (typeof patientId === "object" && !patientId.fullName)) {
+      console.warn(
+        `⚠️ Appointment ${appointment._id} has invalid patientId:`,
+        patientId
+      );
       patientId = {
         _id: appointment.patientId?._id || appointment.patientId || null,
         fullName: appointment.patientId?.fullName || "Không có thông tin",
@@ -706,9 +667,11 @@ export async function getDoctorAppointmentDetail(req, res) {
         phone: appointment.patientId?.phone || null,
         relationshipToOwner: appointment.patientId?.relationshipToOwner || null,
         representativeName: appointment.patientId?.representativeName || null,
-        representativeRelation: appointment.patientId?.representativeRelation || null,
+        representativeRelation:
+          appointment.patientId?.representativeRelation || null,
         representativePhone: appointment.patientId?.representativePhone || null,
-        representativeCitizenId: appointment.patientId?.representativeCitizenId || null,
+        representativeCitizenId:
+          appointment.patientId?.representativeCitizenId || null,
       };
     }
 
@@ -724,9 +687,15 @@ export async function getDoctorAppointmentDetail(req, res) {
       ...appointment,
       patientId, // Use properly populated patientId
       services: appointment.services || [],
-      totalPay: appointment.totalPay !== undefined && appointment.totalPay !== null ? appointment.totalPay : 0,
-      amountPaid: appointment.amountPaid !== undefined && appointment.amountPaid !== null ? appointment.amountPaid : 0,
-      paymentStatus: appointment.paymentStatus || 'unpaid',
+      totalPay:
+        appointment.totalPay !== undefined && appointment.totalPay !== null
+          ? appointment.totalPay
+          : 0,
+      amountPaid:
+        appointment.amountPaid !== undefined && appointment.amountPaid !== null
+          ? appointment.amountPaid
+          : 0,
+      paymentStatus: appointment.paymentStatus || "unpaid",
     };
 
     return ok(res, appointmentWithDefaults);
@@ -1738,32 +1707,54 @@ export async function getAllDoctors(req, res) {
       }
     }
 
-    // Filter by price range (via DoctorRate)
+    // Filter by price range (via EducationLevelPrice)
     let doctorIdsByPrice = null;
     if (priceRange) {
-      let priceFilter = {};
+      let minPrice, maxPrice;
       switch (priceRange) {
         case "0-300000":
-          priceFilter.price = { $gte: 0, $lte: 300000 };
+          minPrice = 0;
+          maxPrice = 300000;
           break;
         case "300000-500000":
-          priceFilter.price = { $gte: 300000, $lte: 500000 };
+          minPrice = 300000;
+          maxPrice = 500000;
           break;
         case "500000-1000000":
-          priceFilter.price = { $gte: 500000, $lte: 1000000 };
+          minPrice = 500000;
+          maxPrice = 1000000;
           break;
         case "1000000+":
-          priceFilter.price = { $gte: 1000000 };
+          minPrice = 1000000;
+          maxPrice = null;
           break;
       }
 
-      // Get doctors with prices in this range (online mode)
-      const doctorRates = await DoctorRate.find({
-        ...priceFilter,
+      // Get education level prices in this range (online mode, use weekdayPrice as reference)
+      const priceQuery = {
         mode: "online",
         isActive: true,
-      }).select("doctorId");
-      doctorIdsByPrice = doctorRates.map((dr) => dr.doctorId.toString());
+        weekdayPrice: maxPrice
+          ? { $gte: minPrice, $lte: maxPrice }
+          : { $gte: minPrice },
+      };
+      const educationLevelPrices = await EducationLevelPrice.find(priceQuery)
+        .select("educationLevel")
+        .lean();
+      const educationLevelsInRange = educationLevelPrices.map(
+        (p) => p.educationLevel
+      );
+
+      // Get doctors with these education levels
+      const doctorsInRange = await Doctor.find({
+        educationLevel: { $in: educationLevelsInRange },
+        isVerified: true,
+        isActive: true,
+      })
+        .select("_id")
+        .lean();
+
+      doctorIdsByPrice = doctorsInRange.map((d) => d._id.toString());
 
       if (doctorIdsByPrice.length === 0) {
         // Return empty results if no doctors match price range
@@ -1812,13 +1803,27 @@ export async function getAllDoctors(req, res) {
           break;
         }
         case "online": {
-          // Doctors with online mode in DoctorRate
-          const onlineRates = await DoctorRate.find({
+          // Doctors with education levels that have online pricing configured
+          const onlinePrices = await EducationLevelPrice.find({
             mode: "online",
             isActive: true,
-          }).select("doctorId");
-          doctorIdsByAvailability = onlineRates.map((dr) =>
-            dr.doctorId.toString()
+          })
+            .select("educationLevel")
+            .lean();
+          const educationLevelsWithOnline = onlinePrices.map(
+            (p) => p.educationLevel
+          );
+
+          const doctorsWithOnline = await Doctor.find({
+            educationLevel: { $in: educationLevelsWithOnline },
+            isVerified: true,
+            isActive: true,
+          })
+            .select("_id")
+            .lean();
+
+          doctorIdsByAvailability = doctorsWithOnline.map((d) =>
+            d._id.toString()
           );
           break;
         }
@@ -1925,93 +1930,7 @@ export async function getAllDoctors(req, res) {
     );
     console.log(`   ❌ Unverified doctors: ${unverifiedCount}`);
     console.log(`   ❌ Inactive doctors (isActive=false): ${inactiveCount}`);
-    console.log("🔍 Doctor filter applied:", JSON.stringify(filter, null, 2)); // Debug log
-    console.log("🔍 Specialization parameter:", specialization); // Debug log
-    console.log("🔍 Facility parameter:", facility); // Debug log
-    console.log("🔍 Experience parameter:", experience); // Debug log
-    console.log("🔍 Rating parameter:", rating); // Debug log
-    console.log("🔍 PriceRange parameter:", priceRange); // Debug log
-    console.log("🔍 Location parameter:", location); // Debug log
-    console.log("🔍 Availability parameter:", availability); // Debug log
-
-    // Debug: Check specific doctor by ID
-    const specificDoctorId = "690789003d30bfde2698ec1f";
-    const mongoose = await import("mongoose");
-    if (mongoose.default.Types.ObjectId.isValid(specificDoctorId)) {
-      const specificDoctor = await Doctor.findById(specificDoctorId).lean();
-      if (specificDoctor) {
-        console.log(`\n🔍 Checking specific doctor (ID: ${specificDoctorId}):`);
-        console.log(`   Name: ${specificDoctor.fullName}`);
-        console.log(`   isVerified: ${specificDoctor.isVerified}`);
-        console.log(`   isActive: ${specificDoctor.isActive}`);
-        console.log(`   Does it match filter? Testing...`);
-
-        // Test if this doctor matches the filter
-        const matchesFilter = await Doctor.findOne({
-          _id: specificDoctorId,
-          ...filter,
-        }).lean();
-
-        if (matchesFilter) {
-          console.log(
-            `   ✅ Doctor MATCHES the filter - should appear in results`
-          );
-
-          // Before pagination, check position
-          const allMatchingDoctors = await Doctor.find(filter)
-            .select("_id fullName")
-            .sort({ ratingAvg: -1, ratingCount: -1 })
-            .lean();
-          const doctorIndex = allMatchingDoctors.findIndex(
-            (d) => d._id.toString() === specificDoctorId
-          );
-          console.log(`\n📍 Specific doctor position in matching results:`);
-          console.log(
-            `   Total matching doctors: ${allMatchingDoctors.length}`
-          );
-          console.log(`   Doctor index (0-based): ${doctorIndex}`);
-          console.log(`   Page: ${page}, Limit: ${limit}, Skip: ${skip}`);
-          console.log(
-            `   Will appear on page: ${
-              Math.floor(doctorIndex / parseInt(limit)) + 1
-            }`
-          );
-          if (doctorIndex >= skip && doctorIndex < skip + parseInt(limit)) {
-            console.log(`   ✅ Doctor is in current page range`);
-          } else {
-            console.log(
-              `   ❌ Doctor is NOT in current page range (out of pagination)`
-            );
-          }
-        } else {
-          console.log(
-            `   ❌ Doctor does NOT match the filter - checking why...`
-          );
-
-          // Check each filter condition
-          if (filter.isVerified && !specificDoctor.isVerified) {
-            console.log(
-              `   ❌ isVerified mismatch: filter requires true, doctor has ${specificDoctor.isVerified}`
-            );
-          }
-          if (filter.$or) {
-            const matchesActive = specificDoctor.isActive === true;
-            const matchesMissing = !("isActive" in specificDoctor);
-            if (!matchesActive && !matchesMissing) {
-              console.log(
-                `   ❌ isActive mismatch: filter requires (true OR missing), doctor has ${specificDoctor.isActive}`
-              );
-            } else {
-              console.log(`   ✅ isActive condition matches`);
-            }
-          }
-        }
-      } else {
-        console.log(`   ⚠️ Specific doctor not found in database`);
-      }
-    }
-
-    // Query doctors with filter
+    // Apply filters to find doctors
     let doctors = await Doctor.find(filter)
       .sort({ ratingAvg: -1, ratingCount: -1 })
       .lean();
@@ -2753,8 +2672,6 @@ export async function getDoctorClinics(req, res) {
  */
 export async function debugAuth(req, res) {
   try {
-    console.log("🔍 debugAuth - req.user:", req.user);
-    console.log("🔍 debugAuth - req.user type:", typeof req.user);
     console.log(
       "🔍 debugAuth - req.user keys:",
       req.user ? Object.keys(req.user) : "req.user is null/undefined"
@@ -4196,8 +4113,14 @@ export async function getAllAppointments(req, res) {
     const appointmentsWithDefaults = appointments.map((apt) => {
       // Ensure patientId is properly populated
       let patientId = apt.patientId;
-      if (!patientId || (typeof patientId === 'object' && !patientId.fullName)) {
-        console.warn(`⚠️ Appointment ${apt._id} has invalid patientId:`, patientId);
+      if (
+        !patientId ||
+        (typeof patientId === "object" && !patientId.fullName)
+      ) {
+        console.warn(
+          `⚠️ Appointment ${apt._id} has invalid patientId:`,
+          patientId
+        );
         patientId = {
           _id: apt.patientId?._id || apt.patientId || null,
           fullName: apt.patientId?.fullName || "Không có thông tin",
@@ -4208,18 +4131,27 @@ export async function getAllAppointments(req, res) {
           userId: apt.patientId?.userId || null,
         };
       }
-      
+
       return {
         ...apt,
         patientId, // Use properly populated patientId
         services: apt.services || [],
-        totalPay: apt.totalPay !== undefined && apt.totalPay !== null ? apt.totalPay : 0,
-        amountPaid: apt.amountPaid !== undefined && apt.amountPaid !== null ? apt.amountPaid : 0,
-        paymentStatus: apt.paymentStatus || 'unpaid',
+        totalPay:
+          apt.totalPay !== undefined && apt.totalPay !== null
+            ? apt.totalPay
+            : 0,
+        amountPaid:
+          apt.amountPaid !== undefined && apt.amountPaid !== null
+            ? apt.amountPaid
+            : 0,
+        paymentStatus: apt.paymentStatus || "unpaid",
       };
     });
 
-    console.log("✅ getAllAppointments - found:", appointmentsWithDefaults.length);
+    console.log(
+      "✅ getAllAppointments - found:",
+      appointmentsWithDefaults.length
+    );
     return ok(res, {
       appointments: appointmentsWithDefaults,
       pagination: {

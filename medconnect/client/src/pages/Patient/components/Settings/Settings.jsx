@@ -36,6 +36,10 @@ export function Settings() {
     representativePhone: "",
     // Tiền sử y tế
     medicalHistory: [],
+    // Bảo hiểm y tế
+    healthInsurance: "",
+    healthInsuranceIssueDate: "",
+    healthInsuranceExpiryDate: "",
     // Ghi chú
     notes: "",
     // Password change fields
@@ -96,6 +100,14 @@ export function Settings() {
         representativePhone: userProfile.representativePhone || "",
         // Tiền sử y tế
         medicalHistory: userProfile.medicalHistory || [],
+        // Bảo hiểm y tế
+        healthInsurance: userProfile.healthInsurance || "",
+        healthInsuranceIssueDate: formatDateForDisplay(
+          userProfile.healthInsuranceIssueDate
+        ),
+        healthInsuranceExpiryDate: formatDateForDisplay(
+          userProfile.healthInsuranceExpiryDate
+        ),
         // Ghi chú
         notes: userProfile.notes || "",
       };
@@ -125,6 +137,10 @@ export function Settings() {
         representativePhone: "",
         // Tiền sử y tế
         medicalHistory: [],
+        // Bảo hiểm y tế
+        healthInsurance: "",
+        healthInsuranceIssueDate: "",
+        healthInsuranceExpiryDate: "",
         // Ghi chú
         notes: "",
       });
@@ -152,6 +168,38 @@ export function Settings() {
       case "email":
         if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
           errors.email = "Email không đúng định dạng";
+        }
+        break;
+
+      case "healthInsuranceIssueDate":
+        if (value) {
+          const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+          if (!dateRegex.test(value)) {
+            errors.healthInsuranceIssueDate =
+              "Ngày cấp phải có định dạng DD/MM/YYYY";
+          } else {
+            const [, day, month, year] = value.match(dateRegex);
+            const issueDate = new Date(year, month - 1, day);
+            if (isNaN(issueDate.getTime())) {
+              errors.healthInsuranceIssueDate = "Ngày cấp không hợp lệ";
+            }
+          }
+        }
+        break;
+
+      case "healthInsuranceExpiryDate":
+        if (value) {
+          const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+          if (!dateRegex.test(value)) {
+            errors.healthInsuranceExpiryDate =
+              "Ngày hết hạn phải có định dạng DD/MM/YYYY";
+          } else {
+            const [, day, month, year] = value.match(dateRegex);
+            const expiryDate = new Date(year, month - 1, day);
+            if (isNaN(expiryDate.getTime())) {
+              errors.healthInsuranceExpiryDate = "Ngày hết hạn không hợp lệ";
+            }
+          }
         }
         break;
 
@@ -269,7 +317,11 @@ export function Settings() {
     let processedValue = value;
 
     // Auto-format birth date: DD/MM/YYYY
-    if (field === "birthDate") {
+    if (
+      field === "birthDate" ||
+      field === "healthInsuranceIssueDate" ||
+      field === "healthInsuranceExpiryDate"
+    ) {
       // Remove all non-digit characters
       const digitsOnly = value.replace(/\D/g, "");
 
@@ -371,6 +423,50 @@ export function Settings() {
           errors.birthDate = "Tuổi không hợp lệ";
         } else if (isNaN(birthDate.getTime())) {
           errors.birthDate = "Ngày sinh không hợp lệ";
+        }
+      }
+    }
+
+    // Validate health insurance issue date
+    if (formData.healthInsuranceIssueDate) {
+      const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+      if (!dateRegex.test(formData.healthInsuranceIssueDate)) {
+        errors.healthInsuranceIssueDate =
+          "Ngày cấp phải có định dạng DD/MM/YYYY";
+      } else {
+        const [, day, month, year] =
+          formData.healthInsuranceIssueDate.match(dateRegex);
+        const issueDate = new Date(year, month - 1, day);
+        if (isNaN(issueDate.getTime())) {
+          errors.healthInsuranceIssueDate = "Ngày cấp không hợp lệ";
+        }
+      }
+    }
+
+    // Validate health insurance expiry date
+    if (formData.healthInsuranceExpiryDate) {
+      const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+      if (!dateRegex.test(formData.healthInsuranceExpiryDate)) {
+        errors.healthInsuranceExpiryDate =
+          "Ngày hết hạn phải có định dạng DD/MM/YYYY";
+      } else {
+        const [, day, month, year] =
+          formData.healthInsuranceExpiryDate.match(dateRegex);
+        const expiryDate = new Date(year, month - 1, day);
+        if (isNaN(expiryDate.getTime())) {
+          errors.healthInsuranceExpiryDate = "Ngày hết hạn không hợp lệ";
+        } else if (formData.healthInsuranceIssueDate) {
+          // Check if expiry date is after issue date
+          const issueDateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+          if (issueDateRegex.test(formData.healthInsuranceIssueDate)) {
+            const [, issueDay, issueMonth, issueYear] =
+              formData.healthInsuranceIssueDate.match(issueDateRegex);
+            const issueDate = new Date(issueYear, issueMonth - 1, issueDay);
+            if (expiryDate <= issueDate) {
+              errors.healthInsuranceExpiryDate =
+                "Ngày hết hạn phải sau ngày cấp";
+            }
+          }
         }
       }
     }
@@ -481,6 +577,14 @@ export function Settings() {
         representativePhone: formData.representativePhone,
         // Tiền sử y tế
         medicalHistory: formData.medicalHistory,
+        // Bảo hiểm y tế (không bắt buộc)
+        healthInsurance: formData.healthInsurance || null,
+        healthInsuranceIssueDate: formData.healthInsuranceIssueDate
+          ? formatDateForAPI(formData.healthInsuranceIssueDate)
+          : null,
+        healthInsuranceExpiryDate: formData.healthInsuranceExpiryDate
+          ? formatDateForAPI(formData.healthInsuranceExpiryDate)
+          : null,
         // Ghi chú
         notes: formData.notes,
       };
@@ -803,7 +907,7 @@ export function Settings() {
                   <div className="form-group">
                     <label className="form-label">Giới tính</label>
                     <select
-                      className="form-input"
+                      className="form-input form-select-small"
                       value={formData.gender}
                       onChange={(e) =>
                         handleInputChange("gender", e.target.value)
@@ -826,6 +930,19 @@ export function Settings() {
                         handleInputChange("ethnicity", e.target.value)
                       }
                       placeholder="Nhập dân tộc"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Địa chỉ</label>
+                    <textarea
+                      className="form-textarea"
+                      value={formData.address}
+                      onChange={(e) =>
+                        handleInputChange("address", e.target.value)
+                      }
+                      rows={3}
+                      placeholder="Nhập địa chỉ đầy đủ"
                     />
                   </div>
                 </div>
@@ -903,43 +1020,7 @@ export function Settings() {
                       placeholder="Nhập nghề nghiệp"
                     />
                   </div>
-                </div>
-              </div>
-            </div>
 
-            {/* Địa chỉ */}
-            <div className="form-section">
-              <h3 className="section-subtitle">Địa chỉ</h3>
-              <div className="form-grid">
-                <div className="form-column">
-                  <div className="form-group">
-                    <label className="form-label">Địa chỉ</label>
-                    <textarea
-                      className="form-textarea"
-                      value={formData.address}
-                      onChange={(e) =>
-                        handleInputChange("address", e.target.value)
-                      }
-                      rows={3}
-                      placeholder="Nhập địa chỉ đầy đủ"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Số nhà</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={formData.houseNumber}
-                      onChange={(e) =>
-                        handleInputChange("houseNumber", e.target.value)
-                      }
-                      placeholder="Nhập số nhà"
-                    />
-                  </div>
-                </div>
-
-                <div className="form-column">
                   <div className="form-group">
                     <label className="form-label">Căn cước công dân</label>
                     <input
@@ -962,6 +1043,19 @@ export function Settings() {
                       <div className="error-text">{fieldErrors.citizenId}</div>
                     )}
                   </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Số nhà</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={formData.houseNumber}
+                      onChange={(e) =>
+                        handleInputChange("houseNumber", e.target.value)
+                      }
+                      placeholder="Nhập số nhà"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -974,7 +1068,7 @@ export function Settings() {
                   <div className="form-group">
                     <label className="form-label">Nhóm máu</label>
                     <select
-                      className="form-input"
+                      className="form-input form-select-small"
                       value={formData.bloodType}
                       onChange={(e) =>
                         handleInputChange("bloodType", e.target.value)
@@ -989,73 +1083,146 @@ export function Settings() {
                       <option value="AB-">AB-</option>
                       <option value="O+">O+</option>
                       <option value="O-">O-</option>
-                      <option value="Unknown">Không rõ</option>
+                      <option value="Không rõ">Không rõ</option>
                     </select>
                   </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Bảo hiểm y tế (nếu có)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={formData.healthInsurance}
+                      onChange={(e) =>
+                        handleInputChange("healthInsurance", e.target.value)
+                      }
+                      placeholder="Nhập số thẻ BHYT"
+                      maxLength={15}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Ngày cấp BHYT (nếu có)</label>
+                    <input
+                      type="text"
+                      className={`form-input ${
+                        fieldErrors.healthInsuranceIssueDate ? "error" : ""
+                      }`}
+                      value={formData.healthInsuranceIssueDate}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "healthInsuranceIssueDate",
+                          e.target.value
+                        )
+                      }
+                      onKeyDown={(e) => {
+                        // Allow: backspace, delete, tab, escape, enter, and numbers
+                        if (
+                          [46, 8, 9, 27, 13, 110, 190].indexOf(e.keyCode) !==
+                            -1 ||
+                          // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+                          (e.keyCode === 65 && e.ctrlKey === true) ||
+                          (e.keyCode === 67 && e.ctrlKey === true) ||
+                          (e.keyCode === 86 && e.ctrlKey === true) ||
+                          (e.keyCode === 88 && e.ctrlKey === true) ||
+                          // Allow: home, end, left, right, down, up
+                          (e.keyCode >= 35 && e.keyCode <= 40)
+                        ) {
+                          return;
+                        }
+                        // Ensure that it is a number and stop the keypress
+                        if (
+                          (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+                          (e.keyCode < 96 || e.keyCode > 105)
+                        ) {
+                          e.preventDefault();
+                        }
+                      }}
+                      maxLength={10}
+                      placeholder="DD/MM/YYYY"
+                    />
+                    {fieldErrors.healthInsuranceIssueDate && (
+                      <div className="error-text">
+                        {fieldErrors.healthInsuranceIssueDate}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">
+                      Ngày hết hạn BHYT (nếu có)
+                    </label>
+                    <input
+                      type="text"
+                      className={`form-input ${
+                        fieldErrors.healthInsuranceExpiryDate ? "error" : ""
+                      }`}
+                      value={formData.healthInsuranceExpiryDate}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "healthInsuranceExpiryDate",
+                          e.target.value
+                        )
+                      }
+                      onKeyDown={(e) => {
+                        // Allow: backspace, delete, tab, escape, enter, and numbers
+                        if (
+                          [46, 8, 9, 27, 13, 110, 190].indexOf(e.keyCode) !==
+                            -1 ||
+                          // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+                          (e.keyCode === 65 && e.ctrlKey === true) ||
+                          (e.keyCode === 67 && e.ctrlKey === true) ||
+                          (e.keyCode === 86 && e.ctrlKey === true) ||
+                          (e.keyCode === 88 && e.ctrlKey === true) ||
+                          // Allow: home, end, left, right, down, up
+                          (e.keyCode >= 35 && e.keyCode <= 40)
+                        ) {
+                          return;
+                        }
+                        // Ensure that it is a number and stop the keypress
+                        if (
+                          (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+                          (e.keyCode < 96 || e.keyCode > 105)
+                        ) {
+                          e.preventDefault();
+                        }
+                      }}
+                      maxLength={10}
+                      placeholder="DD/MM/YYYY"
+                    />
+                    {fieldErrors.healthInsuranceExpiryDate && (
+                      <div className="error-text">
+                        {fieldErrors.healthInsuranceExpiryDate}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Dị ứng và tiền sử y tế */}
-            <div className="form-section">
-              <h3 className="section-subtitle">Thông tin y tế bổ sung</h3>
-
-              <div className="form-group allergies-group">
-                <label className="form-label">Dị ứng (nếu có)</label>
-                <textarea
-                  className={`form-textarea allergies-textarea ${
-                    fieldErrors.allergies ? "error" : ""
-                  }`}
-                  placeholder="Nhập các loại thuốc hoặc thực phẩm gây dị ứng..."
-                  value={formData.allergies}
-                  onChange={(e) =>
-                    handleInputChange("allergies", e.target.value)
-                  }
-                  rows={4}
-                />
-                {fieldErrors.allergies && (
-                  <div className="error-text">{fieldErrors.allergies}</div>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Tiền sử bệnh lý</label>
-                <textarea
-                  className="form-textarea"
-                  placeholder="Nhập các bệnh lý đã mắc phải (mỗi bệnh một dòng)..."
-                  value={
-                    formData.medicalHistory
-                      ? formData.medicalHistory.join("\n")
-                      : ""
-                  }
-                  onChange={(e) => {
-                    const medicalHistory = e.target.value
-                      .split("\n")
-                      .filter((item) => item.trim());
-                    handleInputChange("medicalHistory", medicalHistory);
-                  }}
-                  rows={4}
-                />
-                <div className="form-help-text">
-                  Mỗi bệnh lý một dòng, ví dụ: Tiểu đường, Cao huyết áp, Hen
-                  suyễn
+                <div className="form-column">
+                  <div className="form-group">
+                    <label className="form-label">Tiền sử bệnh lý</label>
+                    <textarea
+                      className="form-textarea"
+                      placeholder="Nhập các bệnh lý đã mắc phải (mỗi bệnh một dòng)..."
+                      value={
+                        formData.medicalHistory
+                          ? formData.medicalHistory.join("\n")
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const medicalHistory = e.target.value
+                          .split("\n")
+                          .filter((item) => item.trim());
+                        handleInputChange("medicalHistory", medicalHistory);
+                      }}
+                      rows={4}
+                    />
+                    <div className="form-help-text">
+                      Mỗi bệnh lý một dòng, ví dụ: Tiểu đường, Cao huyết áp, Hen
+                      suyễn
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Ghi chú bổ sung</label>
-                <textarea
-                  className={`form-textarea ${
-                    fieldErrors.notes ? "error" : ""
-                  }`}
-                  placeholder="Nhập các ghi chú khác về sức khỏe..."
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange("notes", e.target.value)}
-                  rows={3}
-                />
-                {fieldErrors.notes && (
-                  <div className="error-text">{fieldErrors.notes}</div>
-                )}
               </div>
             </div>
 

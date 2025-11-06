@@ -43,7 +43,10 @@ import {
   // Payment revenue controller
   getPaymentRevenueStats,
   getAdminInvoices,
-} from "../../controllers/adminController.js";
+  
+  // Statistics controller
+  getStatistics
+} from '../../controllers/adminController.js';
 
 const adminRouter = express.Router();
 
@@ -92,5 +95,8 @@ adminRouter.post("/cleanup/unpaid-appointments", cleanupUnpaidAppointments);
 // ================== PAYMENT ROUTES ==================
 adminRouter.get("/payment/revenue-stats", getPaymentRevenueStats);
 adminRouter.get("/payment/invoices", getAdminInvoices);
+
+// ================== STATISTICS ROUTES ==================
+adminRouter.get('/statistics', getStatistics);
 
 export default adminRouter;

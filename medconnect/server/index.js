@@ -2,12 +2,19 @@
 import express from "express";
 import http from "http";
 import mongoose from "mongoose";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
 
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
 dotenv.config();
 import apiRouter from "./routes/api.router.js";
+
+// Get __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { initializeFirebase } from "./config/firebase.js";
 import { startAppointmentCleanupJob } from "./services/appointmentCleanupService.js";
 import { startVideoCallReminderJob } from "./services/videoCallReminderService.js";
@@ -46,7 +53,39 @@ app.options("*", cors(corsOptions));
 
 // app.use(morgan("dev"));
 app.use("/uploads", express.static("../client/public/uploads"));
-app.use("/server-uploads", express.static("uploads"));
+// Serve static files from uploads directory - use absolute path to ensure it works
+const uploadsDir = path.join(__dirname, "uploads");
+console.log(`📁 Static files directory: ${uploadsDir}`);
+app.use("/server-uploads", (req, res, next) => {
+  console.log(`📄 Requesting file: ${req.path}`);
+  
+  // Check if file exists before serving
+  const filePath = path.join(uploadsDir, req.path);
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      console.log(`❌ File not found: ${req.path}`);
+      console.log(`   Expected path: ${filePath}`);
+      console.log(`   Uploads directory: ${uploadsDir}`);
+      // List files in doctors directory for debugging
+      const doctorsDir = path.join(uploadsDir, "doctors");
+      if (fs.existsSync(doctorsDir)) {
+        const files = fs.readdirSync(doctorsDir);
+        console.log(`   Files in doctors directory: ${files.length} files`);
+        if (req.path.includes("doctors")) {
+          const requestedFile = req.path.split("/").pop();
+          const matchingFiles = files.filter(f => f.includes(requestedFile?.split("-")[0] || ""));
+          if (matchingFiles.length > 0) {
+            console.log(`   Similar files found: ${matchingFiles.join(", ")}`);
+          }
+        }
+      }
+      res.status(404).json({ error: "Không tìm thấy trang" });
+      return;
+    }
+    // File exists, serve it
+    express.static(uploadsDir)(req, res, next);
+  });
+});
 app.use(cookieParser());
 
 // router

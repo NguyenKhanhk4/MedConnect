@@ -1,19 +1,43 @@
-import React, { useState } from "react";
-import { Card, Row, Col, Button, Space, DatePicker } from "antd";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card, Row, Col, Button, Space, DatePicker, Spin, Alert } from "antd";
 import { 
   UserOutlined, 
   TeamOutlined, 
   CalendarOutlined, 
   DollarOutlined,
-  DownOutlined
+  DownOutlined,
+  MedicineBoxOutlined,
+  RiseOutlined,
+  LineChartOutlined
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line
+} from "recharts";
+import { getAdminStatistics } from "../../lib/api";
 import "./Statistics.scss";
 
 const Statistics = () => {
+  const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState("today");
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [dateRange, setDateRange] = useState([null, null]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [statistics, setStatistics] = useState(null);
 
   const periods = [
     { key: "today", label: "Hôm Nay" },
@@ -23,40 +47,169 @@ const Statistics = () => {
     { key: "custom", label: "Tùy Chỉnh" },
   ];
 
-  const statCards = [
-    {
-      title: "Tổng Bác Sĩ",
-      value: "0",
-      change: "+0 so với tháng trước",
-      icon: <UserOutlined />,
-      cardClass: "stat-card-blue",
-      textColor: "text-blue",
-    },
-    {
-      title: "Tổng Bệnh Nhân",
-      value: "0",
-      change: "+0 so với tuần trước",
-      icon: <TeamOutlined />,
-      cardClass: "stat-card-cyan",
-      textColor: "text-cyan",
-    },
-    {
-      title: "Khám Hôm Nay",
-      value: "0",
-      change: "+0 so với hôm qua",
-      icon: <CalendarOutlined />,
-      cardClass: "stat-card-emerald",
-      textColor: "text-emerald",
-    },
-    {
-      title: "Doanh Thu (Tháng)",
-      value: "₫0",
-      change: "+0% so với tháng trước",
-      icon: <DollarOutlined />,
-      cardClass: "stat-card-violet",
-      textColor: "text-violet",
-    },
-  ];
+  useEffect(() => {
+    fetchStatistics();
+  }, [selectedPeriod, dateRange]);
+
+  const fetchStatistics = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params = { period: selectedPeriod };
+      if (selectedPeriod === "custom" && dateRange[0] && dateRange[1]) {
+        params.startDate = dayjs(dateRange[0]).format("YYYY-MM-DD");
+        params.endDate = dayjs(dateRange[1]).format("YYYY-MM-DD");
+      }
+      
+      const response = await getAdminStatistics(params);
+      const data = response.data || response;
+      
+      // Validate data structure
+      if (!data || typeof data !== 'object') {
+        throw new Error("Dữ liệu thống kê không hợp lệ");
+      }
+      
+      setStatistics(data);
+    } catch (err) {
+      console.error("Error fetching statistics:", err);
+      setError(err.message || "Không thể tải dữ liệu thống kê");
+      setStatistics(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (date) => {
+    if (!date) return "--";
+    return dayjs(date).format("DD/MM/YYYY");
+  };
+
+  const statCards = statistics && 
+    statistics.totalDoctors && 
+    statistics.totalPatients && 
+    statistics.todayAppointments && 
+    statistics.monthRevenue
+    ? [
+        {
+          title: "Tổng Bác Sĩ",
+          value: (statistics.totalDoctors.value || 0).toLocaleString(),
+          change: statistics.totalDoctors.changeLabel || "0 so với tháng trước",
+          icon: <MedicineBoxOutlined />,
+          cardClass: "stat-card-blue",
+          textColor: "text-blue",
+          path: "/admin/users",
+          clickable: true,
+        },
+        {
+          title: "Tổng Bệnh Nhân",
+          value: (statistics.totalPatients.value || 0).toLocaleString(),
+          change: statistics.totalPatients.changeLabel || "0 so với tuần trước",
+          icon: <TeamOutlined />,
+          cardClass: "stat-card-cyan",
+          textColor: "text-cyan",
+          path: "/admin/users",
+          clickable: true,
+        },
+        {
+          title: "Lịch Hẹn",
+          value: (statistics.todayAppointments.value || 0).toLocaleString(),
+          change: statistics.todayAppointments.changeLabel || "0 so với hôm qua",
+          icon: <CalendarOutlined />,
+          cardClass: "stat-card-emerald",
+          textColor: "text-emerald",
+        },
+        {
+          title: (() => {
+            const periodLabels = {
+              today: "Doanh Thu (Hôm Nay)",
+              week: "Doanh Thu (Tuần)",
+              month: "Doanh Thu (Tháng)",
+              year: "Doanh Thu (Năm)",
+              custom: "Doanh Thu (Tùy Chỉnh)",
+            };
+            return periodLabels[selectedPeriod] || "Doanh Thu (Tháng)";
+          })(),
+          value: formatCurrency(statistics.monthRevenue.value || 0),
+          change: statistics.monthRevenue.changeLabel || "0% so với tháng trước",
+          icon: <RiseOutlined />,
+          cardClass: "stat-card-violet",
+          textColor: "text-violet",
+        },
+      ]
+    : [
+        {
+          title: "Tổng Bác Sĩ",
+          value: "0",
+          change: "+0 so với tháng trước",
+          icon: <MedicineBoxOutlined />,
+          cardClass: "stat-card-blue",
+          textColor: "text-blue",
+          path: "/admin/users",
+          clickable: true,
+        },
+        {
+          title: "Tổng Bệnh Nhân",
+          value: "0",
+          change: "+0 so với tuần trước",
+          icon: <TeamOutlined />,
+          cardClass: "stat-card-cyan",
+          textColor: "text-cyan",
+          path: "/admin/users",
+          clickable: true,
+        },
+        {
+          title: "Lịch Hẹn",
+          value: "0",
+          change: "+0 so với hôm qua",
+          icon: <CalendarOutlined />,
+          cardClass: "stat-card-emerald",
+          textColor: "text-emerald",
+        },
+        {
+          title: (() => {
+            const periodLabels = {
+              today: "Doanh Thu (Hôm Nay)",
+              week: "Doanh Thu (Tuần)",
+              month: "Doanh Thu (Tháng)",
+              year: "Doanh Thu (Năm)",
+              custom: "Doanh Thu (Tùy Chỉnh)",
+            };
+            return periodLabels[selectedPeriod] || "Doanh Thu (Tháng)";
+          })(),
+          value: "₫0",
+          change: "+0% so với tháng trước",
+          icon: <RiseOutlined />,
+          cardClass: "stat-card-violet",
+          textColor: "text-violet",
+        },
+      ];
+
+  if (loading && !statistics) {
+    return (
+      <div className="statistics">
+        <div className="statistics-header">
+          <div className="header-content">
+            <div>
+              <h1>Thống kê</h1>
+            </div>
+          </div>
+        </div>
+        <div style={{ textAlign: "center", padding: "50px" }}>
+          <Spin size="large" />
+          <p style={{ marginTop: "16px" }}>Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="statistics">
@@ -65,6 +218,17 @@ const Statistics = () => {
         <div className="header-content">
           <div>
             <h1>Thống kê</h1>
+            {error && (
+              <Alert 
+                message="Lỗi" 
+                description={error} 
+                type="error" 
+                showIcon 
+                style={{ marginTop: "16px" }}
+                closable
+                onClose={() => setError(null)}
+              />
+            )}
           </div>
           <div className="filter-buttons">
             <Space size="small">
@@ -92,8 +256,8 @@ const Statistics = () => {
                         <div className="date-picker-field">
                           <label className="date-picker-label">Từ Ngày</label>
                           <DatePicker
-                            format="MM/DD/YYYY"
-                            placeholder="mm/dd/yyyy"
+                            format="DD/MM/YYYY"
+                            placeholder="dd/mm/yyyy"
                             value={dateRange[0]}
                             onChange={(date) => {
                               setDateRange([date, dateRange[1]]);
@@ -105,8 +269,8 @@ const Statistics = () => {
                         <div className="date-picker-field">
                           <label className="date-picker-label">Đến Ngày</label>
                           <DatePicker
-                            format="MM/DD/YYYY"
-                            placeholder="mm/dd/yyyy"
+                            format="DD/MM/YYYY"
+                            placeholder="dd/mm/yyyy"
                             value={dateRange[1]}
                             onChange={(date) => {
                               setDateRange([dateRange[0], date]);
@@ -126,7 +290,6 @@ const Statistics = () => {
                             if (dateRange[0] && dateRange[1]) {
                               setSelectedPeriod("custom");
                               setShowCustomPicker(false);
-                              // TODO: Apply date range filter here
                             }
                           }}
                           disabled={!dateRange[0] || !dateRange[1]}
@@ -150,14 +313,22 @@ const Statistics = () => {
         <Row gutter={[16, 16]} className="stat-cards-row">
           {statCards.map((card, index) => (
             <Col xs={24} sm={12} lg={6} key={index}>
-              <Card className={`stat-card ${card.cardClass}`}>
+              <Card 
+                className={`stat-card ${card.cardClass} ${card.clickable ? 'clickable' : ''}`}
+                onClick={() => {
+                  if (card.clickable && card.path) {
+                    navigate(card.path);
+                  }
+                }}
+                style={card.clickable ? { cursor: 'pointer' } : {}}
+              >
                 <div className="stat-card-header">
                   <span className={`stat-card-title ${card.textColor}`}>
                     {card.title}
                   </span>
-                  <span className={`stat-card-icon ${card.textColor}`}>
+                  <div className={`stat-card-icon ${card.textColor}`}>
                     {card.icon}
-                  </span>
+                  </div>
                 </div>
                 <div className="stat-card-content">
                   <div className={`stat-card-value ${card.textColor}`}>
@@ -173,6 +344,201 @@ const Statistics = () => {
         </Row>
 
         {/* Charts Section */}
+        {/* Row 1: User Distribution, Appointment Ratio, Top Patients */}
+        <Row gutter={[16, 16]} className="charts-row">
+          {/* User Distribution */}
+          <Col xs={24} lg={8}>
+            <Card 
+              className="chart-card"
+              title={
+                <div>
+                  <div className="chart-card-title">Phân Bố Người Dùng</div>
+                  <div className="chart-card-subtitle">Tỷ lệ theo vai trò</div>
+                </div>
+              }
+            >
+              <div className="pie-chart-placeholder">
+                <div className="chart-container" style={{ height: "250px" }}>
+                  {statistics?.userDistribution ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: "Bệnh Nhân", value: statistics.userDistribution.patient || 0 },
+                            { name: "Bác Sĩ", value: statistics.userDistribution.doctor || 0 },
+                            { name: "Admin", value: statistics.userDistribution.admin || 0 },
+                            { name: "Quản Lý", value: statistics.userDistribution.manager || 0 }
+                          ].filter(item => item.value > 0)}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={false}
+                          outerRadius={90}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          <Cell fill="#1890ff" />
+                          <Cell fill="#52c41a" />
+                          <Cell fill="#fa8c16" />
+                          <Cell fill="#722ed1" />
+                        </Pie>
+                        <Tooltip formatter={(value, name) => [`${value} người`, name]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="chart-empty">Chưa có dữ liệu</div>
+                  )}
+                </div>
+                <div className="pie-legend">
+                  {statistics?.userDistribution && (
+                    <>
+                      <div className="legend-item-center">
+                        <span className="legend-dot legend-dot-blue"></span>
+                        <span className="legend-label">Bệnh Nhân</span>
+                        <span className="legend-percentage">
+                          {statistics.userDistribution.patientPercent || 0}% ({statistics.userDistribution.patient || 0} người)
+                        </span>
+                      </div>
+                      <div className="legend-item-center">
+                        <span className="legend-dot" style={{ backgroundColor: "#52c41a" }}></span>
+                        <span className="legend-label">Bác Sĩ</span>
+                        <span className="legend-percentage">
+                          {statistics.userDistribution.doctorPercent || 0}% ({statistics.userDistribution.doctor || 0} người)
+                        </span>
+                      </div>
+                      {statistics.userDistribution.admin > 0 && (
+                        <div className="legend-item-center">
+                          <span className="legend-dot" style={{ backgroundColor: "#fa8c16" }}></span>
+                          <span className="legend-label">Admin</span>
+                          <span className="legend-percentage">
+                            {statistics.userDistribution.adminPercent || 0}% ({statistics.userDistribution.admin || 0} người)
+                          </span>
+                        </div>
+                      )}
+                      {statistics.userDistribution.manager > 0 && (
+                        <div className="legend-item-center">
+                          <span className="legend-dot" style={{ backgroundColor: "#722ed1" }}></span>
+                          <span className="legend-label">Quản Lý</span>
+                          <span className="legend-percentage">
+                            {statistics.userDistribution.managerPercent || 0}% ({statistics.userDistribution.manager || 0} người)
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </Col>
+
+          {/* Appointment Type Ratio */}
+          <Col xs={24} lg={8}>
+            <Card 
+              className="chart-card"
+              title={
+                <div>
+                  <div className="chart-card-title">Tỷ Lệ Loại Khám</div>
+                  <div className="chart-card-subtitle">Phân bố online vs offline</div>
+                </div>
+              }
+            >
+              <div className="pie-chart-placeholder">
+                <div className="chart-container" style={{ height: "200px" }}>
+                  {statistics?.appointmentRatio ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: "Online", value: statistics.appointmentRatio.online || 0 },
+                            { name: "Offline", value: statistics.appointmentRatio.offline || 0 }
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={false}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          <Cell fill="#1890ff" />
+                          <Cell fill="#13c2c2" />
+                        </Pie>
+                        <Tooltip formatter={(value, name) => [`${value}%`, name]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="chart-empty">Chưa có dữ liệu</div>
+                  )}
+                </div>
+                <div className="pie-legend">
+                  <div className="legend-item-center">
+                    <span className="legend-dot legend-dot-blue"></span>
+                    <span className="legend-label">Online</span>
+                    <span className="legend-percentage">
+                      {statistics?.appointmentRatio?.online || 0}% ({statistics?.appointmentRatio?.onlineCount || 0} cuộc)
+                    </span>
+                  </div>
+                  <div className="legend-item-center">
+                    <span className="legend-dot legend-dot-cyan"></span>
+                    <span className="legend-label">Offline</span>
+                    <span className="legend-percentage">
+                      {statistics?.appointmentRatio?.offline || 0}% ({statistics?.appointmentRatio?.offlineCount || 0} cuộc)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </Col>
+
+          {/* Top Patients */}
+          <Col xs={24} lg={8}>
+            <Card 
+              className="chart-card"
+              title={
+                <div>
+                  <div className="chart-card-title">Bệnh Nhân Đến Khám Nhiều Nhất</div>
+                  <div className="chart-card-subtitle">Top 3 bệnh nhân có lần khám nhiều nhất</div>
+                </div>
+              }
+            >
+              <div className="patient-list">
+                {statistics?.topPatients?.length > 0
+                  ? statistics.topPatients.map((patient) => (
+                      <div key={patient.rank} className="patient-item">
+                        <div className="patient-info">
+                          <div className="patient-name">
+                            {patient.rank}. {patient.name}
+                          </div>
+                          <div className="patient-detail">
+                            Khám: {patient.visitCount} lần | Lần cuối: {formatDate(patient.lastVisit)}
+                          </div>
+                        </div>
+                        <div className="patient-spending">
+                          <div className="spending-amount">
+                            {formatCurrency(patient.totalSpending)}
+                          </div>
+                          <div className="spending-label">Chi tiêu</div>
+                        </div>
+                      </div>
+                    ))
+                  : [1, 2, 3].map((index) => (
+                      <div key={index} className="patient-item">
+                        <div className="patient-info">
+                          <div className="patient-name">{index}. --</div>
+                          <div className="patient-detail">Khám: 0 lần | Lần cuối: --</div>
+                        </div>
+                        <div className="patient-spending">
+                          <div className="spending-amount">₫0</div>
+                          <div className="spending-label">Chi tiêu</div>
+                        </div>
+                      </div>
+                    ))}
+              </div>
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Row 2: Top Doctors Online and Offline */}
         <Row gutter={[16, 16]} className="charts-row">
           {/* Top Doctors Online */}
           <Col xs={24} lg={12}>
@@ -187,22 +553,42 @@ const Statistics = () => {
             >
               <div className="chart-placeholder">
                 <div className="chart-container" style={{ height: "300px" }}>
-                  {/* Placeholder for bar chart */}
-                  <div className="chart-empty">Biểu đồ sẽ được thêm vào đây</div>
+                  {statistics?.topDoctorsOnline?.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={statistics.topDoctorsOnline.map(doctor => ({
+                          name: doctor.name,
+                          count: doctor.count
+                        }))}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#1890ff" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="chart-empty">Chưa có dữ liệu</div>
+                  )}
                 </div>
                 <div className="chart-legend-list">
-                  <div className="legend-item">
-                    <span className="legend-name">1. Dr. Nguyễn Văn A</span>
-                    <span className="legend-value">0 cuộc</span>
-                  </div>
-                  <div className="legend-item">
-                    <span className="legend-name">2. Dr. Trần Thị B</span>
-                    <span className="legend-value">0 cuộc</span>
-                  </div>
-                  <div className="legend-item">
-                    <span className="legend-name">3. Dr. Lê Văn C</span>
-                    <span className="legend-value">0 cuộc</span>
-                  </div>
+                  {statistics?.topDoctorsOnline?.length > 0
+                    ? statistics.topDoctorsOnline.map((doctor) => (
+                        <div key={doctor.rank} className="legend-item">
+                          <span className="legend-name">
+                            {doctor.rank}. {doctor.name}
+                          </span>
+                          <span className="legend-value">{doctor.count} cuộc</span>
+                        </div>
+                      ))
+                    : [1, 2, 3].map((index) => (
+                        <div key={index} className="legend-item">
+                          <span className="legend-name">--</span>
+                          <span className="legend-value">0 cuộc</span>
+                        </div>
+                      ))}
                 </div>
               </div>
             </Card>
@@ -221,86 +607,42 @@ const Statistics = () => {
             >
               <div className="chart-placeholder">
                 <div className="chart-container" style={{ height: "300px" }}>
-                  {/* Placeholder for bar chart */}
-                  <div className="chart-empty">Biểu đồ sẽ được thêm vào đây</div>
+                  {statistics?.topDoctorsOffline?.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={statistics.topDoctorsOffline.map(doctor => ({
+                          name: doctor.name,
+                          count: doctor.count
+                        }))}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#13c2c2" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="chart-empty">Chưa có dữ liệu</div>
+                  )}
                 </div>
                 <div className="chart-legend-list">
-                  <div className="legend-item">
-                    <span className="legend-name">1. Dr. Hoàng Văn E</span>
-                    <span className="legend-value">0 cuộc</span>
-                  </div>
-                  <div className="legend-item">
-                    <span className="legend-name">2. Dr. Vũ Thị F</span>
-                    <span className="legend-value">0 cuộc</span>
-                  </div>
-                  <div className="legend-item">
-                    <span className="legend-name">3. Dr. Đặng Văn G</span>
-                    <span className="legend-value">0 cuộc</span>
-                  </div>
-                  <div className="legend-item">
-                    <span className="legend-name">4. Dr. Bùi Thị H</span>
-                    <span className="legend-value">0 cuộc</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </Col>
-
-          {/* Top Patients */}
-          <Col xs={24} lg={12}>
-            <Card 
-              className="chart-card"
-              title={
-                <div>
-                  <div className="chart-card-title">Bệnh Nhân Đến Khám Nhiều Nhất</div>
-                  <div className="chart-card-subtitle">Top 3 bệnh nhân có lần khám nhiều nhất</div>
-                </div>
-              }
-            >
-              <div className="patient-list">
-                {[1, 2, 3].map((index) => (
-                  <div key={index} className="patient-item">
-                    <div className="patient-info">
-                      <div className="patient-name">{index}. Bệnh nhân {index}</div>
-                      <div className="patient-detail">Khám: 0 lần | Lần cuối: --</div>
-                    </div>
-                    <div className="patient-spending">
-                      <div className="spending-amount">₫0</div>
-                      <div className="spending-label">Chi tiêu</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </Col>
-
-          {/* Appointment Type Ratio */}
-          <Col xs={24} lg={12}>
-            <Card 
-              className="chart-card"
-              title={
-                <div>
-                  <div className="chart-card-title">Tỷ Lệ Loại Khám</div>
-                  <div className="chart-card-subtitle">Phân bố online vs offline</div>
-                </div>
-              }
-            >
-              <div className="pie-chart-placeholder">
-                <div className="chart-container" style={{ height: "200px" }}>
-                  {/* Placeholder for pie chart */}
-                  <div className="chart-empty">Biểu đồ tròn sẽ được thêm vào đây</div>
-                </div>
-                <div className="pie-legend">
-                  <div className="legend-item-center">
-                    <span className="legend-dot legend-dot-blue"></span>
-                    <span className="legend-label">Online</span>
-                    <span className="legend-percentage">0%</span>
-                  </div>
-                  <div className="legend-item-center">
-                    <span className="legend-dot legend-dot-cyan"></span>
-                    <span className="legend-label">Offline</span>
-                    <span className="legend-percentage">0%</span>
-                  </div>
+                  {statistics?.topDoctorsOffline?.length > 0
+                    ? statistics.topDoctorsOffline.map((doctor) => (
+                        <div key={doctor.rank} className="legend-item">
+                          <span className="legend-name">
+                            {doctor.rank}. {doctor.name}
+                          </span>
+                          <span className="legend-value">{doctor.count} cuộc</span>
+                        </div>
+                      ))
+                    : [1, 2, 3].map((index) => (
+                        <div key={index} className="legend-item">
+                          <span className="legend-name">--</span>
+                          <span className="legend-value">0 cuộc</span>
+                        </div>
+                      ))}
                 </div>
               </div>
             </Card>
@@ -335,8 +677,46 @@ const Statistics = () => {
                   </div>
                 </div>
                 <div className="chart-container" style={{ height: "400px" }}>
-                  {/* Placeholder for line chart */}
-                  <div className="chart-empty">Biểu đồ đường sẽ được thêm vào đây</div>
+                  {statistics?.revenueTrend && statistics.revenueTrend.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={statistics.revenueTrend}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip 
+                          formatter={(value) => `${formatCurrency(value)}`}
+                        />
+                        <Legend />
+                        <Line 
+                          type="monotone" 
+                          dataKey="offline" 
+                          stroke="#13c2c2" 
+                          strokeWidth={2}
+                          name="Offline"
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="online" 
+                          stroke="#1890ff" 
+                          strokeWidth={2}
+                          name="Online"
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="total" 
+                          stroke="#8c8c8c" 
+                          strokeWidth={2}
+                          strokeDasharray="5 5"
+                          name="Tổng"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="chart-empty">Chưa có dữ liệu</div>
+                  )}
                 </div>
               </div>
             </Card>

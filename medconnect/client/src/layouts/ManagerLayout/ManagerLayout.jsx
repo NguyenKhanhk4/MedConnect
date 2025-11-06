@@ -59,7 +59,7 @@ const ManagerLayout = () => {
     {
       key: "/manager/quan-ly-gia",
       icon: <DollarOutlined />,
-      label: "Quản lý giá theo trình độ",
+      label: "Quản lý giá khám",
     },
     {
       key: "/manager/yeu-cau-nghi-phep",

@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "cleanup:unpaid": "node scripts/cancelUnpaidAppointments.js",
-    "fix:price-index": "node scripts/fixEducationLevelPriceIndex.js"
+    "cleanup:unpaid": "node scripts/cancelUnpaidAppointments.js"
   },
   "dependencies": {
     "@payos/node": "^2.0.3",

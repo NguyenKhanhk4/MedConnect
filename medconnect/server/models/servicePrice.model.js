@@ -38,6 +38,5 @@ const ServicePriceSchema = new Schema(
 
 // Index
 ServicePriceSchema.index({ isActive: 1 });
-ServicePriceSchema.index({ serviceName: 1 });
 
 export default model("ServicePrice", ServicePriceSchema);

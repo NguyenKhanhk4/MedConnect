@@ -139,6 +139,37 @@
     }
 
     .activity-card {
+      .activities-scroll-container {
+        max-height: 500px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 8px;
+        margin-right: -8px;
+
+        // Custom scrollbar styling
+        &::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        &::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 4px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+          background: #c1c1c1;
+          border-radius: 4px;
+          
+          &:hover {
+            background: #a8a8a8;
+          }
+        }
+
+        // Firefox scrollbar
+        scrollbar-width: thin;
+        scrollbar-color: #c1c1c1 #f1f1f1;
+      }
+
       .ant-list-item {
         padding: 12px 0;
         border-bottom: 1px solid #f0f0f0;

@@ -137,6 +137,20 @@
         background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
       }
 
+      &.clickable {
+        cursor: pointer;
+        transition: all 0.3s ease;
+        
+        &:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        }
+        
+        &:active {
+          transform: translateY(-2px);
+        }
+      }
+
       .ant-card-body {
         padding: 24px;
       }
@@ -144,8 +158,10 @@
       .stat-card-header {
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: flex-start;
         margin-bottom: 16px;
+        position: relative;
+        z-index: 1;
 
         .stat-card-title {
           font-size: 14px;
@@ -169,8 +185,27 @@
         }
 
         .stat-card-icon {
-          font-size: 24px;
-          opacity: 0.8;
+          font-size: 32px;
+          opacity: 0.9;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          line-height: 1;
+          flex-shrink: 0;
+          background: transparent !important;
+          border: none !important;
+          padding: 0 !important;
+          margin: 0 !important;
+
+          svg {
+            width: 32px !important;
+            height: 32px !important;
+            display: block !important;
+            fill: currentColor;
+            background: transparent !important;
+          }
 
           &.text-blue {
             color: #1e40af;

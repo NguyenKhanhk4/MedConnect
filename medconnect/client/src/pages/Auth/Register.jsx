@@ -178,28 +178,46 @@ export default function Register() {
         return;
       }
 
-      // If Firebase client is configured and server returned a customToken, try to sign in.
-      const fbConfigured = Boolean(import.meta.env.VITE_FB_PROJECT_ID);
-      if (fbConfigured && data?.customToken) {
+      // For patients: automatically log in after registration
+      // If server returned a customToken, sign in automatically
+      if (data?.customToken && data?.role?.toLowerCase() === "patient") {
         try {
-          const cred = await signInWithCustomToken(auth, data.customToken);
-          const idToken = await cred.user.getIdToken();
+          const fbConfigured = Boolean(import.meta.env.VITE_FB_PROJECT_ID);
+          if (fbConfigured) {
+            // Sign in with Firebase custom token
+            const cred = await signInWithCustomToken(auth, data.customToken);
+            const idToken = await cred.user.getIdToken();
 
-          const sessionResponse = await fetch(apiUrl + "/api/auth/session", {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken }),
-          });
+            // Create session cookie on backend
+            const sessionResponse = await fetch(apiUrl + "/api/auth/session", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ idToken }),
+            });
 
-          if (!sessionResponse.ok)
-            throw new Error("Không tạo được phiên đăng nhập");
+            if (!sessionResponse.ok) {
+              throw new Error("Không tạo được phiên đăng nhập");
+            }
+
+          } else {
+            console.warn("Firebase not configured, skipping auto-login");
+          }
         } catch (err) {
-          console.warn("Firebase sign-in skipped/failed:", err);
-          // continue without blocking the user; still navigate by role
+          console.error("Auto-login failed after registration:", err);
+          // Still navigate - user can manually log in if needed
+          // But for better UX, we should show an error message
+          setErrors({
+            general: "Đăng ký thành công nhưng không thể tự động đăng nhập. Vui lòng đăng nhập thủ công.",
+          });
+          setTimeout(() => {
+            navigate("/dang-nhap");
+          }, 2000);
+          return;
         }
       }
 
+      // Navigate to appropriate page based on role
       goByRole(data.role);
     } catch (err) {
       console.error("Registration error:", err);
@@ -240,6 +258,34 @@ export default function Register() {
       if (!response.ok) {
         await signOut(auth);
         throw new Error("Lỗi đăng ký với Google");
+      }
+
+      // For patients: ensure session is created (backend should have done this)
+      // But verify by checking if we need to create session manually
+      if (data?.role?.toLowerCase() === "patient") {
+        try {
+          // Backend should have created session cookie, but verify
+          // by checking if user is authenticated
+          const currentUser = auth.currentUser;
+          if (currentUser) {
+            // Get fresh idToken and ensure session is created
+            const freshIdToken = await currentUser.getIdToken();
+            const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+            const sessionResponse = await fetch(apiUrl + "/api/auth/session", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ idToken: freshIdToken }),
+            });
+
+            if (!sessionResponse.ok) {
+              console.warn("Session creation failed, but continuing...");
+            }
+          }
+        } catch (err) {
+          console.warn("Auto-login verification failed:", err);
+          // Continue anyway - backend may have already created session
+        }
       }
 
       goByRole(data.role);

@@ -65,26 +65,6 @@ const ProfileSettings = () => {
       try {
         const doctor = await getDoctorProfileWithFallback();
         if (doctor) {
-          console.log("🔍 ProfileSettings - Doctor data:", doctor);
-          console.log("🔍 ProfileSettings - User data:", doctor.userId);
-          console.log("🔍 ProfileSettings - Doctor fullName:", doctor.fullName);
-          console.log(
-            "🔍 ProfileSettings - User fullName:",
-            doctor.userId?.fullName
-          );
-          console.log(
-            "🔍 ProfileSettings - Final name:",
-            doctor.userId?.fullName || doctor.fullName
-          );
-          console.log(
-            "🔍 ProfileSettings - specializationIds:",
-            doctor.specializationIds
-          );
-          console.log(
-            "🔍 ProfileSettings - specializationIds names:",
-            doctor.specializationIds?.map((spec) => spec?.name)
-          );
-
           setDoctorInfo(doctor);
           setFormData({
             fullName: doctor.userId?.fullName || doctor.fullName || "",
@@ -125,16 +105,11 @@ const ProfileSettings = () => {
     try {
       // Remove email from formData as it should not be editable by doctor
       const { email, ...updateData } = formData;
-      console.log("🔄 Sending data to API:", updateData);
       const response = await updateDoctorProfile(updateData);
-      console.log("✅ API Response:", response);
 
       if (response) {
         // Refresh doctor info after successful update
         const updatedDoctor = await getDoctorProfileWithFallback();
-        console.log("🔄 Refreshed doctor data:", updatedDoctor);
-        console.log("🔄 User fullName:", updatedDoctor?.userId?.fullName);
-        console.log("🔄 Doctor fullName:", updatedDoctor?.fullName);
 
         if (updatedDoctor) {
           setDoctorInfo(updatedDoctor);
