@@ -131,7 +131,7 @@ const PaymentSchema = new Schema(
 );
 
 // Index để query nhanh
-// Compound index cho phép nhiều payment cho 1 appointment (booking + service)
+//  index cho phép nhiều payment cho 1 appointment (booking + service)
 PaymentSchema.index({ appointmentId: 1, invoiceType: 1 }, { unique: false });
 PaymentSchema.index({ pendingOrderCode: 1 });
 
