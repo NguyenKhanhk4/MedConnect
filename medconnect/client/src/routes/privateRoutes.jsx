@@ -72,7 +72,6 @@ export const privateRoutes = (
     {/* Patient routes with PatientLayout (includes Sidebar and Header) */}
     <Route element={<AuthMiddleware />}>
       <Route element={<PatientMiddleware />}>
-        {/* Fullscreen patient video call route (no PatientLayout) */}
         <Route
           path="/benh-nhan/video-call/:appointmentId"
           element={<PatientVideoCallPage />}
