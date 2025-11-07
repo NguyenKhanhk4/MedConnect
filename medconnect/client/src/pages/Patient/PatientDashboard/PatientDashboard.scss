@@ -1,16 +1,13 @@
 /* Patient Dashboard - Main SCSS File */
 
 // Import all component styles
-@import "../styles/variables";
-@import "../styles/base";
-@import "../styles/common";
-@import "../components/AppSidebar/AppSidebar";
-@import "../components/PatientHeader/PatientHeader";
-@import "../components/WelcomeSection/WelcomeSection";
-@import "../components/StatsCards/StatsCards";
-@import "../components/AppointmentCalendar/AppointmentCalendar";
-@import "../components/UpcomingAppointments/UpcomingAppointments";
-@import "../components/QuickActions/QuickActions";
+@import "../AppSidebar/AppSidebar.scss";
+@import "../dau-trang-benh-nhan/DauTrangBenhNhan.scss";
+@import "../phan-chao-mung/PhanChaoMung.scss";
+@import "../the-thong-ke/TheThongKe.scss";
+@import "../lich-kham/LichKham.scss";
+@import "../lich-hen-sap-toi/LichHenSapToi.scss";
+@import "../hanh-dong-nhanh/HanhDongNhanh.scss";
 
 /* All styles are now imported from separate component files */
 
@@ -23,7 +20,41 @@
   border: 2px solid #cbd5e1 !important;
 }
 
+/* Ensure stat cards have white background - highest priority */
+.stat-card,
+.stat-card.stat-card-white,
+.stat-card[class*="stat-card"],
+div.stat-card {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+}
+
 /* Main content responsive */
 .main-content {
   /* No margin needed - flex layout handles spacing */
+  display: block;
+}
+
+/* Main grid layout: Calendar + Upcoming Appointments on left, Quick Actions on right */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-main-grid {
+    grid-template-columns: 2fr 1fr !important;
+  }
+}
+
+.dashboard-left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.dashboard-right-column {
+  width: 100%;
 }

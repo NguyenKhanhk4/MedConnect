@@ -1991,7 +1991,51 @@ export async function getAllDoctors(req, res) {
       );
     }
 
-    // Apply pagination AFTER populate to ensure we don't lose doctors
+    // Calculate ratingAvg and ratingCount from Review collection for each doctor
+    const doctorIds = doctors.map((d) => d._id);
+    const ratingStats = await Review.aggregate([
+      {
+        $match: {
+          doctorId: { $in: doctorIds },
+        },
+      },
+      {
+        $group: {
+          _id: "$doctorId",
+          averageRating: { $avg: "$rating" },
+          totalReviews: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Create a map for quick lookup
+    const ratingMap = new Map();
+    ratingStats.forEach((stat) => {
+      ratingMap.set(stat._id.toString(), {
+        ratingAvg: parseFloat(stat.averageRating.toFixed(2)),
+        ratingCount: stat.totalReviews,
+      });
+    });
+
+    // Update each doctor with calculated rating data
+    doctors = doctors.map((doctor) => {
+      const ratingData = ratingMap.get(doctor._id.toString());
+      if (ratingData) {
+        return {
+          ...doctor,
+          ratingAvg: ratingData.ratingAvg,
+          ratingCount: ratingData.ratingCount,
+        };
+      }
+      // If no reviews, keep default values (0, 0)
+      return {
+        ...doctor,
+        ratingAvg: doctor.ratingAvg || 0,
+        ratingCount: doctor.ratingCount || 0,
+      };
+    });
+
+    // Apply pagination AFTER populate and rating calculation
     const total = doctors.length; // Count before pagination
     doctors = doctors.slice(skip, skip + parseInt(limit));
 
