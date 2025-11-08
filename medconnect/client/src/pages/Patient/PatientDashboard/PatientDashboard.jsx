@@ -1,16 +1,16 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { WelcomeSection } from "../components/WelcomeSection/WelcomeSection";
-import { StatsCards } from "../components/StatsCards/StatsCards";
-import { UpcomingAppointments } from "../components/UpcomingAppointments/UpcomingAppointments";
-import { CurrentConsultation } from "../components/CurrentConsultation/CurrentConsultation";
-import { AppointmentCalendar } from "../components/AppointmentCalendar/AppointmentCalendar";
-import { QuickActions } from "../components/QuickActions/QuickActions";
-import { DoctorSearch } from "../components/DoctorSearch/DoctorSearch";
-import { MyAppointments } from "../components/MyAppointments/MyAppointments";
-import { HealthProfile } from "../components/HealthProfile/HealthProfile";
-import { FamilyHealthProfile } from "../components/FamilyHealthProfile/FamilyHealthProfile";
-import { Notifications } from "../components/Notifications/Notifications";
+import { PhanChaoMung } from "../phan-chao-mung/PhanChaoMung";
+import { TheThongKe } from "../the-thong-ke/TheThongKe";
+import { LichHenSapToi } from "../lich-hen-sap-toi/LichHenSapToi";
+import { TuVanHienTai } from "../tu-van-hien-tai/TuVanHienTai";
+import { LichKham } from "../lich-kham/LichKham";
+import { HanhDongNhanh } from "../hanh-dong-nhanh/HanhDongNhanh";
+import { TimKiemBacSi } from "../tim-kiem-bac-si/TimKiemBacSi";
+import { LichHenCuaToi } from "../lich-hen-cua-toi/LichHenCuaToi";
+import { HoSoSucKhoe } from "../ho-so-suc-khoe/HoSoSucKhoe";
+import { HoSoSucKhoeGiaDinh } from "../ho-so-suc-khoe-gia-dinh/HoSoSucKhoeGiaDinh";
+import { ThongBao } from "../thong-bao/ThongBao";
 import "./PatientDashboard.scss";
 
 /**
@@ -32,64 +32,60 @@ import "./PatientDashboard.scss";
  * - Medical liability: Dashboard is informational only
  */
 
+// Route mapping configuration
+const ROUTE_MAP = {
+  "/benh-nhan/tim-bac-si": TimKiemBacSi,
+  "/tim-bac-si": TimKiemBacSi,
+  "/search-doctors": TimKiemBacSi,
+  "/benh-nhan/lich-hen-cua-toi": LichHenCuaToi,
+  "/lich-hen-cua-toi": LichHenCuaToi,
+  "/my-appointments": LichHenCuaToi,
+  "/benh-nhan/ho-so-benh-an": HoSoSucKhoe,
+  "/ho-so-benh-an": HoSoSucKhoe,
+  "/medical-records": HoSoSucKhoe,
+  "/benh-nhan/ho-so-suc-khoe-gia-dinh": HoSoSucKhoeGiaDinh,
+  "/ho-so-suc-khoe-gia-dinh": HoSoSucKhoeGiaDinh,
+  "/family-health-records": HoSoSucKhoeGiaDinh,
+  "/benh-nhan/thong-bao": ThongBao,
+  "/thong-bao": ThongBao,
+};
+
+// Default dashboard home component
+const DefaultDashboard = () => (
+  <div className="container mx-auto px-4 py-6 lg:px-8 lg:py-8">
+    <div className="space-y-6">
+      <PhanChaoMung />
+      <TheThongKe />
+      <TuVanHienTai />
+      {/* Main grid: Calendar, Quick Actions, and Upcoming Appointments */}
+      <div className="dashboard-main-grid">
+        {/* Left column: Calendar and Upcoming Appointments (2/3 width on desktop) */}
+        <div className="dashboard-left-column">
+          <LichKham />
+          <LichHenSapToi />
+        </div>
+        {/* Right column: Quick Actions (1/3 width on desktop) */}
+        <div className="dashboard-right-column">
+          <HanhDongNhanh />
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 export default function PatientDashboard() {
   const location = useLocation();
 
-  // Force re-render and scroll to top when location changes
-  // This ensures content updates when navigating between different patient routes
+  // Scroll to top when route changes
   useEffect(() => {
-    // Scroll to top when route changes
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
-  // Render different content based on current route
-  const renderContent = () => {
-    const path = location.pathname;
+  // Render content based on current route
+  const content = useMemo(() => {
+    const Component = ROUTE_MAP[location.pathname];
+    return Component ? <Component /> : <DefaultDashboard />;
+  }, [location.pathname]);
 
-    switch (path) {
-      case "/benh-nhan/tim-bac-si":
-      case "/tim-bac-si": // Legacy route support
-      case "/search-doctors": // Legacy route support
-        return <DoctorSearch />;
-      case "/benh-nhan/lich-hen-cua-toi":
-      case "/lich-hen-cua-toi": // Legacy route support
-      case "/my-appointments": // Legacy route support
-        return <MyAppointments />;
-      case "/benh-nhan/ho-so-benh-an":
-      case "/ho-so-benh-an": // Legacy route support
-      case "/medical-records": // Legacy route support
-        return <HealthProfile />;
-      case "/benh-nhan/ho-so-suc-khoe-gia-dinh":
-      case "/ho-so-suc-khoe-gia-dinh": // Legacy route support
-      case "/family-health-records": // Legacy route support
-        return <FamilyHealthProfile />;
-      case "/benh-nhan/thong-bao":
-      case "/thong-bao": // Legacy route support
-        return <Notifications />;
-      case "/benh-nhan/trang-chu":
-      case "/benh-nhan": // Legacy route support
-      default:
-        // Default dashboard home
-        return (
-          <div className="container mx-auto px-4 py-6 lg:px-8 lg:py-8">
-            <div className="space-y-6">
-              <WelcomeSection />
-              <StatsCards />
-              <CurrentConsultation />
-              <div className="grid gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-2 space-y-6">
-                  <AppointmentCalendar />
-                  <UpcomingAppointments />
-                </div>
-                <div className="space-y-6">
-                  <QuickActions />
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-    }
-  };
-
-  return renderContent();
+  return content;
 }

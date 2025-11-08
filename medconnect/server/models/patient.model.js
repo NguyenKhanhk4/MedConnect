@@ -43,6 +43,11 @@ const PatientSchema = new Schema(
     // Cho phép nhập hoặc chọn nhiều bệnh mạn tính
     medicalHistory: [{ type: String, trim: true }],
 
+    // Bảo hiểm y tế
+    healthInsurance: String, // Số thẻ BHYT
+    healthInsuranceIssueDate: Date, // Ngày cấp BHYT
+    healthInsuranceExpiryDate: Date, // Ngày hết hạn BHYT
+
     // ⚙️ Quản trị & liên thông (tối giản)
     relationshipToOwner: {
       type: String,

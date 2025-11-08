@@ -7,7 +7,6 @@ import Clinic from "../models/clinic.model.js";
 import Payment from "../models/payment.model.js";
 import DoctorTimeSlot from "../models/doctorTimeSlot.model.js";
 import DoctorScheduleRule from "../models/doctor_schedule_rules.model.js";
-import DoctorRate from "../models/doctor_rates.model.js";
 import Review from "../models/review.model.js";
 import EducationLevelPrice from "../models/educationLevelPrice.model.js";
 import Prescription from "../models/prescription.model.js";
@@ -22,74 +21,6 @@ import fs from "fs";
 import path from "path";
 
 // ================== HELPER FUNCTIONS ==================
-
-/**
- * Helper function to create/update DoctorRate based on educationLevel
- * This will create rates for both online and offline modes based on EducationLevelPrice
- */
-async function syncDoctorRatesFromEducationLevel(doctorId, educationLevel) {
-  try {
-    if (!educationLevel || !doctorId) {
-      return { success: false, message: "Missing doctorId or educationLevel" };
-    }
-
-    const doctor = await Doctor.findById(doctorId).lean();
-    if (!doctor) {
-      return { success: false, message: "Doctor not found" };
-    }
-
-    // Get education level prices for both modes
-    const onlinePrice = await EducationLevelPrice.findOne({
-      educationLevel,
-      mode: "online",
-      isActive: true,
-    }).lean();
-
-    const offlinePrice = await EducationLevelPrice.findOne({
-      educationLevel,
-      mode: "offline",
-      isActive: true,
-    }).lean();
-
-    // Create or update online rate
-    if (onlinePrice) {
-      await DoctorRate.findOneAndUpdate(
-        { doctorId, mode: "online", clinicId: { $exists: false } },
-        {
-          doctorId,
-          mode: "online",
-          weekdayPrice: onlinePrice.weekdayPrice,
-          weekendPrice: onlinePrice.weekendPrice,
-          currency: onlinePrice.currency || "VND",
-          isActive: true,
-        },
-        { upsert: true, new: true }
-      );
-    }
-
-    // Create or update offline rate (if doctor has clinic)
-    if (offlinePrice && doctor.clinicDefaultId) {
-      await DoctorRate.findOneAndUpdate(
-        { doctorId, mode: "offline", clinicId: doctor.clinicDefaultId },
-        {
-          doctorId,
-          mode: "offline",
-          clinicId: doctor.clinicDefaultId,
-          weekdayPrice: offlinePrice.weekdayPrice,
-          weekendPrice: offlinePrice.weekendPrice,
-          currency: offlinePrice.currency || "VND",
-          isActive: true,
-        },
-        { upsert: true, new: true }
-      );
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error syncing doctor rates from education level:", error);
-    return { success: false, message: error.message };
-  }
-}
 
 /**
  * Check if doctor has all required information to be active
@@ -1765,21 +1696,7 @@ export const updateUser = async (req, res) => {
               `Doctor profile not found for user ${id}, but user update succeeded`
             );
           } else {
-            // If educationLevel was updated, sync DoctorRate from EducationLevelPrice
-            if (educationLevel !== undefined && educationLevel) {
-              try {
-                await syncDoctorRatesFromEducationLevel(
-                  doctor._id,
-                  educationLevel
-                );
-                console.log(
-                  `✅ Synced DoctorRate for doctor ${doctor._id} with educationLevel ${educationLevel}`
-                );
-              } catch (rateError) {
-                console.error("Error syncing doctor rates:", rateError);
-                // Don't fail the update if rate sync fails, just log it
-              }
-            }
+            // Education level is now used directly from EducationLevelPrice, no sync needed
 
             // If doctor is verified but not active, check if they can now be active
             // (doctor might have just filled in required fields: yearsExperience, bio, educationLevel)
@@ -1929,8 +1846,7 @@ export const deleteUser = async (req, res) => {
 
         // Step 3: Delete doctor-specific records and appointments
         await Promise.all([
-          // Delete doctor-specific records
-          DoctorRate.deleteMany({ doctorId }),
+          // Delete doctor-specific records (DoctorRate no longer exists - using EducationLevelPrice)
           DoctorScheduleRule.deleteMany({ doctorId }),
           DoctorTimeSlot.deleteMany({ doctorId }),
 
@@ -2394,11 +2310,17 @@ export const getAllAppointments = async (req, res) => {
     // Also ensure patientId is properly populated
     const appointmentsWithDefaults = appointments.map((apt) => {
       const aptObj = apt.toObject();
-      
+
       // Ensure patientId is properly populated
       let patientId = aptObj.patientId;
-      if (!patientId || (typeof patientId === 'object' && !patientId.fullName)) {
-        console.warn(`⚠️ Appointment ${aptObj._id} has invalid patientId:`, patientId);
+      if (
+        !patientId ||
+        (typeof patientId === "object" && !patientId.fullName)
+      ) {
+        console.warn(
+          `⚠️ Appointment ${aptObj._id} has invalid patientId:`,
+          patientId
+        );
         patientId = {
           _id: aptObj.patientId?._id || aptObj.patientId || null,
           fullName: aptObj.patientId?.fullName || "Không có thông tin",
@@ -2407,71 +2329,79 @@ export const getAllAppointments = async (req, res) => {
           userId: aptObj.patientId?.userId || null,
         };
       }
-      
+
       return {
         ...aptObj,
         patientId, // Use properly populated patientId
         services: aptObj.services || [],
-        totalPay: aptObj.totalPay !== undefined && aptObj.totalPay !== null ? aptObj.totalPay : 0,
-        amountPaid: aptObj.amountPaid !== undefined && aptObj.amountPaid !== null ? aptObj.amountPaid : 0,
-        paymentStatus: aptObj.paymentStatus || 'unpaid',
+        totalPay:
+          aptObj.totalPay !== undefined && aptObj.totalPay !== null
+            ? aptObj.totalPay
+            : 0,
+        amountPaid:
+          aptObj.amountPaid !== undefined && aptObj.amountPaid !== null
+            ? aptObj.amountPaid
+            : 0,
+        paymentStatus: aptObj.paymentStatus || "unpaid",
       };
     });
 
-    const formattedAppointments = appointmentsWithDefaults.map((appointment, index) => {
-      const patient = appointment.patientId;
-      const doctor = appointment.doctorId;
-      const specializations = appointment.doctorId?.specializationIds;
-      const clinic = appointment.clinicId;
+    const formattedAppointments = appointmentsWithDefaults.map(
+      (appointment, index) => {
+        const patient = appointment.patientId;
+        const doctor = appointment.doctorId;
+        const specializations = appointment.doctorId?.specializationIds;
+        const clinic = appointment.clinicId;
 
-      return {
-        id: appointment._id,
-        sequentialId: index + 1, // ID bắt đầu từ 1
+        return {
+          id: appointment._id,
+          sequentialId: index + 1, // ID bắt đầu từ 1
 
-        // Thông tin bệnh nhân
-        patientName: patient?.fullName || "Chưa có tên",
-        patientEmail: patient?.userId?.email || "Chưa có email",
-        patientPhone: patient?.phone || null,
-        patientAddress: patient?.address || null,
+          // Thông tin bệnh nhân
+          patientName: patient?.fullName || "Chưa có tên",
+          patientEmail: patient?.userId?.email || "Chưa có email",
+          patientPhone: patient?.phone || null,
+          patientAddress: patient?.address || null,
 
-        // Thông tin bác sĩ
-        doctorName:
-          doctor?.fullName || doctor?.userId?.fullName || "Chưa có tên",
-        doctorEmail: doctor?.userId?.email || "Chưa có email",
-        doctorSpecialty:
-          specializations?.map((s) => s.name).join(", ") ||
-          "Chưa chọn chuyên khoa",
-        doctorLicense: doctor?.licenseNo || null,
-        doctorBio: doctor?.bio || null,
+          // Thông tin bác sĩ
+          doctorName:
+            doctor?.fullName || doctor?.userId?.fullName || "Chưa có tên",
+          doctorEmail: doctor?.userId?.email || "Chưa có email",
+          doctorSpecialty:
+            specializations?.map((s) => s.name).join(", ") ||
+            "Chưa chọn chuyên khoa",
+          doctorLicense: doctor?.licenseNo || null,
+          doctorBio: doctor?.bio || null,
 
-        // Thông tin phòng khám
-        clinicName: clinic?.name || null,
+          // Thông tin phòng khám
+          clinicName: clinic?.name || null,
 
-        // Thông tin lịch hẹn
-        appointmentDate: formatDate(appointment.scheduledStart),
-        appointmentTime: formatTime(appointment.scheduledStart),
-        scheduledStart: appointment.scheduledStart,
-        scheduledEnd: appointment.scheduledEnd,
-        status: appointment.status,
-        mode: appointment.mode,
-        reason: appointment.reason || "Không có lý do",
-        
-        // Thông tin thanh toán mới
-        services: appointment.services || [],
-        totalPay: appointment.totalPay || 0,
-        amountPaid: appointment.amountPaid || 0,
-        paymentStatus: appointment.paymentStatus || 'unpaid',
+          // Thông tin lịch hẹn
+          appointmentDate: formatDate(appointment.scheduledStart),
+          appointmentTime: formatTime(appointment.scheduledStart),
+          scheduledStart: appointment.scheduledStart,
+          scheduledEnd: appointment.scheduledEnd,
+          status: appointment.status,
+          mode: appointment.mode,
+          reason: appointment.reason || "Không có lý do",
 
-        // Thông tin hủy lịch
-        cancelledAt: appointment.cancelledAt,
-        cancelledBy: appointment.cancelledBy,
-        cancelReason: appointment.cancelReason,
+          // Thông tin thanh toán mới
+          services: appointment.services || [],
+          totalPay: appointment.totalPay || 0,
+          amountPaid: appointment.amountPaid || 0,
+          paymentStatus: appointment.paymentStatus || "unpaid",
 
-        // Thông tin hệ thống
-        createdAt: appointment.createdAt,
-        updatedAt: appointment.updatedAt,
-      };
-    });
+          // Thông tin hủy lịch
+          cancelledAt: appointment.cancelledAt,
+          cancelledBy: appointment.cancelledBy,
+          cancelReason: appointment.cancelReason,
+
+          // Thông tin hệ thống
+          createdAt: appointment.createdAt,
+          updatedAt: appointment.updatedAt,
+        };
+      }
+    );
 
     res.json({
       success: true,

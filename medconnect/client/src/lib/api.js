@@ -14,6 +14,17 @@ export async function getCurrentUser() {
     const data = await r.json();
     return data;
   } catch (error) {
+    // Check if it's a connection error
+    if (
+      error.message.includes("Failed to fetch") ||
+      error.message.includes("ERR_CONNECTION_REFUSED")
+    ) {
+      console.error(
+        "Backend server is not running. Please start the server at http://localhost:3000"
+      );
+      // Return null instead of throwing to allow app to continue
+      return null;
+    }
     console.error("Error in getCurrentUser:", error);
     throw error;
   }
@@ -33,6 +44,17 @@ export async function getCurrentPatientProfile() {
     const data = await r.json();
     return data;
   } catch (error) {
+    // Check if it's a connection error
+    if (
+      error.message.includes("Failed to fetch") ||
+      error.message.includes("ERR_CONNECTION_REFUSED")
+    ) {
+      console.error(
+        "Backend server is not running. Please start the server at http://localhost:3000"
+      );
+      // Return null instead of throwing to allow app to continue
+      return null;
+    }
     console.error("Error in getCurrentPatientProfile:", error);
     throw error;
   }
@@ -1055,8 +1077,10 @@ export async function getAdminDashboardActivities(params = {}) {
   const queryParams = new URLSearchParams();
   if (limit) queryParams.append("limit", limit);
   if (offset) queryParams.append("offset", offset);
-  
-  const url = `${BASE}/api/admin/dashboard/activities${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+
+  const url = `${BASE}/api/admin/dashboard/activities${
+    queryParams.toString() ? `?${queryParams.toString()}` : ""
+  }`;
   const r = await fetch(url, {
     credentials: "include",
   });

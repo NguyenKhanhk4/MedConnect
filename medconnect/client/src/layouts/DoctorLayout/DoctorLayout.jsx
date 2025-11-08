@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import Sidebar from "../../pages/Doctor/Sidebar/Sidebar";
-import { DoctorHeader } from "../../pages/Doctor/components/DoctorHeader/DoctorHeader";
+import { DauTrang } from "../../pages/Doctor/components/dau-trang/DauTrang";
 import "./DoctorLayout.scss";
 
 export default function DoctorLayout() {
@@ -62,7 +62,7 @@ export default function DoctorLayout() {
     <div className="doctor-layout-container">
       <Sidebar activeMenu={activeMenu} onMenuChange={handleMenuChange} />
       <div className="doctor-layout-main">
-        <DoctorHeader />
+        <DauTrang />
         <main
           className={`doctor-layout-content ${
             location.pathname === "/bac-si/ho-so-kham" ||

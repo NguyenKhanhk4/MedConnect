@@ -13,9 +13,6 @@ import {
   rescheduleAppointmentByManager,
   getManagerInvoices,
   deleteManagerInvoice,
-  getDoctorPricingForManager,
-  setDoctorPricingForManager,
-  deleteDoctorPricingForManager,
   getAllPatientsForManager,
   getEducationLevelPrices,
   setEducationLevelPrice,
@@ -88,11 +85,7 @@ router.put(
 );
 
 // Booking payment - creates payment BEFORE appointment (appointment created after payment success)
-router.post(
-  "/booking-payments",
-  authGuard,
-  createBookingPaymentByManager
-);
+router.post("/booking-payments", authGuard, createBookingPaymentByManager);
 
 // Leave request routes
 router.get("/leave-requests", authGuard, getLeaveRequests);
@@ -121,19 +114,10 @@ router.delete("/invoices/:invoiceId", authGuard, deleteManagerInvoice);
 // Service payment management routes (only for manager)
 router.get("/service-payments/pending", authGuard, getPendingServicePayments);
 router.post("/service-payments/:paymentId/cash", authGuard, processCashPayment);
-router.post("/service-payments/:paymentId/bank-transfer", authGuard, createBankTransferPayment);
-
-// Pricing routes
-router.get("/doctors/:doctorId/pricing", authGuard, getDoctorPricingForManager);
 router.post(
-  "/doctors/:doctorId/pricing",
+  "/service-payments/:paymentId/bank-transfer",
   authGuard,
-  setDoctorPricingForManager
-);
-router.delete(
-  "/doctors/:doctorId/pricing/:pricingId",
-  authGuard,
-  deleteDoctorPricingForManager
+  createBankTransferPayment
 );
 
 // Education level price routes

@@ -11,7 +11,6 @@ import Patient from "../models/patient.model.js";
 import Doctor from "../models/doctor.model.js";
 import AuthProvider from "../models/auth_providers.model.js";
 import PasswordReset from "../models/passwordReset.model.js";
-import DoctorRate from "../models/doctor_rates.model.js";
 import EducationLevelPrice from "../models/educationLevelPrice.model.js";
 import { ok, fail } from "../utils/response.js";
 import {

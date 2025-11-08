@@ -13,53 +13,53 @@ import DoctorMiddleware from "../middlewares/DoctorMiddleware";
 import ManagerMiddleware from "../middlewares/ManagerMiddleware";
 
 // Shared Components
-import Profile from "../pages/Auth/Profile";
+import TaiKhoan from "../pages/Auth/tai-khoan/TaiKhoan";
 
 // Patient Components
 import PatientDashboard from "../pages/Patient/PatientDashboard/PatientDashboard";
-import { Settings } from "../pages/Patient/components/Settings/Settings";
-import FavoriteDoctors from "../pages/Patient/components/FavoriteDoctors/FavoriteDoctors";
-import AppointmentBookingHome from "../pages/Appointment/AppointmentBookingHome";
-import SpecializationSelection from "../pages/Appointment/SpecializationSelection";
-import DoctorSelection from "../pages/Appointment/DoctorSelection";
-import TimeSlotSelection from "../pages/Appointment/TimeSlotSelection";
-import PaymentResult from "../pages/Appointment/PaymentResult";
-import MultiSpecializationBooking from "../pages/Appointment/MultiSpecializationBooking";
-import PatientVideoCallPage from "../pages/Patient/components/VideoCallPage/VideoCallPage";
+import { CaiDat as CaiDatPatient } from "../pages/Patient/cai-dat/CaiDat";
+import BacSiUaThich from "../pages/Patient/bac-si-ua-thich/BacSiUaThich";
+import TrangChuDatLich from "../pages/Appointment/trang-chu-dat-lich/TrangChuDatLich";
+import ChonChuyenKhoa from "../pages/Appointment/chon-chuyen-khoa/ChonChuyenKhoa";
+import ChonBacSi from "../pages/Appointment/chon-bac-si/ChonBacSi";
+import ChonThoiGian from "../pages/Appointment/chon-thoi-gian/ChonThoiGian";
+import KetQuaThanhToan from "../pages/Appointment/ket-qua-thanh-toan/KetQuaThanhToan";
+import DatLichNhieuChuyenKhoa from "../pages/Appointment/dat-lich-nhieu-chuyen-khoa/DatLichNhieuChuyenKhoa";
+import TrangGoiVideoPatient from "../pages/Patient/trang-goi-video/TrangGoiVideo";
 
 // Doctor Components
-import DoctorDashboard from "../pages/Doctor/DoctorDashboard/DoctorDashboard";
-import AppointmentList from "../pages/Doctor/AppointmentList/AppointmentList";
-import AppointmentDetail from "../pages/Doctor/AppointmentDetail/AppointmentDetail";
-import MedicalHistory from "../pages/Doctor/MedicalHistory/MedicalHistory";
-import ProfileSettings from "../pages/Doctor/ProfileSettings/ProfileSettings";
-import ScheduleManagement from "../pages/Doctor/ScheduleManagement/ScheduleManagement";
-import Feedback from "../pages/Doctor/Feedback/Feedback";
-import OfflineConsultationPage from "../pages/Doctor/OfflineConsultationPage/OfflineConsultationPage";
-import OnlineConsultationPage from "../pages/Doctor/OnlineConsultationPage/OnlineConsultationPage";
-import { RescheduleRequests } from "../pages/Doctor/components/RescheduleRequests/RescheduleRequests";
-import { Notifications } from "../pages/Doctor/components/Notifications/Notifications";
-import DoctorVideoCallPage from "../pages/Doctor/DoctorVideoCallPage/DoctorVideoCallPage";
-import ServicePaymentResult from "../pages/Doctor/ServicePaymentResult/ServicePaymentResult";
+import TrangChuDoctor from "../pages/Doctor/trang-chu/TrangChu";
+import LichHenDoctor from "../pages/Doctor/lich-hen/LichHen";
+import ChiTietLichHen from "../pages/Doctor/chi-tiet-lich-hen/ChiTietLichHen";
+import HoSoKham from "../pages/Doctor/ho-so-kham/HoSoKham";
+import CaiDat from "../pages/Doctor/cai-dat/CaiDat";
+import QuanLyLich from "../pages/Doctor/quan-ly-lich/QuanLyLich";
+import DanhGia from "../pages/Doctor/danh-gia/DanhGia";
+import KhamTrucTiep from "../pages/Doctor/kham-truc-tiep/KhamTrucTiep";
+import TuVanTrucTuyen from "../pages/Doctor/tu-van-truc-tuyen/TuVanTrucTuyen";
+import { YeuCauDoiLich } from "../pages/Doctor/components/yeu-cau-doi-lich/YeuCauDoiLich";
+import { ThongBao } from "../pages/Doctor/components/thong-bao/ThongBao";
+import TrangGoiVideoDoctor from "../pages/Doctor/trang-goi-video/TrangGoiVideo";
+import KetQuaThanhToanDichVu from "../pages/Doctor/ket-qua-thanh-toan-dich-vu/KetQuaThanhToanDichVu";
 
 // Admin Components
-import AdminDashboard from "../pages/Admin/AdminDashboard";
-import VerifyDoctors from "../pages/Admin/VerifyDoctors";
-import UserManagement from "../pages/Admin/UserManagement";
-import Specializations from "../pages/Admin/Specializations";
-import AppointmentManagement from "../pages/Admin/AppointmentManagement";
-import Statistics from "../pages/Admin/Statistics";
+import TrangChuAdmin from "../pages/Admin/trang-chu/TrangChu";
+import XacMinhBacSi from "../pages/Admin/xac-minh-bac-si/XacMinhBacSi";
+import NguoiDung from "../pages/Admin/nguoi-dung/NguoiDung";
+import ChuyenKhoa from "../pages/Admin/chuyen-khoa/ChuyenKhoa";
+import LichHenAdmin from "../pages/Admin/lich-hen/LichHen";
+import ThongKe from "../pages/Admin/thong-ke/ThongKe";
 import AdminLayout from "../layouts/AdminLayout/AdminLayout";
 
 // Manager Components
-import ManagerDashboard from "../pages/Manager/ManagerDashboard/ManagerDashboard";
-import ManagerScheduleManagement from "../pages/Manager/ManagerScheduleManagement/ManagerScheduleManagement";
-import LeaveRequestManagement from "../pages/Manager/LeaveRequestManagement/LeaveRequestManagement";
-import ServicePriceManagement from "../pages/Manager/ServicePriceManagement/ServicePriceManagement";
-import InvoiceManagement from "../pages/Manager/InvoiceManagement/InvoiceManagement";
-import ServicePaymentManagement from "../pages/Manager/ServicePaymentManagement/ServicePaymentManagement";
-import { Notifications as ManagerNotifications } from "../pages/Manager/Notifications/Notifications";
-import EducationLevelPriceManagement from "../pages/Manager/EducationLevelPriceManagement/EducationLevelPriceManagement";
+import TrangChuManager from "../pages/Manager/trang-chu/TrangChu";
+import QuanLyLichBacSi from "../pages/Manager/quan-ly-lich-bac-si/QuanLyLichBacSi";
+import QuanLyYeuCauNghiPhep from "../pages/Manager/quan-ly-yeu-cau-nghi-phep/QuanLyYeuCauNghiPhep";
+import QuanLyGiaDichVu from "../pages/Manager/quan-ly-gia-dich-vu/QuanLyGiaDichVu";
+import QuanLyHoaDon from "../pages/Manager/quan-ly-hoa-don/QuanLyHoaDon";
+import QuanLyThanhToanDichVu from "../pages/Manager/quan-ly-thanh-toan-dich-vu/QuanLyThanhToanDichVu";
+import { ThongBao as ManagerNotifications } from "../pages/Manager/thong-bao/ThongBao";
+import QuanLyGiaTheoTrinhDo from "../pages/Manager/quan-ly-gia-theo-trinh-do/QuanLyGiaTheoTrinhDo";
 import ManagerLayout from "../layouts/ManagerLayout/ManagerLayout";
 
 /**
@@ -75,7 +75,7 @@ export const privateRoutes = (
         {/* Fullscreen patient video call route (no PatientLayout) */}
         <Route
           path="/benh-nhan/video-call/:appointmentId"
-          element={<PatientVideoCallPage />}
+          element={<TrangGoiVideoPatient />}
         />
 
         <Route element={<PatientLayout />}>
@@ -96,12 +96,9 @@ export const privateRoutes = (
             path="/benh-nhan/ho-so-suc-khoe-gia-dinh"
             element={<PatientDashboard />}
           />
-          <Route
-            path="/benh-nhan/bac-si-ua-thich"
-            element={<FavoriteDoctors />}
-          />
+          <Route path="/benh-nhan/bac-si-ua-thich" element={<BacSiUaThich />} />
           <Route path="/benh-nhan/thong-bao" element={<PatientDashboard />} />
-          <Route path="/benh-nhan/cai-dat" element={<Settings />} />
+          <Route path="/benh-nhan/cai-dat" element={<CaiDatPatient />} />
           {/* Legacy route redirects for backward compatibility */}
           <Route path="/tim-bac-si" element={<PatientDashboard />} />
           <Route path="/lich-hen-cua-toi" element={<PatientDashboard />} />
@@ -126,53 +123,47 @@ export const privateRoutes = (
         {/* Fullscreen doctor video call route (no DoctorLayout) */}
         <Route
           path="/bac-si/video-call/:appointmentId"
-          element={<DoctorVideoCallPage />}
+          element={<TrangGoiVideoDoctor />}
         />
 
         <Route element={<DoctorLayout />}>
           {/* Main doctor dashboard */}
-          <Route path="/bac-si/trang-chu" element={<DoctorDashboard />} />
-          <Route path="/bac-si" element={<DoctorDashboard />} />{" "}
+          <Route path="/bac-si/trang-chu" element={<TrangChuDoctor />} />
+          <Route path="/bac-si" element={<TrangChuDoctor />} />{" "}
           {/* Legacy route for backward compatibility */}
           {/* ==================== APPOINTMENT MANAGEMENT ==================== */}
           {/* Doctor appointment management routes */}
-          <Route path="/bac-si/lich-hen" element={<AppointmentList />} />
-          <Route path="/bac-si/lich-hen/:id" element={<AppointmentDetail />} />
+          <Route path="/bac-si/lich-hen" element={<LichHenDoctor />} />
+          <Route path="/bac-si/lich-hen/:id" element={<ChiTietLichHen />} />
           <Route
             path="/bac-si/lich-hen/service-payment-result"
-            element={<ServicePaymentResult />}
+            element={<KetQuaThanhToanDichVu />}
           />
           <Route
             path="/bac-si/kham-truc-tiep/:appointmentId"
-            element={<OfflineConsultationPage />}
+            element={<KhamTrucTiep />}
           />
           <Route
             path="/bac-si/tu-van-truc-tuyen/:appointmentId"
-            element={<OnlineConsultationPage />}
+            element={<TuVanTrucTuyen />}
           />
           {/* ==================== SCHEDULE MANAGEMENT ==================== */}
           {/* Doctor schedule and calendar routes */}
-          <Route
-            path="/bac-si/lich-lam-viec"
-            element={<ScheduleManagement />}
-          />
-          <Route path="/bac-si/quan-ly-lich" element={<ScheduleManagement />} />
+          <Route path="/bac-si/lich-lam-viec" element={<QuanLyLich />} />
+          <Route path="/bac-si/quan-ly-lich" element={<QuanLyLich />} />
           {/* ==================== MEDICAL RECORDS ==================== */}
           {/* Doctor medical records and consultation routes */}
-          <Route path="/bac-si/ho-so-kham" element={<MedicalHistory />} />
+          <Route path="/bac-si/ho-so-kham" element={<HoSoKham />} />
           {/* ==================== SETTINGS & PROFILE ==================== */}
           {/* Doctor settings and profile management */}
-          <Route path="/bac-si/cai-dat" element={<ProfileSettings />} />
+          <Route path="/bac-si/cai-dat" element={<CaiDat />} />
           {/* ==================== NOTIFICATIONS & FEEDBACK ==================== */}
           {/* Doctor notifications and feedback routes */}
-          <Route path="/bac-si/thong-bao" element={<Notifications />} />
-          <Route path="/bac-si/danh-gia" element={<Feedback />} />
+          <Route path="/bac-si/thong-bao" element={<ThongBao />} />
+          <Route path="/bac-si/danh-gia" element={<DanhGia />} />
           {/* ==================== RESCHEDULE MANAGEMENT ==================== */}
           {/* Doctor reschedule request management */}
-          <Route
-            path="/bac-si/yeu-cau-doi-lich"
-            element={<RescheduleRequests />}
-          />
+          <Route path="/bac-si/yeu-cau-doi-lich" element={<YeuCauDoiLich />} />
         </Route>
       </Route>
     </Route>
@@ -183,29 +174,23 @@ export const privateRoutes = (
       <Route element={<AuthMiddleware />}>
         {/* ==================== SHARED ROUTES ==================== */}
         {/* Routes accessible by all authenticated users */}
-        <Route path="/tai-khoan" element={<Profile />} />
+        <Route path="/tai-khoan" element={<TaiKhoan />} />
       </Route>
 
       {/* ==================== PATIENT-SPECIFIC ROUTES ==================== */}
       {/* Routes that require patient role specifically */}
       <Route element={<PatientMiddleware />}>
         {/* Appointment booking routes */}
-        <Route path="/dat-lich" element={<AppointmentBookingHome />} />
-        <Route
-          path="/dat-lich/chon-chuyen-khoa"
-          element={<SpecializationSelection />}
-        />
-        <Route path="/dat-lich/chon-bac-si" element={<DoctorSelection />} />
-        <Route
-          path="/dat-lich/chon-thoi-gian"
-          element={<TimeSlotSelection />}
-        />
+        <Route path="/dat-lich" element={<TrangChuDatLich />} />
+        <Route path="/dat-lich/chon-chuyen-khoa" element={<ChonChuyenKhoa />} />
+        <Route path="/dat-lich/chon-bac-si" element={<ChonBacSi />} />
+        <Route path="/dat-lich/chon-thoi-gian" element={<ChonThoiGian />} />
         {/* Payment result route - handles both success and failed */}
-        <Route path="/dat-lich/payment-result" element={<PaymentResult />} />
+        <Route path="/dat-lich/payment-result" element={<KetQuaThanhToan />} />
         {/* Multi-specialization booking routes */}
         <Route
           path="/dat-lich-nhieu-chuyen-khoa"
-          element={<MultiSpecializationBooking />}
+          element={<DatLichNhieuChuyenKhoa />}
         />
       </Route>
     </Route>
@@ -214,22 +199,22 @@ export const privateRoutes = (
     {/* Admin routes with admin middleware protection */}
     <Route element={<AdminMiddleware />}>
       <Route element={<AdminLayout />}>
-        <Route path="/admin/trang-chu" element={<AdminDashboard />} />
-        <Route path="/admin" element={<AdminDashboard />} />{" "}
+        <Route path="/admin/trang-chu" element={<TrangChuAdmin />} />
+        <Route path="/admin" element={<TrangChuAdmin />} />{" "}
         {/* Legacy route for backward compatibility */}
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />{" "}
+        <Route path="/admin/dashboard" element={<TrangChuAdmin />} />{" "}
         {/* Legacy route */}
-        <Route path="/admin/xac-minh-bac-si" element={<VerifyDoctors />} />
-        <Route path="/admin/nguoi-dung" element={<UserManagement />} />
-        <Route path="/admin/chuyen-khoa" element={<Specializations />} />
-        <Route path="/admin/lich-hen" element={<AppointmentManagement />} />
+        <Route path="/admin/xac-minh-bac-si" element={<XacMinhBacSi />} />
+        <Route path="/admin/nguoi-dung" element={<NguoiDung />} />
+        <Route path="/admin/chuyen-khoa" element={<ChuyenKhoa />} />
+        <Route path="/admin/lich-hen" element={<LichHenAdmin />} />
         {/* Legacy route redirects for backward compatibility */}
-        <Route path="/admin/verify-doctors" element={<VerifyDoctors />} />
-        <Route path="/admin/users" element={<UserManagement />} />
-        <Route path="/admin/specializations" element={<Specializations />} />
-        <Route path="/admin/appointments" element={<AppointmentManagement />} />
-        <Route path="/admin/thong-ke" element={<Statistics />} />
-        <Route path="/admin/statistics" element={<Statistics />} />
+        <Route path="/admin/verify-doctors" element={<XacMinhBacSi />} />
+        <Route path="/admin/users" element={<NguoiDung />} />
+        <Route path="/admin/specializations" element={<ChuyenKhoa />} />
+        <Route path="/admin/appointments" element={<LichHenAdmin />} />
+        <Route path="/admin/thong-ke" element={<ThongKe />} />
+        <Route path="/admin/statistics" element={<ThongKe />} />
       </Route>
     </Route>
 
@@ -237,31 +222,22 @@ export const privateRoutes = (
     {/* Manager routes with manager middleware protection */}
     <Route element={<ManagerMiddleware />}>
       <Route element={<ManagerLayout />}>
-        <Route path="/manager/trang-chu" element={<ManagerDashboard />} />
-        <Route path="/manager" element={<ManagerDashboard />} />
-        <Route
-          path="/manager/quan-ly-lich"
-          element={<ManagerScheduleManagement />}
-        />
-        <Route
-          path="/manager/quan-ly-gia"
-          element={<EducationLevelPriceManagement />}
-        />
+        <Route path="/manager/trang-chu" element={<TrangChuManager />} />
+        <Route path="/manager" element={<TrangChuManager />} />
+        <Route path="/manager/quan-ly-lich" element={<QuanLyLichBacSi />} />
+        <Route path="/manager/quan-ly-gia" element={<QuanLyGiaTheoTrinhDo />} />
         <Route
           path="/manager/yeu-cau-nghi-phep"
-          element={<LeaveRequestManagement />}
+          element={<QuanLyYeuCauNghiPhep />}
         />
         <Route
           path="/manager/quan-ly-gia-dich-vu"
-          element={<ServicePriceManagement />}
+          element={<QuanLyGiaDichVu />}
         />
-        <Route
-          path="/manager/quan-ly-hoa-don"
-          element={<InvoiceManagement />}
-        />
+        <Route path="/manager/quan-ly-hoa-don" element={<QuanLyHoaDon />} />
         <Route
           path="/manager/thanh-toan-dich-vu"
-          element={<ServicePaymentManagement />}
+          element={<QuanLyThanhToanDichVu />}
         />
         <Route path="/manager/thong-bao" element={<ManagerNotifications />} />
       </Route>

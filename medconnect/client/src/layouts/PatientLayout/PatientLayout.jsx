@@ -17,7 +17,7 @@ import {
 } from "@ant-design/icons";
 import { auth } from "../../lib/firebase";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { PatientHeader } from "../../pages/Patient/components/PatientHeader/PatientHeader";
+import { DauTrangBenhNhan } from "../../pages/Patient/dau-trang-benh-nhan/DauTrangBenhNhan";
 import "./PatientLayout.scss";
 
 const { Sider, Content } = Layout;
@@ -208,7 +208,7 @@ const PatientLayout = () => {
       </Sider>
 
       <Layout className="patient-main">
-        <PatientHeader />
+        <DauTrangBenhNhan />
 
         <Content className="patient-content">
           <Outlet />

@@ -36,57 +36,6 @@ export function usePatientAppointments() {
           ["pending_doctor", "accepted"].includes(appointment.status)
         );
 
-        console.log("=== APPOINTMENT DEBUG (Same as MyAppointments) ===");
-        console.log("All appointments from API:", allAppointments.length);
-        console.log(
-          "All appointments details:",
-          allAppointments.map((apt) => ({
-            id: apt._id,
-            status: apt.status,
-            doctor: apt.doctorId?.fullName,
-            scheduledStart: apt.scheduledStart,
-            scheduledEnd: apt.scheduledEnd,
-          }))
-        );
-
-        console.log(
-          "Filtered appointments (accepted + pending_doctor):",
-          filteredAppointments.length
-        );
-        console.log(
-          "Filtered appointments details:",
-          filteredAppointments.map((apt) => ({
-            id: apt._id,
-            status: apt.status,
-            doctor: apt.doctorId?.fullName,
-            scheduledStart: apt.scheduledStart,
-          }))
-        );
-
-        console.log(
-          "Appointments by status:",
-          allAppointments.reduce((acc, apt) => {
-            acc[apt.status] = (acc[apt.status] || 0) + 1;
-            return acc;
-          }, {})
-        );
-
-        // Check each appointment individually
-        console.log("=== INDIVIDUAL APPOINTMENT CHECK ===");
-        allAppointments.forEach((apt, index) => {
-          const hasCorrectStatus = ["pending_doctor", "accepted"].includes(
-            apt.status
-          );
-          console.log(`Appointment ${index + 1}:`, {
-            id: apt._id,
-            status: apt.status,
-            doctor: apt.doctorId?.fullName,
-            scheduledStart: apt.scheduledStart,
-            hasCorrectStatus,
-            willShow: hasCorrectStatus,
-          });
-        });
-
         setAppointments(filteredAppointments);
       } else {
         throw new Error(response.message || "Failed to fetch appointments");
