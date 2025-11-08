@@ -130,6 +130,8 @@ const ThongKe = () => {
             icon: <CalendarOutlined />,
             cardClass: "stat-card-emerald",
             textColor: "text-emerald",
+            path: "/admin/lich-hen",
+            clickable: true,
           },
           {
             title: (() => {
@@ -178,6 +180,8 @@ const ThongKe = () => {
             icon: <CalendarOutlined />,
             cardClass: "stat-card-emerald",
             textColor: "text-emerald",
+            path: "/admin/lich-hen",
+            clickable: true,
           },
           {
             title: (() => {

@@ -12,6 +12,8 @@ import dotenv from "dotenv";
 dotenv.config();
 import apiRouter from "./routes/api.router.js";
 
+import mapRoutes from "./routes/mapRoutes.js";
+
 // Get __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -159,3 +161,6 @@ server.listen(PORT, () => {
   console.log(`🚀 Server đang chạy tại: ${domain}`);
 });
 // });
+
+//=================== map ===================//
+app.use("/api/locations", mapRoutes);
