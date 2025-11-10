@@ -9,6 +9,8 @@ import ConsultationAdvice from "../models/consultationAdvice.model.js";
 import Notification from "../models/notification.model.js";
 import PatientFavorite from "../models/patientFavorite.model.js";
 import EducationLevelPrice from "../models/educationLevelPrice.model.js";
+import Payment from "../models/payment.model.js";
+import Clinic from "../models/clinic.model.js";
 import {
   createBookingNotification,
   createAppointmentNotification,
@@ -617,6 +619,7 @@ export async function getDoctorTimeSlots(req, res) {
       .lean();
 
     // Get all appointments using these slots to check if they're really available
+    // Include ALL appointments (even done) so we can show all slots but mark them as unavailable
     const slotIds = timeSlots.map((slot) => slot._id);
     const appointments = await Appointment.find({
       slotId: { $in: slotIds },
@@ -627,7 +630,7 @@ export async function getDoctorTimeSlots(req, res) {
           "in_progress",
           "done",
           // Exclude cancelled, rejected, no_show, rescheduled
-          // Include "done" to hide completed appointments
+          // Include "done" to show all slots but mark them as unavailable
         ],
       },
     })
@@ -2778,5 +2781,673 @@ MedConnect
       error?.message || error
     );
     // Không throw error để không ảnh hưởng đến flow chính
+  }
+}
+
+/**
+ * Calculate payment summary for single appointment (pre-payment flow)
+ * POST /api/patients/appointments/calculate-payment-summary
+ * 
+ * Tính toán payment summary cho single appointment mà chưa tạo appointment trong DB
+ * Tương tự calculatePaymentSummary cho nhiều lịch nhưng chỉ có 1 appointment
+ */
+async function calculateAppointmentBookingFee(appointment) {
+  try {
+    // Get doctorId (có thể là object hoặc ID)
+    const doctorId = appointment.doctorId?._id || appointment.doctorId;
+    if (!doctorId) {
+      console.warn(`Appointment không có doctorId`);
+      return 0;
+    }
+
+    // Get doctor với education level
+    const doctor = await Doctor.findById(doctorId).lean();
+    if (!doctor) {
+      console.warn(`Doctor ${doctorId} không tồn tại`);
+      return 0;
+    }
+
+    if (!doctor.educationLevel) {
+      console.warn(`Doctor ${doctorId} không có education level, sử dụng giá mặc định 0`);
+      return 0;
+    }
+
+    // Get mode
+    const mode = appointment.mode;
+    if (!mode) {
+      console.warn(`Appointment không có mode`);
+      return 0;
+    }
+
+    // Get pricing based on education level and mode
+    const priceRecord = await EducationLevelPrice.findOne({
+      educationLevel: doctor.educationLevel,
+      mode: mode,
+      isActive: true,
+    }).lean();
+
+    if (!priceRecord) {
+      console.warn(`Không tìm thấy giá cho educationLevel=${doctor.educationLevel}, mode=${mode}`);
+      return 0;
+    }
+
+    // Check if scheduledStart is weekend (Saturday = 6, Sunday = 0)
+    if (!appointment.scheduledStart) {
+      console.warn(`Appointment không có scheduledStart`);
+      return priceRecord.weekdayPrice; // Default to weekday price
+    }
+
+    const scheduledDate = new Date(appointment.scheduledStart);
+    if (isNaN(scheduledDate.getTime())) {
+      console.warn(`Appointment có scheduledStart không hợp lệ: ${appointment.scheduledStart}`);
+      return priceRecord.weekdayPrice; // Default to weekday price
+    }
+
+    const dayOfWeek = scheduledDate.getDay(); // 0 = Sunday, 6 = Saturday
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    // Return appropriate price
+    return isWeekend ? priceRecord.weekendPrice : priceRecord.weekdayPrice;
+  } catch (error) {
+    console.error("Error calculating appointment booking fee:", error);
+    return 0;
+  }
+}
+
+export async function calculatePaymentSummaryForSingleAppointment(req, res) {
+  try {
+    const claims = req.user || {};
+    const appUserId = claims.app_user_id;
+
+    if (!appUserId) {
+      return fail(
+        res,
+        401,
+        ERROR_CODES.UNAUTHORIZED,
+        "User ID not found in token"
+      );
+    }
+
+    const { doctorId, slotId, mode, clinicId, reason, scheduledStart, scheduledEnd, patientId } = req.body;
+
+    // Validate required fields
+    if (!doctorId || !slotId || !mode || !scheduledStart || !scheduledEnd) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.BAD_REQUEST,
+        "Missing required fields: doctorId, slotId, mode, scheduledStart, scheduledEnd"
+      );
+    }
+
+    // Validate mode
+    if (!["online", "offline"].includes(mode)) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.BAD_REQUEST,
+        "Mode must be 'online' or 'offline'"
+      );
+    }
+
+    // If offline mode, clinicId is required
+    if (mode === "offline" && !clinicId) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.BAD_REQUEST,
+        "clinicId is required for offline appointments"
+      );
+    }
+
+    // Get patient profile
+    let patient;
+    if (patientId) {
+      patient = await Patient.findOne({
+        _id: patientId,
+        userId: appUserId,
+      });
+
+      if (!patient) {
+        return fail(
+          res,
+          403,
+          ERROR_CODES.UNAUTHORIZED,
+          "Patient not found or does not belong to you"
+        );
+      }
+    } else {
+      patient = await Patient.findOne({ userId: appUserId });
+      if (!patient) {
+        const user = await User.findById(appUserId);
+        if (!user) {
+          return fail(res, 404, ERROR_CODES.USER_NOT_FOUND, "User not found");
+        }
+
+        const newPatient = new Patient({
+          userId: appUserId,
+          fullName: user.fullName || "Chưa cập nhật",
+          phone: user.phone || "",
+          isComplete: false,
+        });
+
+        await newPatient.save();
+        patient = newPatient;
+      }
+    }
+
+    // Verify the time slot exists and is available
+    const timeSlot = await DoctorTimeSlot.findById(slotId);
+    if (!timeSlot) {
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Time slot not found");
+    }
+
+    if (timeSlot.doctorId.toString() !== doctorId) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.BAD_REQUEST,
+        "Time slot does not belong to the selected doctor"
+      );
+    }
+
+    // Check if slot is really available by checking for active appointments
+    const activeAppointments = await Appointment.find({
+      slotId: slotId,
+      status: {
+        $in: ["pending_doctor", "accepted", "in_progress", "done"],
+      },
+    })
+      .select("slotId status")
+      .lean();
+
+    if (activeAppointments.length > 0) {
+      return fail(
+        res,
+        409,
+        ERROR_CODES.CONFLICT,
+        "Time slot is no longer available"
+      );
+    }
+
+    // Get doctor info
+    const doctor = await Doctor.findById(doctorId)
+      .populate("specializationIds", "name")
+      .lean();
+
+    if (!doctor) {
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Doctor not found");
+    }
+
+    // Get clinic info if offline
+    let clinic = null;
+    if (mode === "offline" && clinicId) {
+      clinic = await Clinic.findById(clinicId).lean();
+    }
+
+    // Prepare appointment data for price calculation
+    const appointmentData = {
+      doctorId: doctor._id,
+      mode: mode,
+      scheduledStart: new Date(scheduledStart),
+      scheduledEnd: new Date(scheduledEnd),
+      clinicId: clinicId || undefined,
+    };
+
+    // Calculate price
+    const price = await calculateAppointmentBookingFee(appointmentData);
+
+    // Get specialization names
+    const specializationNames = doctor.specializationIds
+      ?.map((s) => (typeof s === "object" ? s.name : s))
+      .join(", ") || "";
+
+    // Format scheduled time
+    const scheduledDate = new Date(scheduledStart);
+    const timeText = scheduledDate.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    return ok(res, {
+      totalAmount: price,
+      appointmentSummary: {
+        doctorId: doctor._id,
+        doctorName: doctor.fullName,
+        specializationName: specializationNames || "N/A",
+        mode: mode,
+        scheduledStart: scheduledStart,
+        scheduledEnd: scheduledEnd,
+        clinicId: clinicId || null,
+        clinicName: clinic?.name || null,
+        reason: reason || "",
+        price: price,
+        bookingFee: price,
+        timeText: timeText,
+      },
+      appointmentsCount: 1,
+    });
+  } catch (error) {
+    console.error("❌ Error in calculatePaymentSummaryForSingleAppointment:", error);
+    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+  }
+}
+
+/**
+ * Create payment for single appointment (pre-payment flow)
+ * POST /api/patients/appointments/create-payment
+ * 
+ * Flow mới:
+ * 1. Nhận appointment data từ request body (chưa tạo appointment trong DB)
+ * 2. Validate appointment data
+ * 3. Tính toán payment
+ * 4. Tạo Payment record với appointmentData (lưu appointment data để tạo sau khi thanh toán thành công)
+ * 5. Tạo PayOS payment link
+ * 6. Return payUrl để redirect user đến PayOS
+ * 7. Sau khi thanh toán thành công (webhook), tạo appointment từ payment.appointmentData
+ */
+export async function createPaymentForSingleAppointment(req, res) {
+  try {
+    const claims = req.user || {};
+    const appUserId = claims.app_user_id;
+
+    if (!appUserId) {
+      return fail(
+        res,
+        401,
+        ERROR_CODES.UNAUTHORIZED,
+        "User ID not found in token"
+      );
+    }
+
+    const { doctorId, slotId, mode, clinicId, reason, scheduledStart, scheduledEnd, patientId, gateway = "payos", method = "qr" } = req.body;
+
+    // Validate gateway
+    if (!["payos", "vnpay", "momo"].includes(gateway)) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        "Gateway must be payos, vnpay, or momo"
+      );
+    }
+
+    // Validate required fields
+    if (!doctorId || !slotId || !mode || !scheduledStart || !scheduledEnd) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.BAD_REQUEST,
+        "Missing required fields: doctorId, slotId, mode, scheduledStart, scheduledEnd"
+      );
+    }
+
+    // Validate mode
+    if (!["online", "offline"].includes(mode)) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.BAD_REQUEST,
+        "Mode must be 'online' or 'offline'"
+      );
+    }
+
+    // If offline mode, clinicId is required
+    if (mode === "offline" && !clinicId) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.BAD_REQUEST,
+        "clinicId is required for offline appointments"
+      );
+    }
+
+    // Get patient profile
+    let patient;
+    if (patientId) {
+      patient = await Patient.findOne({
+        _id: patientId,
+        userId: appUserId,
+      }).populate("userId");
+
+      if (!patient) {
+        return fail(
+          res,
+          403,
+          ERROR_CODES.UNAUTHORIZED,
+          "Patient not found or does not belong to you"
+        );
+      }
+    } else {
+      patient = await Patient.findOne({ userId: appUserId }).populate("userId");
+      if (!patient) {
+        const user = await User.findById(appUserId);
+        if (!user) {
+          return fail(res, 404, ERROR_CODES.USER_NOT_FOUND, "User not found");
+        }
+
+        const newPatient = new Patient({
+          userId: appUserId,
+          fullName: user.fullName || "Chưa cập nhật",
+          phone: user.phone || "",
+          isComplete: false,
+        });
+
+        await newPatient.save();
+        await newPatient.populate("userId");
+        patient = newPatient;
+      }
+    }
+
+    // Verify the time slot exists and is available
+    const timeSlot = await DoctorTimeSlot.findById(slotId);
+    if (!timeSlot) {
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Time slot not found");
+    }
+
+    if (timeSlot.doctorId.toString() !== doctorId) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.BAD_REQUEST,
+        "Time slot does not belong to the selected doctor"
+      );
+    }
+
+    // Check if slot is really available by checking for active appointments
+    const activeAppointments = await Appointment.find({
+      slotId: slotId,
+      status: {
+        $in: ["pending_doctor", "accepted", "in_progress", "done"],
+      },
+    })
+      .select("slotId status")
+      .lean();
+
+    if (activeAppointments.length > 0) {
+      return fail(
+        res,
+        409,
+        ERROR_CODES.CONFLICT,
+        "Time slot is no longer available"
+      );
+    }
+
+    // Get doctor info
+    const doctor = await Doctor.findById(doctorId)
+      .populate("specializationIds", "name")
+      .lean();
+
+    if (!doctor) {
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Doctor not found");
+    }
+
+    // Get clinic info if offline
+    let clinic = null;
+    if (mode === "offline" && clinicId) {
+      clinic = await Clinic.findById(clinicId).lean();
+    }
+
+    // Ensure scheduledStart and scheduledEnd are proper Date objects
+    // Use scheduledStart and scheduledEnd from request body (already validated)
+    let appointmentScheduledStart = new Date(scheduledStart);
+    let appointmentScheduledEnd = new Date(scheduledEnd);
+
+    // Validate dates
+    if (isNaN(appointmentScheduledStart.getTime())) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.BAD_REQUEST,
+        "scheduledStart is not a valid date"
+      );
+    }
+
+    if (isNaN(appointmentScheduledEnd.getTime())) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.BAD_REQUEST,
+        "scheduledEnd is not a valid date"
+      );
+    }
+
+    // Ensure scheduledEnd is after scheduledStart
+    if (appointmentScheduledEnd <= appointmentScheduledStart) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.BAD_REQUEST,
+        "scheduledEnd must be after scheduledStart"
+      );
+    }
+
+    // Prepare appointment data for payment
+    const appointmentData = {
+      doctorId: doctorId,
+      slotId: slotId,
+      mode: mode,
+      clinicId: mode === "offline" ? clinicId : undefined,
+      scheduledStart: appointmentScheduledStart,
+      scheduledEnd: appointmentScheduledEnd,
+      reason: reason || "",
+    };
+
+    // Calculate price
+    const price = await calculateAppointmentBookingFee({
+      doctorId: doctor._id,
+      mode: mode,
+      scheduledStart: appointmentScheduledStart,
+      scheduledEnd: appointmentScheduledEnd,
+    });
+
+    if (price === 0) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        "Tổng số tiền thanh toán là 0"
+      );
+    }
+
+    // Get specialization names
+    const specializationNames = doctor.specializationIds
+      ?.map((s) => (typeof s === "object" ? s.name : s))
+      .join(", ") || "";
+
+    // Create payment items
+    const modeText = mode === "online" ? "Trực tuyến" : "Tại phòng khám";
+    const clinicText = clinic?.name ? ` - ${clinic.name}` : "";
+    const timeText = appointmentScheduledStart
+      ? ` (${new Date(appointmentScheduledStart).toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })})`
+      : "";
+
+    const appointmentItems = [{
+      description: `${doctor.fullName}${specializationNames ? ` - ${specializationNames}` : ""} (${modeText}${clinicText})${timeText}`,
+      quantity: 1,
+      unitPrice: price,
+      lineTotal: price,
+    }];
+
+    // Create payment record với appointmentData (chưa tạo appointment)
+    const orderCode = Number(String(Date.now()).slice(-10));
+    const invoiceNumber = `INV-APT-${orderCode}`;
+
+    // Tạo payment object - Đảm bảo appointmentId KHÔNG được set
+    const paymentData = {
+      // KHÔNG có appointmentId - chỉ có appointmentData (pre-payment flow)
+      // KHÔNG có medicalVisitId và appointmentIds vì đây là single appointment
+      appointmentData: [appointmentData], // Lưu appointment data để tạo sau khi thanh toán thành công
+      invoiceType: "booking",
+      invoiceNumber,
+      currency: "VND",
+      issueDate: new Date(),
+      billTo: {
+        patientId: patient._id,
+        name: patient.fullName || patient.userId?.fullName || "Unknown",
+        email: patient.userId?.email,
+        phone: patient.userId?.phoneNumber || patient.phone,
+      },
+      billFrom: {
+        doctorId: doctor._id,
+        clinicId: clinicId || null,
+        doctorName: doctor.fullName || "MedConnect",
+        clinicName: clinic?.name || "MedConnect Clinic",
+      },
+      items: appointmentItems,
+      subtotal: price,
+      discount: 0,
+      total: price,
+      gateway: gateway,
+      method: method,
+      status: "initiated", // Will be updated to captured after payment
+      amountPaid: 0,
+      orderCode: orderCode,
+      pendingOrderCode: orderCode, // Temporary, will be cleared after payment
+    };
+
+    // Log payment data trước khi tạo
+    console.log("🔍 Payment data before creation (single appointment):", {
+      hasAppointmentId: "appointmentId" in paymentData,
+      hasMedicalVisitId: "medicalVisitId" in paymentData,
+      hasAppointmentData: "appointmentData" in paymentData,
+      appointmentDataLength: paymentData.appointmentData?.length || 0,
+      paymentDataKeys: Object.keys(paymentData),
+    });
+
+    // Đảm bảo appointmentId và medicalVisitId KHÔNG có trong paymentData
+    // Xóa chúng nếu có (defensive programming)
+    if ("appointmentId" in paymentData) {
+      delete paymentData.appointmentId;
+      console.log("⚠️ Removed appointmentId from paymentData");
+    }
+    if ("medicalVisitId" in paymentData) {
+      delete paymentData.medicalVisitId;
+      console.log("⚠️ Removed medicalVisitId from paymentData");
+    }
+    if ("appointmentIds" in paymentData) {
+      delete paymentData.appointmentIds;
+      console.log("⚠️ Removed appointmentIds from paymentData");
+    }
+
+    const payment = new Payment(paymentData);
+    
+    // Đảm bảo payment object không có appointmentId
+    if (payment.appointmentId !== undefined) {
+      payment.appointmentId = undefined;
+      payment.unmarkModified('appointmentId');
+      console.log("⚠️ Cleared appointmentId from payment object");
+    }
+
+    // Validate payment trước khi save
+    try {
+      // Manually validate appointmentData exists
+      if (!payment.appointmentData || payment.appointmentData.length === 0) {
+        throw new Error("appointmentData is required for pre-payment flow");
+      }
+      
+      await payment.validate();
+      console.log("✅ Payment validation passed (single appointment)");
+    } catch (validationError) {
+      console.error("❌ Payment validation failed (single appointment):", validationError);
+      console.error("Validation error details:", {
+        name: validationError.name,
+        message: validationError.message,
+        errors: validationError.errors,
+      });
+      console.error("Payment object state:", {
+        hasAppointmentId: payment.appointmentId !== undefined,
+        appointmentIdValue: payment.appointmentId,
+        hasMedicalVisitId: payment.medicalVisitId !== undefined,
+        medicalVisitIdValue: payment.medicalVisitId,
+        appointmentIdsLength: payment.appointmentIds?.length || 0,
+        appointmentDataLength: payment.appointmentData?.length || 0,
+        appointmentData: payment.appointmentData,
+        isNew: payment.isNew,
+      });
+      
+      // Format error message better
+      if (validationError.errors) {
+        const errorMessages = Object.keys(validationError.errors).map(key => {
+          return `${key}: ${validationError.errors[key].message}`;
+        });
+        throw new Error(`Payment validation failed: ${errorMessages.join(', ')}`);
+      }
+      throw validationError;
+    }
+
+    await payment.save();
+    console.log("✅ Payment saved successfully (single appointment):", payment._id);
+
+    // Create PayOS payment link (if gateway is payos)
+    if (gateway === "payos") {
+      try {
+        const { createPayosPaymentLink } = await import("../services/payos.service.js");
+        const payosResult = await createPayosPaymentLink(appUserId, {
+          paymentId: payment._id.toString(), // Pass paymentId for pre-payment flow
+          amount: price,
+          description: `MC Apt ${String(orderCode).slice(-8)}`, // Max 25 chars: "MC Apt " (7) + 8 = 15 chars
+        });
+
+        // Update payment with payUrl
+        payment.payUrl = payosResult.payUrl;
+        await payment.save();
+
+        return ok(res, {
+          paymentId: payment._id,
+          payUrl: payosResult.payUrl,
+          orderCode: orderCode,
+          totalAmount: price,
+          appointmentSummary: {
+            doctorId: doctor._id,
+            doctorName: doctor.fullName,
+            specializationName: specializationNames || "N/A",
+            mode: mode,
+            scheduledStart: appointmentScheduledStart,
+            scheduledEnd: appointmentScheduledEnd,
+            clinicId: clinicId || null,
+            clinicName: clinic?.name || null,
+            reason: reason || "",
+            price: price,
+          },
+        });
+      } catch (payosError) {
+        console.error("Error creating PayOS payment link:", payosError);
+        // Delete payment record if PayOS link creation fails
+        await Payment.findByIdAndDelete(payment._id);
+        return fail(
+          res,
+          500,
+          ERROR_CODES.SERVER_ERROR,
+          `Không thể tạo link thanh toán: ${payosError.message}`
+        );
+      }
+    } else {
+      // For other gateways, return payment info (will be handled separately)
+      return ok(res, {
+        paymentId: payment._id,
+        orderCode: orderCode,
+        totalAmount: price,
+        appointmentSummary: {
+          doctorId: doctor._id,
+          doctorName: doctor.fullName,
+          specializationName: specializationNames || "N/A",
+          mode: mode,
+          scheduledStart: appointmentScheduledStart,
+          scheduledEnd: appointmentScheduledEnd,
+          clinicId: clinicId || null,
+          clinicName: clinic?.name || null,
+          reason: reason || "",
+          price: price,
+        },
+        message: `Payment created for ${gateway}. Payment link will be generated separately.`,
+      });
+    }
+  } catch (error) {
+    console.error("❌ Error in createPaymentForSingleAppointment:", error);
+    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
   }
 }
