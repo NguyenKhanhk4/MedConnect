@@ -941,8 +941,17 @@ export default function LichHen() {
                           apt.patientId.relationshipToOwner !== "self" && (
                             <div style={{ marginTop: "8px" }}>
                               <Badge
-                                className="!bg-blue-100 !text-blue-700 !border-blue-300 cursor-pointer"
-                                style={{ marginBottom: 4 }}
+                                className="cursor-pointer"
+                                style={{ 
+                                  marginBottom: 4,
+                                  backgroundColor: "#3b82f6",
+                                  color: "#ffffff",
+                                  borderColor: "#2563eb",
+                                  fontWeight: 600,
+                                  fontSize: "13px",
+                                  padding: "4px 12px",
+                                  borderRadius: "6px"
+                                }}
                                 onClick={() =>
                                   handleViewRepresentativeInfo(apt)
                                 }

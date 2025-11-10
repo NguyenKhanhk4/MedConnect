@@ -10,7 +10,6 @@ export default function ThanhToan() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all"); // all, booking, service
-  const [statusFilter, setStatusFilter] = useState("all"); // all, captured, failed, etc.
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -35,10 +34,6 @@ export default function ThanhToan() {
         params.invoiceType = "service";
       }
       // "all" tab doesn't filter by invoiceType
-
-      if (statusFilter !== "all") {
-        params.status = statusFilter;
-      }
 
       if (startDate) {
         params.startDate = startDate;
@@ -72,7 +67,7 @@ export default function ThanhToan() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, statusFilter, page, startDate, endDate]);
+  }, [activeTab, page, startDate, endDate]);
 
   useEffect(() => {
     loadInvoices();
@@ -518,24 +513,6 @@ export default function ThanhToan() {
               }}
               className="date-input"
             />
-          </div>
-
-          <div className="filter-item">
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
-              className="status-select"
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="captured">Đã thanh toán</option>
-              <option value="initiated">Đang xử lý</option>
-              <option value="failed">Thất bại</option>
-              <option value="refunded">Đã hoàn tiền</option>
-              <option value="cancelled">Đã hủy</option>
-            </select>
           </div>
         </div>
       </div>

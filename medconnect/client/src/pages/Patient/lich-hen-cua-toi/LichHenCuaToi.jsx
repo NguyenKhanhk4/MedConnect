@@ -563,11 +563,13 @@ export function LichHenCuaToi() {
                       a.patientId.relationshipToOwner !== "self" && (
                         <span
                           style={{
-                            fontSize: 12,
-                            padding: "2px 8px",
-                            borderRadius: 999,
-                            background: "#f59e0b",
+                            fontSize: 13,
+                            padding: "4px 12px",
+                            borderRadius: 6,
+                            background: "#3b82f6",
                             color: "#ffffff",
+                            fontWeight: 600,
+                            display: "inline-block",
                           }}
                           title="Lịch hẹn đã được đặt hộ"
                         >
