@@ -16,6 +16,7 @@ import {
   ToggleLeft,
   ToggleRight,
 } from "lucide-react";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./QuanLyGiaDichVu.scss";
 
 export default function QuanLyGiaDichVu() {
@@ -36,6 +37,12 @@ export default function QuanLyGiaDichVu() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
+  const [alertMessage, setAlertMessage] = useState(null);
+
+  // Helper function to show custom alert
+  const showAlert = (message) => {
+    setAlertMessage(message);
+  };
 
   useEffect(() => {
     loadServicePrices();
@@ -85,11 +92,11 @@ export default function QuanLyGiaDichVu() {
         setServicePrices(response.data.servicePrices || []);
         setTotalPages(response.data.pagination?.pages || 1);
       } else {
-        alert("Không thể tải danh sách giá dịch vụ");
+        showAlert("Không thể tải danh sách giá dịch vụ");
       }
     } catch (error) {
       console.error("Error loading service prices:", error);
-      alert("Có lỗi xảy ra khi tải danh sách giá dịch vụ");
+      showAlert("Có lỗi xảy ra khi tải danh sách giá dịch vụ");
     } finally {
       setLoading(false);
     }
@@ -120,7 +127,7 @@ export default function QuanLyGiaDichVu() {
     e.preventDefault();
 
     if (!formData.serviceName.trim()) {
-      alert("Vui lòng nhập tên dịch vụ");
+      showAlert("Vui lòng nhập tên dịch vụ");
       return;
     }
 
@@ -129,7 +136,7 @@ export default function QuanLyGiaDichVu() {
       isNaN(formData.price) ||
       parseInt(formData.price) < 0
     ) {
-      alert("Vui lòng nhập giá hợp lệ (số nguyên dương)");
+      showAlert("Vui lòng nhập giá hợp lệ (số nguyên dương)");
       return;
     }
 
@@ -141,11 +148,11 @@ export default function QuanLyGiaDichVu() {
       });
 
       if (response.success) {
-        alert("Thêm dịch vụ thành công");
+        showAlert("Thêm dịch vụ thành công");
         setShowAddDialog(false);
         loadServicePrices();
       } else {
-        alert(response.message || "Không thể thêm dịch vụ");
+        showAlert(response.message || "Không thể thêm dịch vụ");
       }
     } catch (error) {
       console.error("Error adding service price:", error);
@@ -169,7 +176,7 @@ export default function QuanLyGiaDichVu() {
         }
       }
 
-      alert(errorMessage);
+      showAlert(errorMessage);
     }
   };
 
@@ -177,7 +184,7 @@ export default function QuanLyGiaDichVu() {
     e.preventDefault();
 
     if (!formData.serviceName.trim()) {
-      alert("Vui lòng nhập tên dịch vụ");
+      showAlert("Vui lòng nhập tên dịch vụ");
       return;
     }
 
@@ -186,7 +193,7 @@ export default function QuanLyGiaDichVu() {
       isNaN(formData.price) ||
       parseInt(formData.price) < 0
     ) {
-      alert("Vui lòng nhập giá hợp lệ (số nguyên dương)");
+      showAlert("Vui lòng nhập giá hợp lệ (số nguyên dương)");
       return;
     }
 
@@ -201,12 +208,12 @@ export default function QuanLyGiaDichVu() {
       );
 
       if (response.success) {
-        alert("Cập nhật dịch vụ thành công");
+        showAlert("Cập nhật dịch vụ thành công");
         setShowEditDialog(false);
         setSelectedService(null);
         loadServicePrices();
       } else {
-        alert(response.message || "Không thể cập nhật dịch vụ");
+        showAlert(response.message || "Không thể cập nhật dịch vụ");
       }
     } catch (error) {
       console.error("Error updating service price:", error);
@@ -230,7 +237,7 @@ export default function QuanLyGiaDichVu() {
         }
       }
 
-      alert(errorMessage);
+      showAlert(errorMessage);
     }
   };
 
@@ -241,12 +248,12 @@ export default function QuanLyGiaDichVu() {
       );
 
       if (response.success) {
-        alert("Xóa dịch vụ thành công");
+        showAlert("Xóa dịch vụ thành công");
         setShowDeleteDialog(false);
         setSelectedService(null);
         loadServicePrices();
       } else {
-        alert(response.message || "Không thể xóa dịch vụ");
+        showAlert(response.message || "Không thể xóa dịch vụ");
       }
     } catch (error) {
       console.error("Error deleting service price:", error);
@@ -270,7 +277,7 @@ export default function QuanLyGiaDichVu() {
         }
       }
 
-      alert(errorMessage);
+      showAlert(errorMessage);
     }
   };
 
@@ -291,18 +298,18 @@ export default function QuanLyGiaDichVu() {
       );
 
       if (response.success) {
-        alert(
+        showAlert(
           service.isActive
             ? "Đã tắt dịch vụ thành công"
             : "Đã bật dịch vụ thành công"
         );
         loadServicePrices();
       } else {
-        alert(response.message || "Không thể cập nhật trạng thái");
+        showAlert(response.message || "Không thể cập nhật trạng thái");
       }
     } catch (error) {
       console.error("Error toggling service status:", error);
-      alert("Có lỗi xảy ra khi cập nhật trạng thái");
+      showAlert("Có lỗi xảy ra khi cập nhật trạng thái");
     }
   };
 
@@ -599,6 +606,13 @@ export default function QuanLyGiaDichVu() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        message={alertMessage}
+        onClose={() => setAlertMessage(null)}
+        title="Hệ thống MedConnect"
+      />
     </div>
   );
 }

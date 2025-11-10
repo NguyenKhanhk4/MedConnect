@@ -733,6 +733,14 @@ h2.page-title {
   padding: 2rem 1rem 1rem 1rem;
   backdrop-filter: blur(4px);
   overflow-y: auto;
+  
+  // Ẩn thanh trượt
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .modal-content {
@@ -745,6 +753,14 @@ h2.page-title {
   overflow-y: auto;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  
+  // Ẩn thanh trượt
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .modal-header {

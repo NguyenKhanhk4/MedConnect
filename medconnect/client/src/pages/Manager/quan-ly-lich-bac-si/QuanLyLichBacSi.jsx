@@ -31,6 +31,7 @@ import {
   getEducationLevelPrices,
 } from "../../../lib/api";
 import { RescheduleModal } from "../../../components/RescheduleModal/RescheduleModal";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./QuanLyLichBacSi.scss";
 
 export default function QuanLyLichBacSi() {
@@ -47,6 +48,25 @@ export default function QuanLyLichBacSi() {
   const [selectedSpecializationId, setSelectedSpecializationId] = useState("");
   const [specializations, setSpecializations] = useState([]);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [alertMessage, setAlertMessage] = useState(null);
+  const [confirmConfig, setConfirmConfig] = useState(null);
+
+  // Helper function to show custom alert
+  const showAlert = (message) => {
+    setAlertMessage(message);
+  };
+
+  // Helper function to show custom confirm
+  const showConfirm = (message, onConfirm) => {
+    setConfirmConfig({
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmConfig(null);
+      },
+      onCancel: () => setConfirmConfig(null),
+    });
+  };
 
   // Leave request states
 
@@ -366,7 +386,7 @@ export default function QuanLyLichBacSi() {
 
   const handleGenerateSlots = async () => {
     if (!selectedDoctorId) {
-      alert("Vui lòng chọn bác sĩ!");
+      showAlert("Vui lòng chọn bác sĩ!");
       return;
     }
 
@@ -383,7 +403,7 @@ export default function QuanLyLichBacSi() {
         // Different messages based on response
         if (createdCount === 0) {
           // No slots created (already have enough slots for current month)
-          alert(
+          showAlert(
             `ℹ️ Hiện tại bác sĩ đã có ${existingSlots} slot trong tháng này.\n\nKhông cần tạo thêm slot lúc này.`
           );
         } else {
@@ -398,15 +418,15 @@ export default function QuanLyLichBacSi() {
             message += `\n\n💡 LƯU Ý: Bác sĩ còn ${totalSlots} slot. Nên tạo thêm slot trong thời gian tới.`;
           }
 
-          alert(message);
+          showAlert(message);
         }
         await loadTimeSlots();
       } else {
-        alert("❌ Lỗi khi tạo slots: " + (response.message || "Unknown error"));
+        showAlert("❌ Lỗi khi tạo slots: " + (response.message || "Unknown error"));
       }
     } catch (error) {
       console.error("❌ Error generating slots:", error);
-      alert("❌ Lỗi khi tạo slots: " + error.message);
+      showAlert("❌ Lỗi khi tạo slots: " + error.message);
     } finally {
       setGenerating(false);
     }
@@ -687,12 +707,12 @@ export default function QuanLyLichBacSi() {
         if (response.success) {
           setSelectedAppointmentDetail(response.data);
         } else {
-          alert("Không thể tải thông tin chi tiết lịch hẹn");
+          showAlert("Không thể tải thông tin chi tiết lịch hẹn");
           setShowAppointmentDetail(false);
         }
       } catch (error) {
         console.error("Error fetching appointment detail:", error);
-        alert("Có lỗi xảy ra khi tải thông tin");
+        showAlert("Có lỗi xảy ra khi tải thông tin");
         setShowAppointmentDetail(false);
       } finally {
         setLoadingAppointmentDetail(false);
@@ -943,7 +963,7 @@ export default function QuanLyLichBacSi() {
     }
 
     if (!selectedDoctorId) {
-      alert("Vui lòng chọn bác sĩ!");
+      showAlert("Vui lòng chọn bác sĩ!");
       return;
     }
 
@@ -991,7 +1011,7 @@ export default function QuanLyLichBacSi() {
           slotId = foundSlot.id || foundSlot._id;
         }
       } else {
-        alert("Thiếu thông tin ngày/giờ. Vui lòng thử lại!");
+        showAlert("Thiếu thông tin ngày/giờ. Vui lòng thử lại!");
         return;
       }
 
@@ -1003,7 +1023,7 @@ export default function QuanLyLichBacSi() {
         bookingData.clinicId;
 
       if (!defaultClinicId) {
-        alert(
+        showAlert(
           "Bác sĩ chưa có phòng khám mặc định. Vui lòng cập nhật thông tin bác sĩ trước."
         );
         return;
@@ -1055,7 +1075,7 @@ export default function QuanLyLichBacSi() {
       );
 
       if (response.success) {
-        alert(
+        showAlert(
           "Đã gửi yêu cầu thanh toán đặt lịch. Vui lòng thanh toán để hoàn tất đặt lịch."
         );
         // Close form and reset
@@ -1090,7 +1110,7 @@ export default function QuanLyLichBacSi() {
         const errorMsg =
           response.message || response.error?.message || "Unknown error";
         console.error("❌ Error response:", response);
-        alert("Lỗi khi đặt lịch: " + errorMsg);
+        showAlert("Lỗi khi đặt lịch: " + errorMsg);
         // Close form even on error
         setShowBookSlot(false);
       }
@@ -1105,7 +1125,7 @@ export default function QuanLyLichBacSi() {
         error.response?.data?.message ||
         error.message ||
         "Có lỗi xảy ra khi đặt lịch";
-      alert("Có lỗi xảy ra khi đặt lịch: " + errorMsg);
+      showAlert("Có lỗi xảy ra khi đặt lịch: " + errorMsg);
       // Close form even on error
       setShowBookSlot(false);
     }
@@ -1127,34 +1147,31 @@ export default function QuanLyLichBacSi() {
     // Check for slot ID (could be _id or id depending on mapping)
     const slotId = slot?._id || slot?.id;
     if (!slot || !slotId || !selectedDoctorId) {
-      alert("Không tìm thấy thông tin slot cần xóa");
+      showAlert("Không tìm thấy thông tin slot cần xóa");
       return;
     }
 
     // Confirm delete
-    const confirmDelete = window.confirm(
-      "Bạn có chắc chắn muốn xóa slot này? Slot có appointment sẽ không thể xóa."
-    );
+    showConfirm(
+      "Bạn có chắc chắn muốn xóa slot này? Slot có appointment sẽ không thể xóa.",
+      async () => {
+        try {
+          const response = await api.delete(
+            `/api/managers/doctors/${selectedDoctorId}/time-slots/${slotId}`
+          );
 
-    if (!confirmDelete) {
-      return;
-    }
-
-    try {
-      const response = await api.delete(
-        `/api/managers/doctors/${selectedDoctorId}/time-slots/${slotId}`
-      );
-
-      if (response.success) {
-        alert("Xóa slot thành công!");
-        await loadTimeSlots(); // Reload time slots
-      } else {
-        alert("Không thể xóa slot: " + (response.message || "Unknown error"));
+          if (response.success) {
+            showAlert("Xóa slot thành công!");
+            await loadTimeSlots(); // Reload time slots
+          } else {
+            showAlert("Không thể xóa slot: " + (response.message || "Unknown error"));
+          }
+        } catch (error) {
+          console.error("❌ Error deleting slot:", error);
+          showAlert("Có lỗi xảy ra khi xóa slot: " + error.message);
+        }
       }
-    } catch (error) {
-      console.error("❌ Error deleting slot:", error);
-      alert("Có lỗi xảy ra khi xóa slot: " + error.message);
-    }
+    );
   };
 
   const selectedDoctor = doctors.find((d) => d._id === selectedDoctorId);
@@ -2834,7 +2851,7 @@ export default function QuanLyLichBacSi() {
                           status: selectedAppointmentDetail.status,
                         };
                         // Manager không có quyền gọi video
-                        alert("Chỉ bác sĩ mới có thể bắt đầu cuộc gọi video");
+                        showAlert("Chỉ bác sĩ mới có thể bắt đầu cuộc gọi video");
                         setShowAppointmentDetail(false);
                       }}
                     >
@@ -2885,6 +2902,24 @@ export default function QuanLyLichBacSi() {
               await loadTimeSlots(); // Reload slots to show updated appointment
             }
           }}
+        />
+      )}
+
+      {/* Custom Alert */}
+      <CustomAlert
+        message={alertMessage}
+        onClose={() => setAlertMessage(null)}
+        title="Hệ thống MedConnect"
+      />
+
+      {/* Custom Confirm */}
+      {confirmConfig && (
+        <CustomAlert
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onClose={confirmConfig.onCancel}
+          title="Hệ thống MedConnect"
+          type="confirm"
         />
       )}
     </div>

@@ -19,6 +19,7 @@ import TaiKhoan from "../pages/Auth/tai-khoan/TaiKhoan";
 import PatientDashboard from "../pages/Patient/PatientDashboard/PatientDashboard";
 import { CaiDat as CaiDatPatient } from "../pages/Patient/cai-dat/CaiDat";
 import BacSiUaThich from "../pages/Patient/bac-si-ua-thich/BacSiUaThich";
+import ThanhToan from "../pages/Patient/thanh-toan/ThanhToan";
 import TrangChuDatLich from "../pages/Appointment/trang-chu-dat-lich/TrangChuDatLich";
 import ChonChuyenKhoa from "../pages/Appointment/chon-chuyen-khoa/ChonChuyenKhoa";
 import ChonBacSi from "../pages/Appointment/chon-bac-si/ChonBacSi";
@@ -72,7 +73,6 @@ export const privateRoutes = (
     {/* Patient routes with PatientLayout (includes Sidebar and Header) */}
     <Route element={<AuthMiddleware />}>
       <Route element={<PatientMiddleware />}>
-        {/* Fullscreen patient video call route (no PatientLayout) */}
         <Route
           path="/benh-nhan/video-call/:appointmentId"
           element={<TrangGoiVideoPatient />}
@@ -99,6 +99,7 @@ export const privateRoutes = (
           <Route path="/benh-nhan/bac-si-ua-thich" element={<BacSiUaThich />} />
           <Route path="/benh-nhan/thong-bao" element={<PatientDashboard />} />
           <Route path="/benh-nhan/cai-dat" element={<CaiDatPatient />} />
+          <Route path="/payments" element={<ThanhToan />} />
           {/* Legacy route redirects for backward compatibility */}
           <Route path="/tim-bac-si" element={<PatientDashboard />} />
           <Route path="/lich-hen-cua-toi" element={<PatientDashboard />} />

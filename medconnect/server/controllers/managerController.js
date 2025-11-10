@@ -1819,6 +1819,7 @@ export async function getManagerInvoices(req, res) {
     const query = {};
 
     // Filter by invoiceType (booking or service)
+    // Show all booking invoices (both manager-created and patient-created)
     if (invoiceType && invoiceType !== "all") {
       query.invoiceType = invoiceType;
     }

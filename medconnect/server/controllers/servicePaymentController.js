@@ -297,6 +297,23 @@ export async function createServicePayment(req, res) {
       }
     }
 
+    // Tạo notification cho manager khi có yêu cầu thanh toán mới
+    try {
+      const { createServicePaymentRequestNotification } = await import(
+        "../services/notificationService.js"
+      );
+      await createServicePaymentRequestNotification(payment._id);
+      console.log(
+        `✅ Service payment request notification created for managers`
+      );
+    } catch (notificationError) {
+      console.error(
+        "❌ Error creating service payment request notification:",
+        notificationError
+      );
+      // Không throw error - payment đã được tạo thành công
+    }
+
     // Không tạo PayOS link nữa - chỉ tạo payment record và chờ manager xử lý
     // Manager sẽ tạo PayOS link hoặc xử lý thanh toán tiền mặt
     return ok(res, {
