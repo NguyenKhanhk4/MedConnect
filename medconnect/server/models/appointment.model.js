@@ -66,7 +66,11 @@ const AppointmentSchema = new Schema(
       default: "pending_doctor",
     },
 
-    reason: String,
+    reason: { 
+      type: String, 
+      maxlength: 100,
+      trim: true 
+    },
     cancelledAt: Date,
     cancelledBy: { type: Schema.Types.ObjectId, ref: "User" },
     cancelReason: String,
@@ -133,11 +137,59 @@ const AppointmentSchema = new Schema(
 
 // Validate thời gian
 AppointmentSchema.pre("validate", function (next) {
+  // Ensure scheduledStart and scheduledEnd are Date objects
+  if (this.scheduledStart && !(this.scheduledStart instanceof Date)) {
+    this.scheduledStart = new Date(this.scheduledStart);
+  }
+  if (this.scheduledEnd && !(this.scheduledEnd instanceof Date)) {
+    this.scheduledEnd = new Date(this.scheduledEnd);
+  }
+
+  // Validate that dates are valid
+  if (this.scheduledStart && isNaN(this.scheduledStart.getTime())) {
+    this.invalidate("scheduledStart", "scheduledStart must be a valid date");
+    return next();
+  }
+  if (this.scheduledEnd && isNaN(this.scheduledEnd.getTime())) {
+    this.invalidate("scheduledEnd", "scheduledEnd must be a valid date");
+    return next();
+  }
+
   if (this.scheduledStart && this.scheduledEnd && this.scheduledStart >= this.scheduledEnd) {
     this.invalidate("scheduledEnd", "scheduledEnd must be after scheduledStart");
   }
-  if (this.isNew && this.scheduledStart && this.scheduledStart < new Date()) {
-    this.invalidate("scheduledStart", "scheduledStart must be in the future");
+  
+  // For new appointments with status "pending_doctor", skip future validation
+  // because these appointments are created before doctor approval, and the slot time
+  // might be in the past due to timezone differences or when doctor reviews later.
+  // We only validate "must be in future" for appointments that are being accepted (status = "accepted")
+  // or for appointments being created directly with accepted status.
+  if (this.isNew && this.scheduledStart && this.status !== "pending_doctor") {
+    const now = new Date();
+    const bufferMs = 5 * 60 * 1000; // 5 minutes buffer to handle timezone and clock skew
+    const minAllowedTime = new Date(now.getTime() - bufferMs);
+    
+    // Only validate if scheduledStart is significantly in the past (more than buffer)
+    if (this.scheduledStart.getTime() < minAllowedTime.getTime()) {
+      const scheduledStartStr = this.scheduledStart.toISOString();
+      const nowStr = now.toISOString();
+      const timeDiffMs = now.getTime() - this.scheduledStart.getTime();
+      const timeDiffMinutes = Math.round(timeDiffMs / (60 * 1000));
+      
+      console.error("[Appointment Validation] scheduledStart is in the past:", {
+        scheduledStart: scheduledStartStr,
+        now: nowStr,
+        timeDiffMinutes: timeDiffMinutes,
+        timeDiffMs: timeDiffMs,
+        bufferMs: bufferMs,
+        status: this.status,
+      });
+      
+      this.invalidate(
+        "scheduledStart", 
+        `scheduledStart must be in the future. Scheduled: ${scheduledStartStr}, Now: ${nowStr}, Difference: ${timeDiffMinutes} minutes ago`
+      );
+    }
   }
   next();
 });
