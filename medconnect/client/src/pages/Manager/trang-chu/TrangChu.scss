@@ -2,18 +2,43 @@
   padding: 24px;
 
   .dashboard-header {
-    margin-bottom: 32px;
+    margin: 0 !important;
+    margin-top: -24px !important;
+    margin-bottom: 1.5rem !important;
+    margin-left: -24px !important;
+    margin-right: -24px !important;
+    padding: 1.5rem 24px !important;
+    width: calc(100% + 48px) !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 32px;
+    background: linear-gradient(135deg, #e0f7f9 0%, #fff4e6 100%) !important;
+    border-radius: 12px !important;
+    border: none !important;
+    border-bottom: 2px solid #f3f4f6 !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    z-index: 1 !important;
+    box-shadow: none !important;
 
     h1 {
-      font-size: 28px;
-      font-weight: 600;
-      color: #1f2937;
-      margin-bottom: 8px;
+      font-size: 2rem !important;
+      font-weight: 800 !important;
+      margin: 0 !important;
+      margin-bottom: 0.25rem !important;
+      letter-spacing: -0.03em !important;
+      background: linear-gradient(135deg, #4db8c4 0%, #3a9ba8 100%) !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      background-clip: text !important;
+      line-height: 1.2 !important;
     }
 
     p {
-      font-size: 16px;
-      color: #6b7280;
+      font-size: 1rem !important;
+      color: #6b7280 !important;
+      margin: 0 !important;
     }
   }
 

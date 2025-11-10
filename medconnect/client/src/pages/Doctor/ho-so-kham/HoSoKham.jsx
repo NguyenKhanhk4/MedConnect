@@ -12,6 +12,7 @@ import {
   Search,
 } from "lucide-react";
 import { api } from "../../../lib/api";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./HoSoKham.scss";
 
 export default function HoSoKham() {
@@ -26,6 +27,12 @@ export default function HoSoKham() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [modalType, setModalType] = useState("summary"); // "summary" or "advice"
   const [searchTerm, setSearchTerm] = useState("");
+  const [alertMessage, setAlertMessage] = useState(null);
+
+  // Helper function to show custom alert
+  const showAlert = (message) => {
+    setAlertMessage(message);
+  };
 
   useEffect(() => {
     fetchData();
@@ -496,7 +503,7 @@ export default function HoSoKham() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading file:", error);
-      alert("Có lỗi khi tải xuống file. Vui lòng thử lại.");
+      showAlert("Có lỗi khi tải xuống file. Vui lòng thử lại.");
     }
   };
 
@@ -517,7 +524,7 @@ export default function HoSoKham() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading file:", error);
-      alert("Có lỗi khi tải xuống file");
+      showAlert("Có lỗi khi tải xuống file");
     }
   };
 
@@ -1386,6 +1393,13 @@ export default function HoSoKham() {
           </div>
         </div>
       )}
+
+      {/* Custom Alert */}
+      <CustomAlert
+        message={alertMessage}
+        onClose={() => setAlertMessage(null)}
+        title="Hệ thống MedConnect"
+      />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { useDoctorReviews } from "../../../hooks/useDoctor";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./DanhGia.scss";
 
 // Add Spin component
@@ -33,6 +34,12 @@ export default function DanhGia() {
   const [responseText, setResponseText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [alertMessage, setAlertMessage] = useState(null);
+
+  // Helper function to show custom alert
+  const showAlert = (message) => {
+    setAlertMessage(message);
+  };
 
   const itemsPerPage = 10;
 
@@ -137,7 +144,7 @@ export default function DanhGia() {
       await refetch(); // Refresh reviews
     } catch (error) {
       console.error("Failed to submit response:", error);
-      alert("Có lỗi xảy ra khi gửi phản hồi");
+      showAlert("Có lỗi xảy ra khi gửi phản hồi");
     } finally {
       setSubmitting(false);
     }
@@ -499,6 +506,13 @@ export default function DanhGia() {
           </Button>
         </div>
       )}
+
+      {/* Custom Alert */}
+      <CustomAlert
+        message={alertMessage}
+        onClose={() => setAlertMessage(null)}
+        title="Hệ thống MedConnect"
+      />
     </div>
   );
 }

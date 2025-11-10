@@ -213,6 +213,36 @@
             border-radius: 4px;
             font-size: 12px;
             font-weight: 500;
+
+            &.captured {
+              background: #d1fae5;
+              color: #065f46;
+            }
+
+            &.initiated {
+              background: #fef3c7;
+              color: #92400e;
+            }
+
+            &.failed {
+              background: #fee2e2;
+              color: #991b1b;
+            }
+
+            &.refunded {
+              background: #e5e7eb;
+              color: #374151;
+            }
+
+            &.cancelled {
+              background: #f3f4f6;
+              color: #6b7280;
+            }
+
+            &.pending_manager {
+              background: #dbeafe;
+              color: #1e40af;
+            }
           }
 
           .amount-cell {
