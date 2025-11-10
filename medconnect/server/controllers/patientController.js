@@ -257,8 +257,16 @@ export async function getCurrentPatientProfile(req, res) {
       fullName: user.fullName,
     });
 
-    // Find patient profile, create if not exists
-    let patient = await Patient.findOne({ userId: appUserId }).lean();
+    // Find patient profile for the user (only "self" relationship, not family members)
+    // Filter by relationshipToOwner === "self" or relationshipToOwner is null/undefined (for legacy data)
+    let patient = await Patient.findOne({
+      userId: appUserId,
+      $or: [
+        { relationshipToOwner: "self" },
+        { relationshipToOwner: { $exists: false } },
+        { relationshipToOwner: null },
+      ],
+    }).lean();
 
     if (!patient) {
       // Create a basic patient profile if it doesn't exist
@@ -267,6 +275,7 @@ export async function getCurrentPatientProfile(req, res) {
         userId: appUserId,
         fullName: user.fullName || "Chưa cập nhật",
         phone: user.phone || "",
+        relationshipToOwner: "self", // Explicitly set to "self" for user's own profile
         isComplete: false,
       });
 
@@ -821,7 +830,15 @@ export async function bookAppointment(req, res) {
       }
     } else {
       // Otherwise, get or create the user's own patient profile
-      patient = await Patient.findOne({ userId: appUserId });
+      // Filter by relationshipToOwner === "self" to avoid getting family member records
+      patient = await Patient.findOne({
+        userId: appUserId,
+        $or: [
+          { relationshipToOwner: "self" },
+          { relationshipToOwner: { $exists: false } },
+          { relationshipToOwner: null },
+        ],
+      });
       if (!patient) {
         // Create a basic patient profile if it doesn't exist
         console.log("Creating new patient profile for user:", appUserId);
@@ -834,6 +851,7 @@ export async function bookAppointment(req, res) {
           userId: appUserId,
           fullName: user.fullName || "Chưa cập nhật",
           phone: user.phone || "",
+          relationshipToOwner: "self", // Explicitly set to "self" for user's own profile
           isComplete: false,
         });
 
@@ -1140,32 +1158,27 @@ export async function cancelPatientAppointment(req, res) {
     const { appointmentId } = req.params;
     const { cancelReason } = req.body;
 
-    // Find patient by user ID, create if not exists
-    let patient = await Patient.findOne({ userId: appUserId });
-    if (!patient) {
-      // Create a basic patient profile if it doesn't exist
-      console.log("Creating new patient profile for user:", appUserId);
-
-      const newPatient = new Patient({
-        userId: appUserId,
-        fullName: user.fullName || "Chưa cập nhật",
-        phone: user.phone || "",
-        isComplete: false,
-      });
-
-      await newPatient.save();
-      patient = newPatient;
-      console.log("Created patient profile:", patient._id);
-    }
-
-    // Find appointment belonging to this patient
-    const appointment = await Appointment.findOne({
-      _id: appointmentId,
-      patientId: patient._id,
-    });
+    // Find appointment and verify it belongs to user or any of user's family members
+    const appointment = await Appointment.findById(appointmentId).populate(
+      "patientId"
+    );
 
     if (!appointment) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Appointment not found");
+    }
+
+    // Verify that the appointment's patient belongs to this user
+    // (support both user's own appointments and family member appointments)
+    if (
+      !appointment.patientId ||
+      appointment.patientId.userId.toString() !== appUserId.toString()
+    ) {
+      return fail(
+        res,
+        403,
+        ERROR_CODES.UNAUTHORIZED,
+        "Appointment does not belong to you or your family members"
+      );
     }
 
     // Check if appointment can be cancelled
@@ -1379,8 +1392,15 @@ export async function getPatientConsultationSummaries(req, res) {
       );
     }
 
-    // Find patient by user ID
-    const patient = await Patient.findOne({ userId: appUserId });
+    // Find patient by user ID (only "self" relationship, not family members)
+    const patient = await Patient.findOne({
+      userId: appUserId,
+      $or: [
+        { relationshipToOwner: "self" },
+        { relationshipToOwner: { $exists: false } },
+        { relationshipToOwner: null },
+      ],
+    });
     if (!patient) {
       return fail(
         res,
@@ -1534,8 +1554,15 @@ export async function getPatientConsultationAdvice(req, res) {
       return fail(res, 404, ERROR_CODES.USER_NOT_FOUND, "User not found");
     }
 
-    // Find patient by user ID, create if not exists
-    let patient = await Patient.findOne({ userId: appUserId });
+    // Find patient by user ID (only "self" relationship), create if not exists
+    let patient = await Patient.findOne({
+      userId: appUserId,
+      $or: [
+        { relationshipToOwner: "self" },
+        { relationshipToOwner: { $exists: false } },
+        { relationshipToOwner: null },
+      ],
+    });
     if (!patient) {
       // Create a basic patient profile if it doesn't exist
       console.log(
@@ -1547,6 +1574,7 @@ export async function getPatientConsultationAdvice(req, res) {
         userId: appUserId,
         fullName: user.fullName || "Chưa cập nhật",
         phone: user.phone || "",
+        relationshipToOwner: "self", // Explicitly set to "self" for user's own profile
         isComplete: false,
       });
 

@@ -82,8 +82,15 @@ router.get("/me/stats", authGuard, async (req, res) => {
       });
     }
 
-    // Find patient by user ID, create if not exists
-    let patient = await Patient.findOne({ userId: appUserId });
+    // Find patient by user ID (only "self" relationship, not family members), create if not exists
+    let patient = await Patient.findOne({
+      userId: appUserId,
+      $or: [
+        { relationshipToOwner: "self" },
+        { relationshipToOwner: { $exists: false } },
+        { relationshipToOwner: null },
+      ],
+    });
     if (!patient) {
       // Create a basic patient profile if it doesn't exist
       console.log("Creating new patient profile for user:", appUserId);
@@ -100,6 +107,7 @@ router.get("/me/stats", authGuard, async (req, res) => {
         userId: appUserId,
         fullName: user.fullName || "Chưa cập nhật",
         phone: user.phone || "",
+        relationshipToOwner: "self", // Explicitly set to "self" for user's own profile
         isComplete: false,
       });
 
