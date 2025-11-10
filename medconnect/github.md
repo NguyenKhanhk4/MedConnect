@@ -11,3 +11,5 @@ git add commit push lên gitlab như bthg
 - Để nhánh ThanhBinh làm nhánh production
  + chỉ sang nhánh này khi cần update code trên product
  + sang nhánh thì pull về + add commit + push github => vercel tự động build 
+
+ 12345
