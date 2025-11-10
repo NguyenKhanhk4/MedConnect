@@ -171,6 +171,7 @@
 
   .schedule-header {
     margin: 0 !important;
+    margin-top: -24px !important;
     margin-bottom: 1.5rem !important;
     margin-left: -24px !important;
     margin-right: -24px !important;
@@ -181,7 +182,7 @@
     align-items: center;
     gap: 32px;
     background: linear-gradient(135deg, #e0f7f9 0%, #fff4e6 100%) !important;
-    border-radius: 0 !important;
+    border-radius: 12px !important;
     border: none !important;
     border-bottom: 2px solid #f3f4f6 !important;
     box-sizing: border-box !important;

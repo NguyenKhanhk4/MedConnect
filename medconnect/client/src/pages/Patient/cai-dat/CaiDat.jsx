@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { User, Lock, CreditCard, Upload, Eye, EyeOff } from "lucide-react";
+import { User, Lock, Upload, Eye, EyeOff } from "lucide-react";
 import { useUserProfile } from "../../../hooks/useUserProfile";
 import { updateCurrentPatientProfile, changePassword } from "../../../lib/api";
 import {
@@ -103,7 +103,6 @@ export function CaiDat() {
   const tabs = [
     { id: "profile", label: "Hồ sơ", icon: User },
     { id: "security", label: "Bảo mật", icon: Lock },
-    { id: "payment", label: "Thanh toán", icon: CreditCard },
   ];
 
   const validateField = (field, value) => {
@@ -1065,48 +1064,6 @@ export function CaiDat() {
           </div>
         )}
 
-        {activeTab === "payment" && (
-          <div className="payment-section">
-            <div className="section-header">
-              <h2 className="section-title">Thông tin thanh toán</h2>
-              <p className="section-subtitle">
-                Quản lý phương thức thanh toán và hóa đơn
-              </p>
-            </div>
-
-            <div className="payment-settings">
-              <div className="payment-item">
-                <div className="payment-info">
-                  <h3 className="payment-title">Phương thức thanh toán</h3>
-                  <p className="payment-description">
-                    Quản lý thẻ tín dụng, ví điện tử
-                  </p>
-                </div>
-                <button className="payment-button">Quản lý</button>
-              </div>
-
-              <div className="payment-item">
-                <div className="payment-info">
-                  <h3 className="payment-title">Lịch sử thanh toán</h3>
-                  <p className="payment-description">
-                    Xem tất cả giao dịch và hóa đơn
-                  </p>
-                </div>
-                <button className="payment-button">Xem lịch sử</button>
-              </div>
-
-              <div className="payment-item">
-                <div className="payment-info">
-                  <h3 className="payment-title">Hóa đơn điện tử</h3>
-                  <p className="payment-description">
-                    Tải xuống hóa đơn và biên lai
-                  </p>
-                </div>
-                <button className="payment-button">Tải xuống</button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Custom Alert */}

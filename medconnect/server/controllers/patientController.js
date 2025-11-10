@@ -9,6 +9,7 @@ import ConsultationAdvice from "../models/consultationAdvice.model.js";
 import Notification from "../models/notification.model.js";
 import PatientFavorite from "../models/patientFavorite.model.js";
 import EducationLevelPrice from "../models/educationLevelPrice.model.js";
+import Payment from "../models/payment.model.js";
 import {
   createBookingNotification,
   createAppointmentNotification,
@@ -2778,5 +2779,131 @@ MedConnect
       error?.message || error
     );
     // Không throw error để không ảnh hưởng đến flow chính
+  }
+}
+
+/**
+ * Get patient payments (invoices)
+ * GET /api/patients/me/payments?invoiceType=booking&page=1&limit=20&status=captured&startDate=...&endDate=...
+ */
+export async function getPatientPayments(req, res) {
+  try {
+    const claims = req.user || {};
+    const appUserId = claims.app_user_id;
+
+    if (!appUserId) {
+      return fail(
+        res,
+        401,
+        ERROR_CODES.UNAUTHORIZED,
+        "User ID not found in token"
+      );
+    }
+
+    // Find patient by user ID
+    const patient = await Patient.findOne({ userId: appUserId });
+    if (!patient) {
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient not found");
+    }
+
+    const {
+      invoiceType,
+      page = 1,
+      limit = 20,
+      status,
+      startDate,
+      endDate,
+    } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build query - only get payments for this patient
+    const query = {
+      "billTo.patientId": patient._id,
+    };
+
+    // Filter by invoiceType (booking or service)
+    if (invoiceType && invoiceType !== "all") {
+      query.invoiceType = invoiceType;
+    }
+
+    // Filter by status
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    // Filter by date range
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      query.createdAt = { $gte: start, $lte: end };
+    }
+
+    // Get payments with populated data
+    const payments = await Payment.find(query)
+      .populate("appointmentId", "scheduledStart status mode")
+      .populate("billTo.patientId", "fullName phone dob gender")
+      .populate("billFrom.doctorId", "fullName")
+      .populate("billFrom.clinicId", "name")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await Payment.countDocuments(query);
+
+    // Format invoices for response
+    const formattedInvoices = payments.map((payment) => ({
+      _id: payment._id,
+      invoiceNumber: payment.invoiceNumber,
+      invoiceType: payment.invoiceType,
+      orderCode: payment.orderCode || payment.pendingOrderCode || null,
+      appointmentId: payment.appointmentId?._id,
+      appointmentDate: payment.appointmentId?.scheduledStart,
+      appointmentStatus: payment.appointmentId?.status,
+      appointmentMode: payment.appointmentId?.mode,
+      patientName:
+        payment.billTo?.name || payment.billTo?.patientId?.fullName || "N/A",
+      patientPhone:
+        payment.billTo?.phone || payment.billTo?.patientId?.phone || null,
+      patientDateOfBirth: payment.billTo?.patientId?.dob || null,
+      patientGender: payment.billTo?.patientId?.gender || null,
+      doctorName:
+        payment.billFrom?.doctorName ||
+        payment.billFrom?.doctorId?.fullName ||
+        "N/A",
+      clinicName:
+        payment.billFrom?.clinicName ||
+        payment.billFrom?.clinicId?.name ||
+        null,
+      items: payment.items || [],
+      subtotal: payment.subtotal,
+      discount: payment.discount || 0,
+      total: payment.total,
+      gateway: payment.gateway,
+      method: payment.method,
+      status: payment.status,
+      paidAt: payment.paidAt || payment.capturedAt || payment.createdAt,
+      createdAt: payment.createdAt,
+      currency: payment.currency || "VND",
+    }));
+
+    return ok(res, {
+      invoices: formattedInvoices,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching patient payments:", error);
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || "Lỗi khi tải danh sách thanh toán"
+    );
   }
 }

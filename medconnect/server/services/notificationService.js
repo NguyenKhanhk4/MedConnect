@@ -564,6 +564,88 @@ export async function createLeaveRequestNotification(leaveRequestId) {
 }
 
 /**
+ * Create notification for service payment request (notify all managers)
+ */
+export async function createServicePaymentRequestNotification(paymentId) {
+  try {
+    const Payment = (await import("../models/payment.model.js")).default;
+    
+    const payment = await Payment.findById(paymentId)
+      .populate("appointmentId")
+      .populate("billFrom.doctorId", "fullName userId")
+      .populate("billTo.patientId", "fullName")
+      .lean();
+
+    if (!payment) {
+      console.error("❌ Payment not found:", paymentId);
+      return null;
+    }
+
+    // Only create notification for pending_manager status
+    if (payment.status !== "pending_manager") {
+      console.log(`⚠️ Payment status is ${payment.status}, skipping notification`);
+      return null;
+    }
+
+    // Get all managers
+    const managers = await User.find({ role: "manager" }).lean();
+
+    if (managers.length === 0) {
+      console.log("⚠️ No managers found to notify");
+      return null;
+    }
+
+    const doctorName = payment.billFrom?.doctorName || "Bác sĩ";
+    const patientName = payment.billTo?.name || "Bệnh nhân";
+    
+    // Format số tiền
+    const formattedAmount = new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(payment.total);
+
+    // Format danh sách dịch vụ
+    const servicesList = payment.items
+      .map((item) => item.description)
+      .join(", ");
+
+    const notifications = managers.map((manager) => ({
+      userId: manager._id,
+      type: "payment",
+      title: "Yêu cầu thanh toán hóa đơn mới",
+      message: `BS. ${doctorName} đã gửi yêu cầu thanh toán ${formattedAmount} cho bệnh nhân ${patientName}. Dịch vụ: ${servicesList}. Mã hóa đơn: ${payment.invoiceNumber}`,
+      priority: "high",
+      relatedId: paymentId,
+      relatedType: "payment",
+      metadata: {
+        paymentId: paymentId.toString(),
+        invoiceNumber: payment.invoiceNumber,
+        appointmentId: payment.appointmentId?._id?.toString(),
+        doctorName,
+        patientName,
+        total: payment.total,
+        services: payment.items,
+        status: "pending_manager",
+      },
+    }));
+
+    console.log(
+      `📢 Creating service payment request notifications for ${managers.length} managers:`,
+      managers.map((m) => ({ id: m._id.toString(), email: m.email }))
+    );
+
+    const createdNotifications = await Notification.insertMany(notifications);
+    console.log(
+      `✅ Created ${createdNotifications.length} service payment request notifications for managers`
+    );
+    return createdNotifications;
+  } catch (error) {
+    console.error("❌ Error creating service payment request notification:", error);
+    throw error;
+  }
+}
+
+/**
  * Create notification for leave request approval/rejection (notify doctor)
  */
 export async function createLeaveRequestStatusNotification(

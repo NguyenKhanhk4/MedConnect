@@ -21,14 +21,10 @@ $gray-900: #111827;
     align-items: center !important;
     margin: 0 0 24px 0 !important;
     padding: 1.5rem 2rem 1.75rem 2rem !important;
-    background: linear-gradient(
-      135deg,
-      $primary-teal-light 0%,
-      $accent-yellow-light 100%
-    ) !important;
-    border-radius: 0 !important;
+    background: linear-gradient(135deg, #e0f7f9 0%, #fff4e6 100%) !important;
+    border-radius: 12px !important;
     border: none !important;
-    border-bottom: 2px solid $gray-100 !important;
+    border-bottom: 2px solid #f3f4f6 !important;
     box-shadow: none !important;
 
     .notifications-title {

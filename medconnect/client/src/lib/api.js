@@ -270,8 +270,14 @@ export async function getPatientPrescriptions(patientId) {
   return r.json();
 }
 
-export async function getPatientPayments(patientId) {
-  const r = await fetch(`${BASE}/api/patients/${patientId}/payments`, {
+export async function getPatientPayments(params = {}) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      searchParams.append(key, value);
+    }
+  });
+  const r = await fetch(`${BASE}/api/patients/me/payments?${searchParams}`, {
     credentials: "include",
   });
   if (!r.ok) throw new Error(await r.text());

@@ -3446,7 +3446,7 @@ export async function getDoctorTimeSlots(req, res) {
           // Map appointment statuses to display statuses
           const statusMap = {
             pending_doctor: "pending",
-            accepted: "confirmed",
+            accepted: "accepted", // Keep as "accepted" to match frontend expectations
             in_progress: "in_progress",
             cancelled: "cancelled",
             done: "completed",
