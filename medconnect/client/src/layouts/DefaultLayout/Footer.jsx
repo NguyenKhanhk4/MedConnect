@@ -4,10 +4,11 @@ import {
   PhoneOutlined,
   EnvironmentOutlined,
 } from "@ant-design/icons";
+import { Link } from "react-router-dom";
 import "./Footer.scss";
 
 const { Footer } = Layout;
-const { Title, Text, Link } = Typography;
+const { Title, Text } = Typography;
 
 const AppFooter = () => {
   return (
@@ -20,15 +21,42 @@ const AppFooter = () => {
               MedConnect
             </Title>
             <Text>Nền tảng kết nối bác sĩ và bệnh nhân hàng đầu Việt Nam.</Text>
-            <Space direction="vertical" style={{ marginTop: 12 }}>
+            <Space direction="vertical" style={{ marginTop: 12 }} size="small">
+              <Link 
+                to="/co-so-y-te" 
+                style={{ 
+                  display: "flex", 
+                  alignItems: "flex-start", 
+                  color: "inherit",
+                  textDecoration: "none",
+                  cursor: "pointer"
+                }}
+              >
+                <EnvironmentOutlined style={{ marginRight: 8, marginTop: 4, flexShrink: 0 }} />
+                <Text style={{ lineHeight: 1.5 }}>
+                  1C Bà Triệu, Q.Hai Bà Trưng, Hà Nội
+                </Text>
+              </Link>
+              <Link 
+                to="/co-so-y-te" 
+                style={{ 
+                  display: "flex", 
+                  alignItems: "flex-start", 
+                  color: "inherit",
+                  textDecoration: "none",
+                  cursor: "pointer"
+                }}
+              >
+                <EnvironmentOutlined style={{ marginRight: 8, marginTop: 4, flexShrink: 0 }} />
+                <Text style={{ lineHeight: 1.5 }}>
+                  36 Phạm Văn Đồng, TP.Thủ Đức, TP.HCM
+                </Text>
+              </Link>
               <Text>
-                <EnvironmentOutlined /> Lô B4/D21, Cầu Giấy, Hà Nội
+                <PhoneOutlined style={{ marginRight: 8 }} /> 0984 771 123 (7h - 18h)
               </Text>
               <Text>
-                <PhoneOutlined /> 024-7301-2468 (7h - 18h)
-              </Text>
-              <Text>
-                <MailOutlined /> support@medconnect.vn
+                <MailOutlined style={{ marginRight: 8 }} /> support@medconnect.vn
               </Text>
             </Space>
           </Col>
@@ -40,13 +68,13 @@ const AppFooter = () => {
             </Title>
             <ul className="footer-links">
               <li>
-                <a href="/about">Về chúng tôi</a>
+                <Link to="/gioi-thieu">Về chúng tôi</Link>
               </li>
               <li>
-                <a href="/doctors">Danh sách bác sĩ</a>
+                <Link to="/danh-sach-bac-si">Danh sách bác sĩ</Link>
               </li>
               <li>
-                <a href="/specializations">Chuyên khoa</a>
+                <Link to="/chuyen-khoa">Chuyên khoa</Link>
               </li>
             </ul>
           </Col>
@@ -58,13 +86,13 @@ const AppFooter = () => {
             </Title>
             <ul className="footer-links">
               <li>
-                <a href="/help">Trung tâm trợ giúp</a>
+                <Link to="/help">Trung tâm trợ giúp</Link>
               </li>
               <li>
-                <a href="/contact">Liên hệ</a>
+                <Link to="/contact">Liên hệ</Link>
               </li>
               <li>
-                <a href="/privacy">Chính sách bảo mật</a>
+                <Link to="/chinh-sach-bao-mat">Chính sách bảo mật</Link>
               </li>
             </ul>
           </Col>
