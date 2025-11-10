@@ -41,12 +41,40 @@ const BillFromSchema = new Schema(
 
 const PaymentSchema = new Schema(
   {
+    // Single appointment (backward compatible)
     appointmentId: {
       type: Schema.Types.ObjectId,
       ref: "Appointment",
-      required: true,
+      required: false, // Explicitly set to false - không required
+      // Validation sẽ được thực hiện trong pre('validate') hook
       // Bỏ unique để cho phép nhiều payment cho 1 appointment (booking + service)
     },
+
+    // Multiple appointments (NEW - for medical visit)
+    medicalVisitId: {
+      type: Schema.Types.ObjectId,
+      ref: "MedicalVisit",
+      required: false,
+      index: true,
+    },
+
+    // Array of appointment IDs for multiple appointments payment
+    appointmentIds: [{
+      type: Schema.Types.ObjectId,
+      ref: "Appointment",
+    }],
+
+    // Appointment data (before creating appointments in DB) - for medical visit payment
+    // This stores the appointment information that will be created after payment success
+    appointmentData: [{
+      doctorId: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
+      slotId: { type: Schema.Types.ObjectId, ref: "DoctorTimeSlot", required: true },
+      mode: { type: String, enum: ["online", "offline"], required: true },
+      clinicId: { type: Schema.Types.ObjectId, ref: "Clinic" },
+      scheduledStart: { type: Date, required: true },
+      scheduledEnd: { type: Date, required: true },
+      reason: { type: String, default: "" },
+    }],
 
     invoiceType: {
       type: String,
@@ -134,8 +162,86 @@ const PaymentSchema = new Schema(
 // Compound index cho phép nhiều payment cho 1 appointment (booking + service)
 // NOT unique - allows multiple payments per appointment
 PaymentSchema.index({ appointmentId: 1, invoiceType: 1 }, { unique: false });
+PaymentSchema.index({ medicalVisitId: 1, invoiceType: 1 }, { unique: false });
 
+// Validation: either appointmentId (single) OR (medicalVisitId + appointmentIds) (multiple) OR appointmentData (pre-payment)
+// IMPORTANT: This hook runs BEFORE Mongoose's built-in required validation
 PaymentSchema.pre("validate", function (next) {
+  // Validate: must have either:
+  // 1. appointmentId (single appointment - backward compatible)
+  // 2. medicalVisitId + appointmentIds (multiple appointments - existing visits)
+  // 3. appointmentData (pre-payment - appointments will be created after payment)
+  
+  // Check if appointmentData array exists and has items (pre-payment flow - highest priority)
+  // This is the primary indicator for pre-payment flow
+  const hasPrePaymentData = this.appointmentData && 
+    Array.isArray(this.appointmentData) && 
+    this.appointmentData.length > 0;
+  
+  // Check if appointmentId is set (single appointment - backward compatible)
+  // Only check if NOT in pre-payment flow
+  const hasSingleAppointment = !hasPrePaymentData && 
+    this.appointmentId !== undefined && 
+    this.appointmentId !== null;
+  
+  // Check if medicalVisitId exists and appointmentIds array is populated (multiple appointments)
+  // Only check if NOT in pre-payment flow
+  const hasMultipleAppointments = !hasPrePaymentData && 
+    this.medicalVisitId && 
+    Array.isArray(this.appointmentIds) && 
+    this.appointmentIds.length > 0;
+
+  // Log để debug
+  console.log("🔍 Payment validation check:", {
+    hasSingleAppointment,
+    hasMultipleAppointments,
+    hasPrePaymentData,
+    appointmentId: this.appointmentId?.toString(),
+    appointmentIdExists: this.appointmentId !== undefined && this.appointmentId !== null,
+    medicalVisitId: this.medicalVisitId?.toString(),
+    appointmentIdsLength: this.appointmentIds?.length || 0,
+    appointmentDataLength: this.appointmentData?.length || 0,
+  });
+
+  // If appointmentData is present (pre-payment flow), this is valid - skip other validations
+  if (hasPrePaymentData) {
+    console.log("✅ Pre-payment flow detected - validation passed");
+    // For pre-payment flow, explicitly clear appointmentId, medicalVisitId, and appointmentIds
+    // to avoid any validation conflicts
+    if (this.appointmentId !== undefined) {
+      delete this.appointmentId;
+      this.unmarkModified('appointmentId');
+    }
+    if (this.medicalVisitId !== undefined) {
+      delete this.medicalVisitId;
+      this.unmarkModified('medicalVisitId');
+    }
+    if (this.appointmentIds !== undefined) {
+      this.appointmentIds = undefined;
+      this.unmarkModified('appointmentIds');
+    }
+    // Skip to calculation step - pre-payment flow is valid
+    // Don't check appointmentId or medicalVisitId in this case
+  } else {
+    // Validate other flows (single appointment or multiple appointments)
+    // Validate that at least one of the required fields is present
+    if (!hasSingleAppointment && !hasMultipleAppointments) {
+      // If none of the required fields are present, this is invalid
+      const error = new Error("Payment must have either appointmentId (single) OR medicalVisitId + appointmentIds (multiple) OR appointmentData (pre-payment)");
+      return next(error);
+    }
+
+    // If medicalVisitId is provided without appointmentIds, it's invalid
+    if (this.medicalVisitId && (!Array.isArray(this.appointmentIds) || this.appointmentIds.length === 0)) {
+      const error = new Error("If medicalVisitId is provided, appointmentIds must be a non-empty array");
+      return next(error);
+    }
+    
+    // Validation passed - at least one valid combination is present
+    console.log("✅ Payment validation passed (single or multiple appointments)");
+  }
+
+  // Calculate subtotal from items
   if (this.items?.length) {
     this.subtotal = this.items.reduce(
       (s, it) => s + (it.lineTotal ?? it.quantity * it.unitPrice),

@@ -124,10 +124,9 @@ const ChonBacSi = () => {
           setFilteredDoctors(response.data.doctors);
         }
       } catch (apiError) {
-        console.log("API not available, using mock data");
+        // API not available, using mock data
       }
     } catch (error) {
-      console.error("Error fetching doctors:", error);
       message.error("Có lỗi xảy ra khi tải danh sách bác sĩ");
     } finally {
       setLoading(false);
@@ -165,12 +164,9 @@ const ChonBacSi = () => {
   const fetchDoctorReviews = async (doctorId) => {
     try {
       setReviewsLoading(true);
-      console.log("Fetching reviews for doctor:", doctorId);
       const response = await api.get(
         `/api/doctors/${doctorId}/reviews?limit=10&page=1`
       );
-      
-      console.log("Reviews API response:", response);
       
       // Handle different response structures
       let reviews = [];
@@ -194,12 +190,9 @@ const ChonBacSi = () => {
         pagination = response.pagination;
       }
       
-      console.log("Parsed reviews:", reviews);
-      console.log("Parsed pagination:", pagination);
       setDoctorReviews(reviews);
       setReviewsPagination(pagination);
     } catch (error) {
-      console.error("Error fetching doctor reviews:", error);
       message.error("Không thể tải đánh giá. Vui lòng thử lại.");
       setDoctorReviews([]);
       setReviewsPagination(null);
