@@ -46,3 +46,93 @@
   font-size: 20px;
 }
 
+.multi-specialization-booking .doctor-rating {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.multi-specialization-booking .doctor-rating .ant-rate {
+  font-size: 14px;
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.multi-specialization-booking .doctor-rating .ant-rate-star {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  margin-right: 4px !important;
+}
+
+.multi-specialization-booking .doctor-rating .ant-rate-star-zero {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.multi-specialization-booking .doctor-rating .ant-rate-star-zero .ant-rate-star-first,
+.multi-specialization-booking .doctor-rating .ant-rate-star-zero .ant-rate-star-second {
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #f0f0f0 !important;
+  fill: #f0f0f0 !important;
+}
+
+.multi-specialization-booking .doctor-rating .ant-rate-star-zero svg {
+  visibility: visible !important;
+  opacity: 1 !important;
+  fill: #f0f0f0 !important;
+  color: #f0f0f0 !important;
+}
+
+.multi-specialization-booking .doctor-rating .ant-rate-star-zero .anticon {
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #f0f0f0 !important;
+}
+
+/* Ensure all stars are visible even when value is 0 */
+.multi-specialization-booking .doctor-rating .ant-rate li {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  margin-right: 4px !important;
+}
+
+.multi-specialization-booking .doctor-rating .ant-rate li.ant-rate-star-zero {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Doctor card in modal - allow vertical scrolling */
+.multi-specialization-booking .ant-modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.multi-specialization-booking .ant-modal-body .ant-row {
+  margin-bottom: 0;
+}
+
+/* Doctor card - horizontal rectangle layout */
+.multi-specialization-booking .ant-card {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.multi-specialization-booking .ant-card-body {
+  padding: 16px;
+}
+
+.multi-specialization-booking .ant-card-hoverable {
+  transition: all 0.3s;
+}
+
+.multi-specialization-booking .ant-card-hoverable:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+

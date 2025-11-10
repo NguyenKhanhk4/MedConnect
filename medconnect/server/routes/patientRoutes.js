@@ -24,6 +24,8 @@ import {
   removeFavoriteDoctor,
   getDoctorVisitCount,
   getPatientPayments,
+  calculatePaymentSummaryForSingleAppointment,
+  createPaymentForSingleAppointment,
 } from "../controllers/patientController.js";
 import Patient from "../models/patient.model.js";
 import User from "../models/user.model.js";
@@ -54,8 +56,14 @@ router.get("/doctors/:doctorId/time-slots", getDoctorTimeSlots);
 // Get doctor pricing (public)
 router.get("/doctors/:doctorId/pricing", getDoctorPricing);
 
-// Book an appointment
+// Book an appointment (OLD FLOW - backward compatibility)
 router.post("/appointments", authGuard, bookAppointment);
+
+// Calculate payment summary for single appointment (NEW FLOW - pre-payment)
+router.post("/appointments/calculate-payment-summary", authGuard, calculatePaymentSummaryForSingleAppointment);
+
+// Create payment for single appointment (NEW FLOW - pre-payment)
+router.post("/appointments/create-payment", authGuard, createPaymentForSingleAppointment);
 
 // Get patient's appointments
 router.get("/me/appointments", authGuard, getPatientAppointments);
