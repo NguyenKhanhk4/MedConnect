@@ -440,6 +440,17 @@ export default function LichHen() {
       `Bạn có chắc chắn muốn bắt đầu khám cho ${patientName}?`,
       async () => {
     try {
+      // Đối với appointments ở trạng thái pending_doctor (cả online và offline), tự động accept trước khi bắt đầu khám
+      if (appointment.status === "pending_doctor") {
+        await updateAppointmentStatus(appointment._id, "accepted");
+        // Cập nhật trạng thái trong UI
+        setAppointments((prevAppointments) =>
+          prevAppointments.map((apt) =>
+            apt._id === appointment._id ? { ...apt, status: "accepted" } : apt
+          )
+        );
+      }
+
       await updateAppointmentStatus(appointment._id, "in_progress");
 
       // Cập nhật trạng thái ngay lập tức trong UI
@@ -609,8 +620,9 @@ export default function LichHen() {
     );
   };
 
-  // Accept all pending appointments
+  // Accept all pending appointments (cả online và offline)
   const handleAcceptAll = async () => {
+    // Lấy tất cả appointments đang chờ xác nhận (cả online và offline)
     const pendingAppointments = appointments.filter(
       (apt) => apt.status === "pending_doctor"
     );
@@ -1020,25 +1032,28 @@ export default function LichHen() {
                     </td>
                     <td className="appointment-list-td appointment-list-actions">
                       <div className="appointment-list-action-buttons">
+                        {/* Cả online và offline: Bỏ qua bước xác nhận, vào thẳng bắt đầu khám/không đến khám */}
                         {apt.status === "pending_doctor" && (
                           <>
                             <Button
                               size="sm"
-                              className="appointment-list-accept-btn"
-                              onClick={() => handleAccept(apt)}
+                              variant="secondary"
+                              onClick={() => handleStart(apt)}
                               disabled={updatingAppointments.has(apt._id)}
                             >
                               {updatingAppointments.has(apt._id)
                                 ? "Đang xử lý..."
-                                : "Chấp nhận"}
+                                : "Bắt đầu khám"}
                             </Button>
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => handleReject(apt)}
+                              onClick={() => handleNoShow(apt)}
                               disabled={updatingAppointments.has(apt._id)}
                             >
-                              Từ chối
+                              {updatingAppointments.has(apt._id)
+                                ? "Đang xử lý..."
+                                : "Không đến khám"}
                             </Button>
                           </>
                         )}
@@ -1251,27 +1266,28 @@ export default function LichHen() {
                   <div className="appointment-detail-actions">
                     <h4>Thay đổi trạng thái</h4>
                     <div className="appointment-status-buttons">
+                      {/* Cả online và offline: Bỏ qua bước xác nhận, vào thẳng bắt đầu khám/không đến khám */}
                       {selectedAppointment.status === "pending_doctor" && (
                         <>
                           <Button
                             size="sm"
-                            className="appointment-list-accept-btn"
+                            variant="secondary"
                             onClick={() => {
-                              handleAccept(selectedAppointment);
+                              handleStart(selectedAppointment);
                               setIsDetailDialogOpen(false);
                             }}
                           >
-                            Chấp nhận
+                            Bắt đầu khám
                           </Button>
                           <Button
                             size="sm"
                             variant="destructive"
                             onClick={() => {
-                              handleReject(selectedAppointment);
+                              handleNoShow(selectedAppointment);
                               setIsDetailDialogOpen(false);
                             }}
                           >
-                            Từ chối
+                            Không đến khám
                           </Button>
                         </>
                       )}

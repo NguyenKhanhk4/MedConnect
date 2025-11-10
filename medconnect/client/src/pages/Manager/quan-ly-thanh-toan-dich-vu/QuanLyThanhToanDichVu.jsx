@@ -30,7 +30,6 @@ export default function QuanLyThanhToanDichVu() {
   const [processing, setProcessing] = useState(false);
   const [creatingLink, setCreatingLink] = useState(false);
   const [activeTab, setActiveTab] = useState("all"); // all | booking | service
-  const [statusFilter, setStatusFilter] = useState("pending"); // pending | initiated | all
   const [alertMessage, setAlertMessage] = useState(null);
   const [confirmConfig, setConfirmConfig] = useState(null);
 
@@ -53,7 +52,7 @@ export default function QuanLyThanhToanDichVu() {
 
   useEffect(() => {
     loadPayments();
-  }, [page, activeTab, statusFilter]);
+  }, [page, activeTab]);
 
   // Xử lý returnUrl sau khi thanh toán PayOS (chạy riêng khi component mount)
   useEffect(() => {
@@ -138,14 +137,6 @@ export default function QuanLyThanhToanDichVu() {
       params.append("limit", "20");
       if (activeTab === "booking") params.append("invoiceType", "booking");
       if (activeTab === "service") params.append("invoiceType", "service");
-      if (statusFilter !== "all") {
-        if (statusFilter === "pending") {
-          // Hiển thị cả pending_manager và initiated (đang chờ thanh toán)
-          params.append("status", "pending_manager,initiated");
-        } else {
-          params.append("status", statusFilter);
-        }
-      }
 
       const response = await api.get(
         `/api/managers/service-payments/pending?${params.toString()}`
@@ -349,18 +340,6 @@ export default function QuanLyThanhToanDichVu() {
             </Button>
           ))}
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setPage(1);
-            setStatusFilter(e.target.value);
-          }}
-          style={{ padding: 6, borderRadius: 6, border: "1px solid #e5e7eb" }}
-        >
-          <option value="pending">Chờ xử lý</option>
-          <option value="initiated">Đang chờ thanh toán</option>
-          <option value="all">Tất cả trạng thái</option>
-        </select>
       </div>
 
       {/* Search */}

@@ -888,7 +888,8 @@ export async function bookAppointment(req, res) {
     //   return fail(res, 400, ERROR_CODES.PAYMENT_REQUIRED, "Payment is required for this appointment");
     // }
 
-    // Create appointment with pending_doctor status and unpaid paymentStatus
+    // Create appointment
+    // Both online and offline appointments: automatically accepted (no approval needed)
     const appointment = new Appointment({
       patientId: patient._id,
       doctorId: doctorId,
@@ -897,7 +898,7 @@ export async function bookAppointment(req, res) {
       clinicId: mode === "offline" ? clinicId : undefined,
       scheduledStart: new Date(scheduledStart),
       scheduledEnd: new Date(scheduledEnd),
-      status: "pending_doctor", // Waiting for doctor approval
+      status: "accepted", // Auto-accepted for both online and offline (no approval needed)
       paymentStatus: "unpaid", // Initially unpaid
       // paymentDeadline không set - không giới hạn thời gian thanh toán
       reason: reason,
@@ -931,7 +932,7 @@ export async function bookAppointment(req, res) {
       .lean();
 
     return ok(res, {
-      message: "Appointment booked successfully. Waiting for doctor approval.",
+      message: "Appointment booked successfully.",
       appointment: populatedAppointment,
     });
   } catch (error) {

@@ -122,9 +122,7 @@ export default function QuanLyHoaDon() {
       pending_manager: "Yêu cầu thanh toán",
       captured: "Đã thanh toán",
       initiated: "Đang xử lý",
-      failed: "Thất bại",
-      refunded: "Đã hoàn tiền",
-      cancelled: "Đã hủy",
+      
     };
     return texts[status] || status;
   };
@@ -162,13 +160,13 @@ export default function QuanLyHoaDon() {
       : "Chưa thanh toán";
     const patientDob = invoice.patientDateOfBirth
       ? formatDateOnlyForDoc(invoice.patientDateOfBirth)
-      : "N/A";
+      : "Không";
     const genderText =
       invoice.patientGender === "male"
         ? "Nam"
         : invoice.patientGender === "female"
         ? "Nữ"
-        : invoice.patientGender || "N/A";
+        : invoice.patientGender || "Không";
 
     const itemsRows =
       invoice.items
@@ -584,9 +582,7 @@ export default function QuanLyHoaDon() {
               <option value="all">Tất cả trạng thái</option>
               <option value="captured">Đã thanh toán</option>
               <option value="initiated">Đang xử lý</option>
-              <option value="failed">Thất bại</option>
-              <option value="refunded">Đã hoàn tiền</option>
-              <option value="cancelled">Đã hủy</option>
+              
             </select>
           </div>
         </div>

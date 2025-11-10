@@ -459,11 +459,11 @@ const Header = () => {
                           src={patientAvatar}
                           icon={!patientAvatar && <UserOutlined />}
                         />
-                         <div>
-                           <div style={{ fontWeight: 700 }}>
+                        <div>
+                          <div style={{ fontWeight: 700 }}>
                              {userProfile?.fullName || userProfile?.displayName || user?.displayName || "Bệnh nhân"}
-                           </div>
-                         </div>
+                          </div>
+                        </div>
                       </div>
                     ),
                     disabled: true,

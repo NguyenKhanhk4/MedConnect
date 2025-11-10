@@ -1818,28 +1818,10 @@ export async function getManagerInvoices(req, res) {
     // Build query
     const query = {};
 
-    // For booking invoices: only show those created by manager
-    // Manager-created: invoiceNumber starts with "INV-BOOKING-" OR has pendingOrderCode
-    // Patient-created: invoiceNumber starts with "INV-PAYOS-" (created in webhook)
-    // Simply exclude patient-created payments by filtering out INV-PAYOS- pattern
-    if (invoiceType === "booking") {
-      // For booking type, filter to only manager-created payments
-      query.invoiceType = "booking";
-      // Exclude patient-created payments (INV-PAYOS-*)
-      query.invoiceNumber = { $not: { $regex: /^INV-PAYOS-/ } };
-    } else if (invoiceType === "service") {
-      // Service payments: show all
-      query.invoiceType = "service";
-    } else {
-      // For "all" type, exclude patient-created booking payments
-      // Show: service payments OR manager-created booking payments (not INV-PAYOS-*)
-      query.$or = [
-        { invoiceType: "service" },
-        {
-          invoiceType: "booking",
-          invoiceNumber: { $not: { $regex: /^INV-PAYOS-/ } }
-        }
-      ];
+    // Filter by invoiceType (booking or service)
+    // Show all booking invoices (both manager-created and patient-created)
+    if (invoiceType && invoiceType !== "all") {
+      query.invoiceType = invoiceType;
     }
 
     // Filter by status
