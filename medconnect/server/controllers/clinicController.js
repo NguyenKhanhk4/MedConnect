@@ -43,16 +43,24 @@ export async function getAllClinics(req, res) {
     // Get total count
     const total = await Clinic.countDocuments(searchQuery);
 
-    // Format response - only include fields that exist in the model
+    // Format response - include all fields from model
     const formattedClinics = clinics.map((clinic) => ({
       id: clinic._id,
       _id: clinic._id,
       name: clinic.name || "",
+      type: clinic.type || "hospital",
+      location: clinic.location || "",
       address: clinic.address || "",
       phone: clinic.phone || "",
       latitude: clinic.latitude,
       longitude: clinic.longitude,
       coordinates: clinic.geo?.coordinates,
+      specialties: clinic.specialties || [],
+      doctorCount: clinic.doctorCount || 0,
+      rating: clinic.rating || 4.0,
+      reviewCount: clinic.reviewCount || 0,
+      description: clinic.description || "",
+      image: clinic.image || "",
       createdAt: clinic.createdAt,
       updatedAt: clinic.updatedAt,
     }));

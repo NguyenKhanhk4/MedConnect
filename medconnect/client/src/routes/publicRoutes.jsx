@@ -18,6 +18,7 @@ import XacMinhOtp from "../pages/Auth/xac-minh-otp/XacMinhOtp";
 import DatLaiMatKhau from "../pages/Auth/dat-lai-mat-khau/DatLaiMatKhau";
 import ChinhSachBaoMat from "../pages/Privacy and Terms/ChinhSachBaoMat";
 import DieuKhoanSuDung from "../pages/Privacy and Terms/DieuKhoanSuDung";
+import ClinicMapPage from "../pages/Map/ClinicMapPage";
 import { Route } from "react-router-dom";
 import GuestMiddleware from "../middlewares/GuestMiddleware";
 export const publicRoutes = (
@@ -31,6 +32,7 @@ export const publicRoutes = (
       <Route path="/bac-si/:doctorId/danh-gia" element={<DanhGia />} />
       <Route path="/chuyen-khoa" element={<ChuyenKhoa />} />
       <Route path="/co-so-y-te" element={<CoSoYTe />} />
+      <Route path="/ban-do-co-so-y-te" element={<ClinicMapPage />} />
       <Route path="/goi-kham" element={<GoiKham />} />
       <Route path="/chinh-sach-bao-mat" element={<ChinhSachBaoMat />} />
       <Route path="/dieu-khoan-su-dung" element={<DieuKhoanSuDung />} />
