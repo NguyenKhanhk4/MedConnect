@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import dayjs from "dayjs";
 import {
   Row,
   Col,
@@ -14,6 +15,7 @@ import {
   Rate,
   Tag,
   Space,
+  Modal,
 } from "antd";
 import {
   SearchOutlined,
@@ -23,6 +25,8 @@ import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
   HomeOutlined,
+  EyeOutlined,
+  ClockCircleOutlined,
 } from "@ant-design/icons";
 import NavigationBreadcrumb from "../../../components/Breadcrumb/NavigationBreadcrumb";
 import { api } from "../../../lib/api";
@@ -39,6 +43,13 @@ const ChonBacSi = () => {
   const [filteredDoctors, setFilteredDoctors] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [specialization, setSpecialization] = useState(null);
+  
+  // Modal state for viewing reviews
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewDoctor, setReviewDoctor] = useState(null);
+  const [doctorReviews, setDoctorReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsPagination, setReviewsPagination] = useState(null);
 
   useEffect(() => {
     if (location.state?.specialization) {
@@ -150,6 +161,53 @@ const ChonBacSi = () => {
     return specializationIds.map((spec) => spec.name).join(", ");
   };
 
+  // Fetch doctor reviews
+  const fetchDoctorReviews = async (doctorId) => {
+    try {
+      setReviewsLoading(true);
+      console.log("Fetching reviews for doctor:", doctorId);
+      const response = await api.get(
+        `/api/doctors/${doctorId}/reviews?limit=10&page=1`
+      );
+      
+      console.log("Reviews API response:", response);
+      
+      // Handle different response structures
+      let reviews = [];
+      let pagination = null;
+      
+      if (response?.success || response?.data?.success) {
+        // Response structure: { success: true, data: { reviews: [...], pagination: {...} } }
+        if (response?.data?.reviews) {
+          reviews = response.data.reviews;
+          pagination = response.data.pagination;
+        } else if (response?.reviews) {
+          reviews = response.reviews;
+          pagination = response.pagination;
+        } else if (response?.data?.data?.reviews) {
+          reviews = response.data.data.reviews;
+          pagination = response.data.data.pagination;
+        }
+      } else if (response?.reviews) {
+        // Direct reviews in response
+        reviews = response.reviews;
+        pagination = response.pagination;
+      }
+      
+      console.log("Parsed reviews:", reviews);
+      console.log("Parsed pagination:", pagination);
+      setDoctorReviews(reviews);
+      setReviewsPagination(pagination);
+    } catch (error) {
+      console.error("Error fetching doctor reviews:", error);
+      message.error("Không thể tải đánh giá. Vui lòng thử lại.");
+      setDoctorReviews([]);
+      setReviewsPagination(null);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div
@@ -225,6 +283,15 @@ const ChonBacSi = () => {
           />
         </div>
 
+        {/* Results Count */}
+        {filteredDoctors.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <Text type="secondary" style={{ fontSize: "14px" }}>
+              Hiển thị <Text strong style={{ color: "#262626" }}>{filteredDoctors.length}</Text> bác sĩ
+            </Text>
+          </div>
+        )}
+
         {/* Doctors Grid */}
         <div className="doctors-grid">
           {filteredDoctors.length === 0 ? (
@@ -234,79 +301,176 @@ const ChonBacSi = () => {
             />
           ) : (
             <Row gutter={[24, 24]}>
-              {filteredDoctors.map((doctor) => (
-                <Col xs={24} lg={12} xl={8} key={doctor._id}>
-                  <Card
-                    hoverable
-                    className="doctor-card"
-                    actions={[
-                      <Button
-                        type="primary"
-                        icon={<CalendarOutlined />}
-                        onClick={() => handleDoctorSelect(doctor)}
-                      >
-                        Đặt lịch
-                      </Button>,
-                    ]}
-                  >
-                    <div className="doctor-content">
-                      <div>
-                        <Avatar
-                          size={80}
-                          src={doctor.avatarUrl}
-                          icon={<UserOutlined />}
-                        />
-                      </div>
-
-                      <div className="doctor-info">
-                        <Title level={4} className="doctor-name">
-                          {(() => {
-                            const fullName =
-                              doctor.userId?.fullName || doctor.fullName;
-                            return fullName?.startsWith("BS.")
-                              ? fullName
-                              : `BS. ${fullName}`;
-                          })()}
-                        </Title>
-
-                        <div className="doctor-specializations">
-                          <Tag color="blue">
-                            {getSpecializationNames(doctor.specializationIds)}
-                          </Tag>
+              {filteredDoctors.map((doctor) => {
+                const fullName = doctor.userId?.fullName || doctor.fullName;
+                const displayName = fullName?.startsWith("BS.") ? fullName : `BS. ${fullName}`;
+                const specializationName = doctor.specializationIds?.[0]?.name || doctor.specializationIds?.[0] || "";
+                
+                return (
+                  <Col xs={24} sm={12} lg={8} key={doctor._id}>
+                    <Card
+                      className="doctor-card-modern"
+                      hoverable
+                      cover={
+                        <div className="doctor-image-container">
+                          {doctor.avatarUrl ? (
+                            <img
+                              alt={displayName}
+                              src={doctor.avatarUrl}
+                              className="doctor-image"
+                              onError={(e) => {
+                                e.target.src = "/placeholder.svg";
+                              }}
+                            />
+                          ) : (
+                            <div style={{
+                              width: "100%",
+                              height: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center"
+                            }}>
+                              <Avatar
+                                size={160}
+                                icon={<UserOutlined />}
+                                style={{
+                                  backgroundColor: "#1890ff",
+                                  border: "4px solid #fff",
+                                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)"
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      }
+                      actions={[
+                        <Button
+                          type="primary"
+                          block
+                          onClick={() => handleDoctorSelect(doctor)}
+                          className="doctor-book-button"
+                        >
+                          Đặt lịch khám
+                        </Button>,
+                      ]}
+                    >
+                      <div className="doctor-card-content">
+                        {/* Name */}
+                        <div style={{ marginBottom: 10 }}>
+                          <Title level={4} className="doctor-name-modern">
+                            {displayName}
+                          </Title>
                         </div>
 
-                        <div className="doctor-experience">
-                          <Text type="secondary">
-                            {formatExperience(doctor.yearsExperience)}
-                          </Text>
+                        {/* Specialty and Education Level Tags */}
+                        <div style={{ marginBottom: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {specializationName && (
+                            <Tag
+                              style={{
+                                backgroundColor: "#e6f4ff",
+                                borderColor: "#1890ff",
+                                color: "#1890ff",
+                                borderRadius: "6px",
+                                padding: "4px 12px",
+                                fontSize: "14px",
+                                fontWeight: 500,
+                                border: "1px solid",
+                                margin: 0,
+                              }}
+                            >
+                              {specializationName}
+                            </Tag>
+                          )}
+                          {doctor.educationLevel && (
+                            <Tag
+                              style={{
+                                backgroundColor: "#e6fffb",
+                                borderColor: "#13c2c2",
+                                color: "#13c2c2",
+                                borderRadius: "6px",
+                                padding: "4px 12px",
+                                fontSize: "14px",
+                                fontWeight: 500,
+                                border: "1px solid",
+                                margin: 0,
+                              }}
+                            >
+                              {doctor.educationLevel}
+                            </Tag>
+                          )}
                         </div>
 
+                        {/* Experience and Rating Row */}
+                        <div style={{ 
+                          display: "flex", 
+                          alignItems: "center", 
+                          justifyContent: "space-between",
+                          marginBottom: 10,
+                          gap: 12
+                        }}>
+                          {doctor.yearsExperience && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              <ClockCircleOutlined style={{ color: "#ff7a00", fontSize: "16px" }} />
+                              <Text style={{ fontSize: "15px", fontWeight: 500, color: "#ff7a00" }}>
+                                {doctor.yearsExperience} năm
+                              </Text>
+                            </div>
+                          )}
+                          <Rate
+                            disabled
+                            value={doctor.ratingAvg || 0}
+                            style={{ fontSize: 16 }}
+                          />
+                        </div>
+
+                        {/* Rating Text */}
+                        {doctor.ratingAvg > 0 && (
+                          <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <Text style={{ fontSize: "14px", color: "#8c8c8c" }}>
+                              <Text strong style={{ color: "#262626", fontSize: "14px" }}>
+                                {doctor.ratingAvg.toFixed(1)}
+                              </Text>{" "}
+                              ({doctor.ratingCount || 0} đánh giá)
+                            </Text>
+                            {doctor.ratingCount > 0 && (
+                              <Button
+                                type="link"
+                                size="small"
+                                icon={<EyeOutlined />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReviewDoctor(doctor);
+                                  setShowReviewModal(true);
+                                  fetchDoctorReviews(doctor._id);
+                                }}
+                                style={{ 
+                                  padding: 0, 
+                                  height: 'auto', 
+                                  fontSize: "14px",
+                                  color: "#1890ff"
+                                }}
+                              >
+                                Xem đánh giá
+                              </Button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Description */}
                         {doctor.bio && (
                           <Paragraph
-                            className="doctor-bio"
+                            className="doctor-bio-modern"
                             ellipsis={{ rows: 2 }}
+                            style={{ marginBottom: 0 }}
                           >
                             {doctor.bio}
                           </Paragraph>
                         )}
-
-                        <div className="doctor-rating">
-                          <Space>
-                            <Rate
-                              disabled
-                              value={doctor.ratingAvg || 0}
-                              style={{ fontSize: 14 }}
-                            />
-                            <Text type="secondary">
-                              ({doctor.ratingCount || 0} đánh giá)
-                            </Text>
-                          </Space>
-                        </div>
                       </div>
-                    </div>
-                  </Card>
-                </Col>
-              ))}
+                    </Card>
+                  </Col>
+                );
+              })}
             </Row>
           )}
         </div>
@@ -331,6 +495,112 @@ const ChonBacSi = () => {
           </Card>
         </div>
       </div>
+
+      {/* Modal for viewing doctor reviews */}
+      <Modal
+        title={
+          <Space>
+            <UserOutlined />
+            <span>Đánh giá của {reviewDoctor?.fullName || reviewDoctor?.userId?.fullName || "Bác sĩ"}</span>
+          </Space>
+        }
+        open={showReviewModal}
+        onCancel={() => {
+          setShowReviewModal(false);
+          setReviewDoctor(null);
+          setDoctorReviews([]);
+          setReviewsPagination(null);
+        }}
+        footer={null}
+        width={800}
+      >
+        {reviewsLoading ? (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <Spin size="large" />
+            <Paragraph style={{ marginTop: 16 }}>
+              Đang tải đánh giá...
+            </Paragraph>
+          </div>
+        ) : doctorReviews && doctorReviews.length > 0 ? (
+          <div style={{ maxHeight: "600px", overflowY: "auto" }}>
+            {doctorReviews.map((review) => (
+              <Card
+                key={review._id}
+                style={{ marginBottom: 16 }}
+                size="small"
+              >
+                <Space direction="vertical" style={{ width: "100%" }} size="small">
+                  <Space>
+                    <Avatar
+                      size="small"
+                      src={review.patient?.avatarUrl}
+                      icon={<UserOutlined />}
+                    />
+                    <Text strong>
+                      {review.isAnonymous
+                        ? "Bệnh nhân"
+                        : review.patient?.fullName || "Bệnh nhân"}
+                    </Text>
+                    <Rate
+                      disabled
+                      value={review.rating}
+                      style={{ fontSize: 12 }}
+                    />
+                    <Text type="secondary" style={{ fontSize: "12px" }}>
+                      {dayjs(review.createdAt).format("DD/MM/YYYY")}
+                    </Text>
+                  </Space>
+                  {review.comment && (
+                    <Paragraph style={{ marginBottom: 0, marginTop: 8 }}>
+                      {review.comment}
+                    </Paragraph>
+                  )}
+                  {review.tags && review.tags.length > 0 && (
+                    <Space wrap>
+                      {review.tags.map((tag, index) => (
+                        <Tag key={index} color="blue">
+                          {tag}
+                        </Tag>
+                      ))}
+                    </Space>
+                  )}
+                  {review.doctorResponse && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        padding: 12,
+                        background: "#f5f5f5",
+                        borderRadius: 4,
+                      }}
+                    >
+                      <Text strong style={{ color: "#1890ff" }}>
+                        Phản hồi từ bác sĩ:
+                      </Text>
+                      <Paragraph style={{ marginBottom: 0, marginTop: 4 }}>
+                        {review.doctorResponse}
+                      </Paragraph>
+                      {review.doctorResponseAt && (
+                        <Text type="secondary" style={{ fontSize: "12px" }}>
+                          {dayjs(review.doctorResponseAt).format("DD/MM/YYYY HH:mm")}
+                        </Text>
+                      )}
+                    </div>
+                  )}
+                </Space>
+              </Card>
+            ))}
+            {reviewsPagination && reviewsPagination.total > reviewsPagination.limit && (
+              <div style={{ textAlign: "center", marginTop: 16 }}>
+                <Text type="secondary">
+                  Hiển thị {doctorReviews.length} / {reviewsPagination.total} đánh giá
+                </Text>
+              </div>
+            )}
+          </div>
+        ) : (
+          <Empty description="Chưa có đánh giá nào" />
+        )}
+      </Modal>
     </div>
   );
 };

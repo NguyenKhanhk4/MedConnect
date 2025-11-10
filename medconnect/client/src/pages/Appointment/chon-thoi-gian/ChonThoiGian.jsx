@@ -20,6 +20,8 @@ import {
   Rate,
   Checkbox,
   Modal,
+  Empty,
+  Avatar,
 } from "antd";
 import {
   CalendarOutlined,
@@ -31,7 +33,7 @@ import {
   ArrowLeftOutlined,
   CheckCircleOutlined,
   HomeOutlined,
-  ShareAltOutlined,
+  EyeOutlined,
   ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import NavigationBreadcrumb from "../../../components/Breadcrumb/NavigationBreadcrumb";
@@ -66,9 +68,62 @@ const ChonThoiGian = () => {
   const [pendingAppointmentId, setPendingAppointmentId] = useState(null); // Track appointment chưa thanh toán
   const [pendingOrderCode, setPendingOrderCode] = useState(null); // Track orderCode để cleanup
   const [doctorPricing, setDoctorPricing] = useState(null); // Doctor pricing from API
+  
+  // Modal state for viewing reviews
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [doctorReviews, setDoctorReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsPagination, setReviewsPagination] = useState(null);
 
   // Get user profile to validate required fields
   const { userProfile } = useUserProfile();
+
+  // Fetch doctor reviews
+  const fetchDoctorReviews = async (doctorId) => {
+    try {
+      setReviewsLoading(true);
+      console.log("Fetching reviews for doctor:", doctorId);
+      const response = await api.get(
+        `/api/doctors/${doctorId}/reviews?limit=10&page=1`
+      );
+      
+      console.log("Reviews API response:", response);
+      
+      // Handle different response structures
+      let reviews = [];
+      let pagination = null;
+      
+      if (response?.success || response?.data?.success) {
+        // Response structure: { success: true, data: { reviews: [...], pagination: {...} } }
+        if (response?.data?.reviews) {
+          reviews = response.data.reviews;
+          pagination = response.data.pagination;
+        } else if (response?.reviews) {
+          reviews = response.reviews;
+          pagination = response.pagination;
+        } else if (response?.data?.data?.reviews) {
+          reviews = response.data.data.reviews;
+          pagination = response.data.data.pagination;
+        }
+      } else if (response?.reviews) {
+        // Direct reviews in response
+        reviews = response.reviews;
+        pagination = response.pagination;
+      }
+      
+      console.log("Parsed reviews:", reviews);
+      console.log("Parsed pagination:", pagination);
+      setDoctorReviews(reviews);
+      setReviewsPagination(pagination);
+    } catch (error) {
+      console.error("Error fetching doctor reviews:", error);
+      message.error("Không thể tải đánh giá. Vui lòng thử lại.");
+      setDoctorReviews([]);
+      setReviewsPagination(null);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
 
   // Helper function to get price for display (weekday or weekend)
   const getPriceForDisplay = (mode, isWeekend = false) => {
@@ -789,19 +844,43 @@ const ChonThoiGian = () => {
                           : `BS. ${fullName}`;
                       })()}
                     </Title>
-                    <div className="doctor-specializations">
-                      <Tag color="blue">
-                        {getSpecializationNames(doctor.specializationIds)}
-                      </Tag>
-                    </div>
-                    {doctor.educationLevel && (
-                      <div className="doctor-education">
-                        <Text type="secondary" style={{ fontSize: "14px" }}>
-                          <UserOutlined style={{ marginRight: 4 }} />
+                    <div className="doctor-specializations" style={{ marginBottom: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {doctor.specializationIds && doctor.specializationIds.length > 0 && (
+                        doctor.specializationIds.map((spec, index) => (
+                          <Tag
+                            key={index}
+                            style={{
+                              backgroundColor: "#e6f4ff",
+                              borderColor: "#1890ff",
+                              color: "#1890ff",
+                              borderRadius: "6px",
+                              padding: "4px 12px",
+                              fontSize: "14px",
+                              fontWeight: 500,
+                              border: "1px solid",
+                            }}
+                          >
+                            {spec.name || spec}
+                          </Tag>
+                        ))
+                      )}
+                      {doctor.educationLevel && (
+                        <Tag
+                          style={{
+                            backgroundColor: "#e6fffb",
+                            borderColor: "#13c2c2",
+                            color: "#13c2c2",
+                            borderRadius: "6px",
+                            padding: "4px 12px",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            border: "1px solid",
+                          }}
+                        >
                           {doctor.educationLevel}
-                        </Text>
-                      </div>
-                    )}
+                        </Tag>
+                      )}
+                    </div>
                     {doctor.yearsExperience && (
                       <div className="doctor-experience">
                         <Text type="secondary">
@@ -814,18 +893,27 @@ const ChonThoiGian = () => {
                       <Paragraph className="doctor-bio">{doctor.bio}</Paragraph>
                     )}
                     <div className="doctor-rating">
-                      <Rate disabled value={doctor.ratingAvg || 0} />
-                      <Text type="secondary">
-                        ({doctor.ratingCount || 0} đánh giá)
-                      </Text>
+                      <Space>
+                        <Rate disabled value={doctor.ratingAvg || 0} />
+                        <Text type="secondary">
+                          ({doctor.ratingCount || 0} đánh giá)
+                        </Text>
+                        {doctor.ratingCount > 0 && (
+                          <Button
+                            type="link"
+                            size="small"
+                            icon={<EyeOutlined />}
+                            onClick={() => {
+                              setShowReviewModal(true);
+                              fetchDoctorReviews(doctor._id);
+                            }}
+                            style={{ padding: 0, height: 'auto', fontSize: "14px" }}
+                          >
+                            Xem đánh giá
+                          </Button>
+                        )}
+                      </Space>
                     </div>
-                    <Button
-                      type="primary"
-                      icon={<ShareAltOutlined />}
-                      className="share-btn"
-                    >
-                      Chia sẻ
-                    </Button>
                   </div>
                 </div>
               </Card>
@@ -1526,6 +1614,111 @@ const ChonThoiGian = () => {
           </Col>
         </Row>
       </div>
+
+      {/* Modal for viewing doctor reviews */}
+      <Modal
+        title={
+          <Space>
+            <UserOutlined />
+            <span>Đánh giá của {doctor?.fullName || "Bác sĩ"}</span>
+          </Space>
+        }
+        open={showReviewModal}
+        onCancel={() => {
+          setShowReviewModal(false);
+          setDoctorReviews([]);
+          setReviewsPagination(null);
+        }}
+        footer={null}
+        width={800}
+      >
+        {reviewsLoading ? (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <Spin size="large" />
+            <Paragraph style={{ marginTop: 16 }}>
+              Đang tải đánh giá...
+            </Paragraph>
+          </div>
+        ) : doctorReviews && doctorReviews.length > 0 ? (
+          <div style={{ maxHeight: "600px", overflowY: "auto" }}>
+            {doctorReviews.map((review) => (
+              <Card
+                key={review._id}
+                style={{ marginBottom: 16 }}
+                size="small"
+              >
+                <Space direction="vertical" style={{ width: "100%" }} size="small">
+                  <Space>
+                    <Avatar
+                      size="small"
+                      src={review.patient?.avatarUrl}
+                      icon={<UserOutlined />}
+                    />
+                    <Text strong>
+                      {review.isAnonymous
+                        ? "Bệnh nhân"
+                        : review.patient?.fullName || "Bệnh nhân"}
+                    </Text>
+                    <Rate
+                      disabled
+                      value={review.rating}
+                      style={{ fontSize: 12 }}
+                    />
+                    <Text type="secondary" style={{ fontSize: "12px" }}>
+                      {dayjs(review.createdAt).format("DD/MM/YYYY")}
+                    </Text>
+                  </Space>
+                  {review.comment && (
+                    <Paragraph style={{ marginBottom: 0, marginTop: 8 }}>
+                      {review.comment}
+                    </Paragraph>
+                  )}
+                  {review.tags && review.tags.length > 0 && (
+                    <Space wrap>
+                      {review.tags.map((tag, index) => (
+                        <Tag key={index} color="blue">
+                          {tag}
+                        </Tag>
+                      ))}
+                    </Space>
+                  )}
+                  {review.doctorResponse && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        padding: 12,
+                        background: "#f5f5f5",
+                        borderRadius: 4,
+                      }}
+                    >
+                      <Text strong style={{ color: "#1890ff" }}>
+                        Phản hồi từ bác sĩ:
+                      </Text>
+                      <Paragraph style={{ marginBottom: 0, marginTop: 4 }}>
+                        {review.doctorResponse}
+                      </Paragraph>
+                      {review.doctorResponseAt && (
+                        <Text type="secondary" style={{ fontSize: "12px" }}>
+                          {dayjs(review.doctorResponseAt).format("DD/MM/YYYY HH:mm")}
+                        </Text>
+                      )}
+                    </div>
+                  )}
+                </Space>
+              </Card>
+            ))}
+            {reviewsPagination && reviewsPagination.total > reviewsPagination.limit && (
+              <div style={{ textAlign: "center", marginTop: 16 }}>
+                <Text type="secondary">
+                  Hiển thị {doctorReviews.length} / {reviewsPagination.total} đánh giá
+                </Text>
+              </div>
+            )}
+          </div>
+        ) : (
+          <Empty description="Chưa có đánh giá nào" />
+        )}
+      </Modal>
     </div>
   );
 };

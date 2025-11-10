@@ -10,6 +10,7 @@ import DoctorTimeSlot from "../models/doctorTimeSlot.model.js";
 import Specialization from "../models/specialization.model.js";
 import Patient from "../models/patient.model.js";
 import User from "../models/user.model.js";
+import Review from "../models/review.model.js";
 import { ok, fail } from "../utils/response.js";
 import { ERROR_CODES } from "../constants/index.js";
 import {
@@ -186,6 +187,30 @@ export async function getAvailableDoctorsAndSlots(req, res) {
             available: true,
           }));
 
+        // Calculate rating from Review model if ratingAvg is null/undefined or if ratingCount is 0 but there are reviews
+        let ratingAvg = doctor.ratingAvg !== undefined && doctor.ratingAvg !== null ? doctor.ratingAvg : 0;
+        let ratingCount = doctor.ratingCount !== undefined && doctor.ratingCount !== null ? doctor.ratingCount : 0;
+        
+        // If rating is missing or count is 0, check if there are reviews in database
+        if ((ratingAvg === 0 && ratingCount === 0) || ratingAvg === null || ratingAvg === undefined) {
+          // Calculate rating from Review model
+          const ratingStats = await Review.aggregate([
+            { $match: { doctorId: doctor._id } },
+            {
+              $group: {
+                _id: null,
+                avgRating: { $avg: "$rating" },
+                totalReviews: { $sum: 1 },
+              },
+            },
+          ]);
+          
+          if (ratingStats.length > 0 && ratingStats[0].totalReviews > 0) {
+            ratingAvg = Math.round(ratingStats[0].avgRating * 10) / 10; // Round to 1 decimal
+            ratingCount = ratingStats[0].totalReviews;
+          }
+        }
+
         return {
           _id: doctor._id,
           fullName: doctor.fullName,
@@ -196,8 +221,8 @@ export async function getAvailableDoctorsAndSlots(req, res) {
           specializationIds: doctor.specializationIds,
           clinicDefaultId: doctor.clinicDefaultId,
           educationLevel: doctor.educationLevel,
-          ratingAvg: doctor.ratingAvg,
-          ratingCount: doctor.ratingCount,
+          ratingAvg: ratingAvg,
+          ratingCount: ratingCount,
           availableSlots: availableSlots,
         };
       })
