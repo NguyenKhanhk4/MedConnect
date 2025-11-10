@@ -21,6 +21,7 @@ import {
   Avatar,
   Rate,
   Divider,
+  Input,
 } from "antd";
 import {
   CalendarOutlined,
@@ -34,6 +35,8 @@ import {
   PlusOutlined,
   DeleteOutlined,
   EditOutlined,
+  EnvironmentOutlined,
+  PhoneOutlined,
 } from "@ant-design/icons";
 import NavigationBreadcrumb from "../../../components/Breadcrumb/NavigationBreadcrumb";
 import { api } from "../../../lib/api";
@@ -42,6 +45,7 @@ import "./DatLichNhieuChuyenKhoa.css";
 const { Title, Text, Paragraph } = Typography;
 const { Step } = Steps;
 const { RangePicker } = DatePicker;
+const { TextArea } = Input;
 
 const DatLichNhieuChuyenKhoa = () => {
   const navigate = useNavigate();
@@ -65,6 +69,10 @@ const DatLichNhieuChuyenKhoa = () => {
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [appointmentToReplace, setAppointmentToReplace] = useState(null);
+  const [doctorPricing, setDoctorPricing] = useState(null); // Doctor pricing from API
+  const [appointmentReason, setAppointmentReason] = useState(""); // Reason for appointment
+  const [defaultClinic, setDefaultClinic] = useState(null); // Default clinic for offline appointments
+  const [clinicLoading, setClinicLoading] = useState(false); // Loading state for clinic
 
   // Fetch specializations
   useEffect(() => {
@@ -199,10 +207,18 @@ const DatLichNhieuChuyenKhoa = () => {
       if (appointmentToReplace.mode) {
         setSelectedMode(appointmentToReplace.mode);
       }
+      if (appointmentToReplace.reason) {
+        setAppointmentReason(appointmentToReplace.reason);
+      } else {
+        setAppointmentReason("");
+      }
     } else {
       setAppointmentToReplace(null);
       setSelectedMode("online");
+      setAppointmentReason("");
     }
+    setDoctorPricing(null);
+    setDefaultClinic(null);
     fetchAvailableDoctorsAndSlots(spec._id);
   };
 
@@ -218,7 +234,14 @@ const DatLichNhieuChuyenKhoa = () => {
 
       if (response?.success || response?.data?.success) {
         const doctors = response?.data?.doctors || response?.doctors || [];
-        setAvailableDoctors(doctors);
+        // Ensure all doctors have rating fields with default values
+        const doctorsWithRatings = doctors.map(doctor => ({
+          ...doctor,
+          ratingAvg: doctor.ratingAvg !== undefined && doctor.ratingAvg !== null ? Number(doctor.ratingAvg) : 0,
+          ratingCount: doctor.ratingCount !== undefined && doctor.ratingCount !== null ? Number(doctor.ratingCount) : 0,
+        }));
+        console.log("Available doctors with ratings:", doctorsWithRatings);
+        setAvailableDoctors(doctorsWithRatings);
         
         // If replacing appointment, auto-select the same doctor
         if (appointmentToReplace?.doctor?._id) {
@@ -241,10 +264,87 @@ const DatLichNhieuChuyenKhoa = () => {
     }
   };
 
+  // Fetch doctor pricing
+  const fetchDoctorPricing = async (doctorId) => {
+    try {
+      const response = await api.get(
+        `/api/patients/doctors/${doctorId}/pricing`
+      );
+
+      if (response.success) {
+        setDoctorPricing(response.data.pricing);
+        console.log("💰 Fetched doctor pricing:", response.data.pricing);
+      } else {
+        console.log("No custom pricing, using default");
+        setDoctorPricing(null);
+      }
+    } catch (error) {
+      console.error("Error fetching doctor pricing:", error);
+      setDoctorPricing(null);
+    }
+  };
+
+  // Fetch default clinic for doctor
+  const fetchDefaultClinic = async (doctorId) => {
+    try {
+      setClinicLoading(true);
+      const response = await api.get(`/api/doctors/${doctorId}/clinics`);
+
+      if (
+        response.success &&
+        response.data.clinics &&
+        response.data.clinics.length > 0
+      ) {
+        // Lấy phòng khám đầu tiên làm phòng khám mặc định
+        setDefaultClinic(response.data.clinics[0]);
+      } else {
+        console.error("Error fetching clinics:", response.message);
+        setDefaultClinic(null);
+      }
+    } catch (error) {
+      console.error("Error fetching clinics:", error);
+      setDefaultClinic(null);
+    } finally {
+      setClinicLoading(false);
+    }
+  };
+
+  // Helper function to get price for display (weekday or weekend)
+  const getPriceForDisplay = (mode, isWeekend = false) => {
+    if (!mode) return 0;
+
+    // If doctor has custom pricing from API, use it
+    if (doctorPricing && doctorPricing.length > 0) {
+      const modePricing = doctorPricing.find((p) => p.mode === mode);
+      if (modePricing) {
+        return isWeekend ? modePricing.weekendPrice : modePricing.weekdayPrice;
+      }
+    }
+
+    // No pricing found - return 0 instead of default values
+    return 0;
+  };
+
+  // Helper function to calculate price based on mode and date
+  const calculatePrice = (mode, dateStr) => {
+    if (!mode || !dateStr) return 0;
+
+    const date = dayjs(dateStr);
+    const dayOfWeek = date.day(); // 0 = Sunday, 6 = Saturday
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+
+    return getPriceForDisplay(mode, isWeekend);
+  };
+
   // Fetch time slots for selected doctor
   const handleDoctorSelect = async (doctor) => {
     setSelectedDoctor(doctor);
     setSelectedSlot(null);
+    
+    // Fetch doctor pricing when doctor is selected
+    fetchDoctorPricing(doctor._id);
+    // Fetch default clinic for offline appointments
+    fetchDefaultClinic(doctor._id);
 
     try {
       setLoadingSlots(true);
@@ -362,6 +462,11 @@ const DatLichNhieuChuyenKhoa = () => {
       message.warning("Vui lòng chọn bác sĩ và khung giờ");
       return;
     }
+    
+    if (!selectedMode) {
+      message.warning("Vui lòng chọn hình thức khám");
+      return;
+    }
 
     // Check for conflicts with existing local appointments (exclude the one being replaced)
     const conflictingAppointment = appointments.find((apt) => {
@@ -438,14 +543,14 @@ const DatLichNhieuChuyenKhoa = () => {
       scheduledEnd: slotEndAt,
       status: "draft", // Not saved yet
       mode: selectedMode,
-      reason: appointmentToReplace ? appointmentToReplace.reason : `Khám ${currentSpecialization.name}`,
+      reason: appointmentReason || (appointmentToReplace ? appointmentToReplace.reason : `Khám ${currentSpecialization.name}`),
       // Store original data for saving later
       _tempData: {
         doctorId: selectedDoctor._id,
         slotId: selectedSlot._id,
         mode: selectedMode,
-        clinicId: selectedMode === "offline" ? undefined : undefined, // Will be required for offline
-        reason: appointmentToReplace ? appointmentToReplace.reason : `Khám ${currentSpecialization.name}`,
+        clinicId: selectedMode === "offline" && defaultClinic ? defaultClinic._id : undefined, // Required for offline
+        reason: appointmentReason || (appointmentToReplace ? appointmentToReplace.reason : `Khám ${currentSpecialization.name}`),
       },
       // Store slot reference for display
       slotId: selectedSlot._id,
@@ -468,6 +573,9 @@ const DatLichNhieuChuyenKhoa = () => {
     setSelectedDoctor(null);
     setSelectedSlot(null);
     setSelectedMode("online");
+    setAppointmentReason("");
+    setDoctorPricing(null);
+    setDefaultClinic(null);
   };
 
   // Step 4: Hoàn tất và tạo visit với appointments (status pending_doctor)
@@ -1102,6 +1210,9 @@ const DatLichNhieuChuyenKhoa = () => {
             setSelectedSlot(null);
             setAppointmentToReplace(null);
             setSelectedMode("online");
+            setAppointmentReason("");
+            setDoctorPricing(null);
+            setDefaultClinic(null);
           }}
           footer={null}
           width={800}
@@ -1122,62 +1233,139 @@ const DatLichNhieuChuyenKhoa = () => {
                 <div>
                   <Title level={4}>Chọn bác sĩ</Title>
                   <Row gutter={[16, 16]}>
-                    {availableDoctors.map((doctor) => (
-                      <Col xs={24} sm={12} md={8} key={doctor._id}>
-                        <Card
-                          hoverable
-                          onClick={() => handleDoctorSelect(doctor)}
-                          style={{ cursor: "pointer" }}
-                        >
-                          <Space direction="vertical" style={{ width: "100%" }}>
-                            <Avatar
-                              size={64}
-                              src={doctor.avatarUrl}
-                              icon={<UserOutlined />}
-                            />
-                            <Text strong>{doctor.fullName}</Text>
-                            <Rate
-                              disabled
-                              defaultValue={doctor.ratingAvg}
-                              allowHalf
-                            />
-                            <Text type="secondary">
-                              {doctor.yearsExperience} năm kinh nghiệm
-                            </Text>
-                          </Space>
-                        </Card>
-                      </Col>
-                    ))}
+                    {availableDoctors.map((doctor) => {
+                      const doctorName = doctor.userId?.fullName || doctor.fullName;
+                      const displayName = doctorName?.startsWith("BS.") ? doctorName : `BS. ${doctorName}`;
+                      const specializationNames = doctor.specializationIds?.map(s => s.name || s).join(", ") || "";
+                      
+                      return (
+                        <Col xs={24} sm={12} md={12} key={doctor._id}>
+                          <Card
+                            hoverable
+                            onClick={() => handleDoctorSelect(doctor)}
+                            style={{ cursor: "pointer" }}
+                          >
+                            <div style={{ display: "flex", gap: 16 }}>
+                              <Avatar
+                                size={80}
+                                src={doctor.avatarUrl}
+                                icon={<UserOutlined />}
+                                style={{ flexShrink: 0 }}
+                              />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <Title level={4} style={{ marginBottom: 8, marginTop: 0 }}>
+                                  {displayName}
+                                </Title>
+                                
+                                <div style={{ marginBottom: 8, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                                  {specializationNames && (
+                                    <Tag color="blue">{specializationNames}</Tag>
+                                  )}
+                                  {doctor.educationLevel && (
+                                    <Tag color="cyan">{doctor.educationLevel}</Tag>
+                                  )}
+                                </div>
+                                
+                                {doctor.yearsExperience && (
+                                  <div style={{ marginBottom: 8 }}>
+                                    <Text type="secondary">
+                                      <UserOutlined style={{ marginRight: 4 }} />
+                                      {doctor.yearsExperience} năm kinh nghiệm
+                                    </Text>
+                                  </div>
+                                )}
+                                
+                                {doctor.bio && (
+                                  <Paragraph
+                                    ellipsis={{ rows: 2 }}
+                                    style={{ marginBottom: 8, fontSize: "14px" }}
+                                  >
+                                    {doctor.bio}
+                                  </Paragraph>
+                                )}
+                                
+                                <div className="doctor-rating" style={{ marginTop: 4 }}>
+                                  <Rate disabled value={doctor.ratingAvg || 0} />
+                                  <Text type="secondary">
+                                    ({doctor.ratingCount || 0} đánh giá)
+                                  </Text>
+                                </div>
+                              </div>
+                            </div>
+                          </Card>
+                        </Col>
+                      );
+                    })}
                   </Row>
                 </div>
               ) : (
                 <>
                   {/* Selected Doctor Info */}
-                  <Card size="small" style={{ marginBottom: 16 }}>
-                    <Space>
+                  <Card style={{ marginBottom: 16 }}>
+                    <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
                       <Avatar
+                        size={80}
                         src={selectedDoctor.avatarUrl}
                         icon={<UserOutlined />}
+                        style={{ flexShrink: 0 }}
                       />
-                      <div>
-                        <Text strong>{selectedDoctor.fullName}</Text>
-                        <br />
-                        <Rate
-                          disabled
-                          defaultValue={selectedDoctor.ratingAvg}
-                          allowHalf
-                        />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                          <Title level={4} style={{ marginTop: 0, marginBottom: 8 }}>
+                            {(() => {
+                              const doctorName = selectedDoctor.userId?.fullName || selectedDoctor.fullName;
+                              return doctorName?.startsWith("BS.") ? doctorName : `BS. ${doctorName}`;
+                            })()}
+                          </Title>
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              setSelectedDoctor(null);
+                              setSelectedSlot(null);
+                            }}
+                          >
+                            Chọn lại
+                          </Button>
+                        </div>
+                        
+                        <div style={{ marginBottom: 8, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                          {selectedDoctor.specializationIds && selectedDoctor.specializationIds.length > 0 && (
+                            <Tag color="blue">
+                              {selectedDoctor.specializationIds.map(s => s.name || s).join(", ")}
+                            </Tag>
+                          )}
+                          {selectedDoctor.educationLevel && (
+                            <Tag color="cyan">{selectedDoctor.educationLevel}</Tag>
+                          )}
+                        </div>
+                        
+                        {selectedDoctor.yearsExperience && (
+                          <div style={{ marginBottom: 8 }}>
+                            <Text type="secondary">
+                              <UserOutlined style={{ marginRight: 4 }} />
+                              {selectedDoctor.yearsExperience} năm kinh nghiệm
+                            </Text>
+                          </div>
+                        )}
+                        
+                        {selectedDoctor.bio && (
+                          <Paragraph style={{ marginBottom: 8, fontSize: "14px" }}>
+                            {selectedDoctor.bio}
+                          </Paragraph>
+                        )}
+                        
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                          <Rate
+                            disabled
+                            value={selectedDoctor.ratingAvg || 0}
+                            style={{ fontSize: 14 }}
+                          />
+                          <Text type="secondary" style={{ fontSize: "14px" }}>
+                            ({selectedDoctor.ratingCount || 0} đánh giá)
+                          </Text>
+                        </div>
                       </div>
-                      <Button
-                        size="small"
-                        onClick={() => {
-                          setSelectedDoctor(null);
-                          setSelectedSlot(null);
-                        }}
-                      >
-                        Chọn lại
-                      </Button>
-                    </Space>
+                    </div>
                   </Card>
 
                   {/* Mode Selection */}
@@ -1191,6 +1379,200 @@ const DatLichNhieuChuyenKhoa = () => {
                       <Radio value="offline">Tại phòng khám</Radio>
                     </Radio.Group>
                   </div>
+
+                  {/* Clinic Info - Show when offline mode is selected */}
+                  {selectedMode === "offline" && (
+                    <div style={{ marginBottom: 16 }}>
+                      <Title level={5}>Phòng khám</Title>
+                      {clinicLoading ? (
+                        <div style={{ padding: "8px 0" }}>
+                          <Spin size="small" /> Đang tải thông tin phòng khám...
+                        </div>
+                      ) : defaultClinic ? (
+                        <div
+                          style={{
+                            padding: "12px",
+                            background: "#f5f5f5",
+                            borderRadius: "4px",
+                            border: "1px solid #d9d9d9",
+                          }}
+                        >
+                          <div style={{ marginBottom: 8 }}>
+                            <Text strong>
+                              <EnvironmentOutlined style={{ marginRight: 8 }} />
+                              {defaultClinic.name}
+                            </Text>
+                          </div>
+                          <div style={{ marginBottom: 4 }}>
+                            <Text type="secondary">{defaultClinic.address}</Text>
+                          </div>
+                          {defaultClinic.phone && (
+                            <div>
+                              <Text type="secondary">
+                                <PhoneOutlined style={{ marginRight: 8 }} />
+                                {defaultClinic.phone}
+                              </Text>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <Text type="secondary">
+                          Không có thông tin phòng khám
+                        </Text>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Price Table - Show when mode is selected */}
+                  {selectedMode && visitDate && (
+                    <div style={{ marginBottom: 16 }}>
+                      <Text
+                        strong
+                        style={{ display: "block", marginBottom: 12 }}
+                      >
+                        Bảng giá
+                      </Text>
+                      <div
+                        style={{
+                          border: "1px solid #d9d9d9",
+                          borderRadius: "4px",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <table
+                          style={{
+                            width: "100%",
+                            borderCollapse: "collapse",
+                          }}
+                        >
+                          <thead>
+                            <tr style={{ background: "#fafafa" }}>
+                              <th
+                                style={{
+                                  padding: "12px",
+                                  textAlign: "left",
+                                  borderBottom: "1px solid #d9d9d9",
+                                }}
+                              >
+                                Hình thức
+                              </th>
+                              <th
+                                style={{
+                                  padding: "12px",
+                                  textAlign: "center",
+                                  borderBottom: "1px solid #d9d9d9",
+                                }}
+                              >
+                                Thứ 2-6
+                              </th>
+                              <th
+                                style={{
+                                  padding: "12px",
+                                  textAlign: "center",
+                                  borderBottom: "1px solid #d9d9d9",
+                                }}
+                              >
+                                Thứ 7-CN
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr
+                              style={{
+                                background:
+                                  selectedMode === "online"
+                                    ? "#e6f7ff"
+                                    : "#fff",
+                              }}
+                            >
+                              <td
+                                style={{ padding: "12px", fontWeight: 600 }}
+                              >
+                                Khám online
+                              </td>
+                              <td
+                                style={{
+                                  padding: "12px",
+                                  textAlign: "center",
+                                }}
+                              >
+                                {getPriceForDisplay(
+                                  "online",
+                                  false
+                                ).toLocaleString("vi-VN")}
+                                đ
+                              </td>
+                              <td
+                                style={{
+                                  padding: "12px",
+                                  textAlign: "center",
+                                }}
+                              >
+                                {getPriceForDisplay(
+                                  "online",
+                                  true
+                                ).toLocaleString("vi-VN")}
+                                đ
+                              </td>
+                            </tr>
+                            <tr
+                              style={{
+                                background:
+                                  selectedMode === "offline"
+                                    ? "#e6f7ff"
+                                    : "#fff",
+                              }}
+                            >
+                              <td
+                                style={{ padding: "12px", fontWeight: 600 }}
+                              >
+                                Khám tại phòng khám
+                              </td>
+                              <td
+                                style={{
+                                  padding: "12px",
+                                  textAlign: "center",
+                                }}
+                              >
+                                {getPriceForDisplay(
+                                  "offline",
+                                  false
+                                ).toLocaleString("vi-VN")}
+                                đ
+                              </td>
+                              <td
+                                style={{
+                                  padding: "12px",
+                                  textAlign: "center",
+                                }}
+                              >
+                                {getPriceForDisplay(
+                                  "offline",
+                                  true
+                                ).toLocaleString("vi-VN")}
+                                đ
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 12,
+                          padding: "12px",
+                          background: "#f6ffed",
+                          border: "1px solid #b7eb8f",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        <Text strong>
+                          💰 Tổng thanh toán:{" "}
+                          {calculatePrice(selectedMode, visitDate).toLocaleString("vi-VN")}
+                          đ
+                        </Text>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Time Slot Selection */}
                   <Divider />
@@ -1318,6 +1700,20 @@ const DatLichNhieuChuyenKhoa = () => {
                     <Empty description="Không có khung giờ trống" />
                   )}
 
+                  {/* Reason Input */}
+                  <Divider />
+                  <div style={{ marginBottom: 16 }}>
+                    <Title level={5}>Lý do khám</Title>
+                    <TextArea
+                      rows={3}
+                      placeholder="Mô tả triệu chứng hoặc lý do khám (không bắt buộc)"
+                      value={appointmentReason}
+                      onChange={(e) => setAppointmentReason(e.target.value)}
+                      maxLength={500}
+                      showCount
+                    />
+                  </div>
+
                   {/* Confirm Button */}
                   <div style={{ marginTop: 24, textAlign: "right" }}>
                     <Space>
@@ -1328,6 +1724,9 @@ const DatLichNhieuChuyenKhoa = () => {
                           setSelectedSlot(null);
                           setAppointmentToReplace(null);
                           setSelectedMode("online");
+                          setAppointmentReason("");
+                          setDoctorPricing(null);
+                          setDefaultClinic(null);
                         }}
                       >
                         Hủy

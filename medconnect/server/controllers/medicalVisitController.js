@@ -195,6 +195,7 @@ export async function getAvailableDoctorsAndSlots(req, res) {
           avatarUrl: doctor.avatarUrl,
           specializationIds: doctor.specializationIds,
           clinicDefaultId: doctor.clinicDefaultId,
+          educationLevel: doctor.educationLevel,
           ratingAvg: doctor.ratingAvg,
           ratingCount: doctor.ratingCount,
           availableSlots: availableSlots,
