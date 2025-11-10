@@ -79,11 +79,15 @@ router.get("/clinics/search", getSearchClinics);
 // Get doctor profile by ID (public)
 router.get("/:doctorId", getDoctorProfile);
 
-// Get public doctor reviews (public)
-router.get("/:doctorId/reviews", getPublicDoctorReviews);
-
 // Get doctor clinics (public)
 router.get("/:doctorId/clinics", getDoctorClinics);
+
+// IMPORTANT: /me/reviews must be defined BEFORE /:doctorId/reviews to avoid route conflicts
+// Route cụ thể hơn phải được định nghĩa trước route có parameter
+router.get("/me/reviews", authGuard, getDoctorReviews);
+
+// Get public doctor reviews (public) - Must be after /me/reviews
+router.get("/:doctorId/reviews", getPublicDoctorReviews);
 
 // ================== AUTHENTICATED DOCTOR ROUTES ==================
 // Apply auth middleware to all routes below
@@ -140,7 +144,7 @@ router.post("/me/upload-consultation-file", uploadConsultationFile);
 router.post("/me/prescriptions", createPrescription);
 
 // ================== REVIEW ROUTES ==================
-router.get("/me/reviews", getDoctorReviews);
+// Note: /me/reviews GET is already defined above (line 87, with authGuard)
 router.post("/me/reviews/:reviewId/respond", respondToReview);
 
 export default router;

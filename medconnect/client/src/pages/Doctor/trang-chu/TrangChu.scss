@@ -34,6 +34,24 @@
   border-radius: 0.5rem;
   margin: 1rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  
+  // Ẩn thanh trượt
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  
+  &::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+  
+  // Ẩn scrollbar cho tất cả phần tử con
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
 }
 
 // Removed old header styles as we're not using them anymore
@@ -55,31 +73,49 @@
   margin-bottom: 2rem;
 }
 
-.stat-card {
-  background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%);
+.doctor-dashboard-container .stat-card,
+.doctor-content-area .stat-card,
+.dashboard-stats .stat-card,
+div.stat-card {
+  background: #17B0D0 !important;
+  background-color: #17B0D0 !important;
   padding: 1.5rem;
   border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(8, 145, 178, 0.3);
-  border: none;
+  box-shadow: 0 4px 20px rgba(23, 176, 208, 0.3);
+  border: none !important;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  
+  * {
+    color: #ffffff !important;
+    opacity: 1 !important;
+  }
 }
 
-.stat-card::before {
+.doctor-dashboard-container .stat-card::before,
+.doctor-content-area .stat-card::before,
+.dashboard-stats .stat-card::before,
+div.stat-card::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
   pointer-events: none;
+  opacity: 1 !important;
 }
 
-.stat-card:hover {
+.doctor-dashboard-container .stat-card:hover,
+.doctor-content-area .stat-card:hover,
+.dashboard-stats .stat-card:hover,
+div.stat-card:hover {
   transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 8px 30px rgba(8, 145, 178, 0.4);
+  box-shadow: 0 8px 30px rgba(23, 176, 208, 0.4);
+  background: #17B0D0 !important;
+  background-color: #17B0D0 !important;
 }
 
 .stat-card-content {
@@ -90,26 +126,38 @@
   z-index: 1;
 }
 
-.stat-icon {
+.doctor-dashboard-container .stat-icon,
+.doctor-content-area .stat-icon,
+.dashboard-stats .stat-icon,
+.stat-card .stat-icon {
   width: 2.5rem;
   height: 2.5rem;
-  color: white;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  color: #ffffff !important;
+  opacity: 1 !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
-.stat-label {
+.doctor-dashboard-container .stat-label,
+.doctor-content-area .stat-label,
+.dashboard-stats .stat-label,
+.stat-card .stat-label {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: #ffffff !important;
+  opacity: 1 !important;
   margin-bottom: 0.5rem;
   font-weight: 500;
 }
 
-.stat-value {
+.doctor-dashboard-container .stat-value,
+.doctor-content-area .stat-value,
+.dashboard-stats .stat-value,
+.stat-card .stat-value {
   font-size: 2rem;
   font-weight: 700;
-  color: white;
+  color: #ffffff !important;
+  opacity: 1 !important;
   margin: 0;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .appointment-search {
@@ -153,6 +201,8 @@
 
   .stat-card {
     padding: 1rem;
+    background: #17B0D0 !important;
+    background-color: #17B0D0 !important;
   }
 
   .stat-value {
@@ -167,6 +217,8 @@
 
   .stat-card {
     padding: 0.75rem;
+    background: #17B0D0 !important;
+    background-color: #17B0D0 !important;
   }
 
   .stat-label {

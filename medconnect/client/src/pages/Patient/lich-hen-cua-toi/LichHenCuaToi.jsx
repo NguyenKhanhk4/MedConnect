@@ -29,6 +29,7 @@ import {
   getUniqueClinics,
   applyAppointmentFilters,
 } from "../../../utils/appointmentUtils";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./LichHenCuaToi.scss";
 
 const STATUS = {
@@ -57,8 +58,21 @@ export function LichHenCuaToi() {
     customDateRange: null,
     selectedClinic: "",
   });
+  const [confirmConfig, setConfirmConfig] = useState(null);
 
   const navigate = useNavigate();
+
+  // Helper function to show custom confirm
+  const showConfirm = (message, onConfirm) => {
+    setConfirmConfig({
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmConfig(null);
+      },
+      onCancel: () => setConfirmConfig(null),
+    });
+  };
 
   // Fetch appointments
   const { appointments, loading, setAppointments } = useAppointments();
@@ -67,13 +81,9 @@ export function LichHenCuaToi() {
   const { specializations } = useSpecializations();
 
   const handleCancelAppointment = async (appointmentId) => {
-    Modal.confirm({
-      title: "Xác nhận hủy lịch hẹn",
-      content: "Bạn có chắc chắn muốn hủy lịch hẹn này?",
-      okText: "Hủy lịch hẹn",
-      cancelText: "Không",
-      okType: "danger",
-      onOk: async () => {
+    showConfirm(
+      "Bạn có chắc chắn muốn hủy lịch hẹn này?",
+      async () => {
         try {
           // Gọi API endpoint mới
           const response = await api.put(
@@ -108,8 +118,8 @@ export function LichHenCuaToi() {
           });
           message.error(`Có lỗi xảy ra khi hủy lịch hẹn: ${error.message}`);
         }
-      },
-    });
+      }
+    );
   };
 
   // Get unique clinics from appointments
@@ -752,6 +762,17 @@ export function LichHenCuaToi() {
         appointment={selectedAppointmentForReview}
         onReviewSubmitted={handleReviewSubmitted}
       />
+
+      {/* Custom Confirm */}
+      {confirmConfig && (
+        <CustomAlert
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onClose={confirmConfig.onCancel}
+          title="Hệ thống MedConnect"
+          type="confirm"
+        />
+      )}
     </div>
   );
 }

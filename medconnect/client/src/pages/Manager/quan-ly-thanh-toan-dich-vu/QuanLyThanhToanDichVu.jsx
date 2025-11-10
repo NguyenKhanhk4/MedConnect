@@ -12,6 +12,7 @@ import {
   Check,
   AlertCircle,
 } from "lucide-react";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./QuanLyThanhToanDichVu.scss";
 
 export default function QuanLyThanhToanDichVu() {
@@ -30,6 +31,25 @@ export default function QuanLyThanhToanDichVu() {
   const [creatingLink, setCreatingLink] = useState(false);
   const [activeTab, setActiveTab] = useState("all"); // all | booking | service
   const [statusFilter, setStatusFilter] = useState("pending"); // pending | initiated | all
+  const [alertMessage, setAlertMessage] = useState(null);
+  const [confirmConfig, setConfirmConfig] = useState(null);
+
+  // Helper function to show custom alert
+  const showAlert = (message) => {
+    setAlertMessage(message);
+  };
+
+  // Helper function to show custom confirm
+  const showConfirm = (message, onConfirm) => {
+    setConfirmConfig({
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmConfig(null);
+      },
+      onCancel: () => setConfirmConfig(null),
+    });
+  };
 
   useEffect(() => {
     loadPayments();
@@ -54,13 +74,13 @@ export default function QuanLyThanhToanDichVu() {
 
       if (response.success && response.data) {
         if (status === "success" && response.data.paid) {
-          alert("Thanh toán thành công!");
+          showAlert("Thanh toán thành công!");
           // Xóa params ngay để tránh xử lý lại khi reload
           setSearchParams({});
           // Reload danh sách để cập nhật
           await loadPayments();
         } else if (status === "failed") {
-          alert("Thanh toán thất bại. Vui lòng thử lại.");
+          showAlert("Thanh toán thất bại. Vui lòng thử lại.");
           setSearchParams({});
         }
       } else {
@@ -70,7 +90,7 @@ export default function QuanLyThanhToanDichVu() {
 
         const checkPaymentStatus = async () => {
           if (retryCount >= maxRetries) {
-            alert(
+            showAlert(
               "Đang xử lý thanh toán. Vui lòng đợi vài giây rồi tải lại trang."
             );
             setSearchParams({});
@@ -84,7 +104,7 @@ export default function QuanLyThanhToanDichVu() {
                 `/api/payments/payos/check-status/${orderCode}`
               );
               if (retryResponse.success && retryResponse.data?.paid) {
-                alert("Thanh toán thành công!");
+                showAlert("Thanh toán thành công!");
                 setSearchParams({});
                 await loadPayments();
               } else if (retryCount < maxRetries) {
@@ -136,11 +156,11 @@ export default function QuanLyThanhToanDichVu() {
         setTotalPages(response.data.pagination?.pages || 1);
       } else {
         console.error("Failed to load payments:", response.message);
-        alert("Không thể tải danh sách yêu cầu thanh toán");
+        showAlert("Không thể tải danh sách yêu cầu thanh toán");
       }
     } catch (error) {
       console.error("Error loading payments:", error);
-      alert("Có lỗi xảy ra khi tải danh sách yêu cầu thanh toán");
+      showAlert("Có lỗi xảy ra khi tải danh sách yêu cầu thanh toán");
     } finally {
       setLoading(false);
     }
@@ -201,7 +221,7 @@ export default function QuanLyThanhToanDichVu() {
           prevPayments.map((p) => (p._id === payment._id ? updatedPayment : p))
         );
       } else {
-        alert(response.message || "Không thể tạo link thanh toán");
+        showAlert(response.message || "Không thể tạo link thanh toán");
         setShowBankModal(false);
         setSelectedPayment(null);
       }
@@ -211,7 +231,7 @@ export default function QuanLyThanhToanDichVu() {
         error.response?.data?.message ||
         error.message ||
         "Có lỗi xảy ra khi tạo link thanh toán";
-      alert(errorMsg);
+      showAlert(errorMsg);
       setShowBankModal(false);
       setSelectedPayment(null);
     } finally {
@@ -224,12 +244,12 @@ export default function QuanLyThanhToanDichVu() {
 
     const amount = parseInt(amountPaid);
     if (!amount || amount <= 0) {
-      alert("Vui lòng nhập số tiền hợp lệ");
+      showAlert("Vui lòng nhập số tiền hợp lệ");
       return;
     }
 
     if (amount > selectedPayment.total) {
-      alert("Số tiền thanh toán không được vượt quá tổng tiền");
+      showAlert("Số tiền thanh toán không được vượt quá tổng tiền");
       return;
     }
 
@@ -246,32 +266,30 @@ export default function QuanLyThanhToanDichVu() {
         ? `Số tiền thừa: ${formatCurrency(amount - selectedPayment.total)}\n`
         : ``);
 
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
+    showConfirm(confirmMessage, async () => {
+      try {
+        setProcessing(true);
+        const response = await api.post(
+          `/api/managers/service-payments/${selectedPayment._id}/cash`,
+          { amountPaid: amount }
+        );
 
-    try {
-      setProcessing(true);
-      const response = await api.post(
-        `/api/managers/service-payments/${selectedPayment._id}/cash`,
-        { amountPaid: amount }
-      );
-
-      if (response.success) {
-        alert(response.message || "Thanh toán tiền mặt thành công");
-        setShowCashModal(false);
-        setSelectedPayment(null);
-        setAmountPaid("");
-        loadPayments(); // Reload danh sách
-      } else {
-        alert(response.message || "Không thể xử lý thanh toán tiền mặt");
+        if (response.success) {
+          showAlert(response.message || "Thanh toán tiền mặt thành công");
+          setShowCashModal(false);
+          setSelectedPayment(null);
+          setAmountPaid("");
+          loadPayments(); // Reload danh sách
+        } else {
+          showAlert(response.message || "Không thể xử lý thanh toán tiền mặt");
+        }
+      } catch (error) {
+        console.error("Error processing cash payment:", error);
+        showAlert("Có lỗi xảy ra khi xử lý thanh toán tiền mặt");
+      } finally {
+        setProcessing(false);
       }
-    } catch (error) {
-      console.error("Error processing cash payment:", error);
-      alert("Có lỗi xảy ra khi xử lý thanh toán tiền mặt");
-    } finally {
-      setProcessing(false);
-    }
+    });
   };
 
   const filteredPayments = payments.filter((payment) => {
@@ -492,6 +510,24 @@ export default function QuanLyThanhToanDichVu() {
             // Không reload danh sách để tránh chuyển trạng thái ngay lập tức
           }}
           formatCurrency={formatCurrency}
+        />
+      )}
+
+      {/* Custom Alert */}
+      <CustomAlert
+        message={alertMessage}
+        onClose={() => setAlertMessage(null)}
+        title="Hệ thống MedConnect"
+      />
+
+      {/* Custom Confirm */}
+      {confirmConfig && (
+        <CustomAlert
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onClose={confirmConfig.onCancel}
+          title="Hệ thống MedConnect"
+          type="confirm"
         />
       )}
     </div>

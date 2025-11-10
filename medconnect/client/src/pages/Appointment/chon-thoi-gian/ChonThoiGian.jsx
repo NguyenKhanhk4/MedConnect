@@ -37,6 +37,7 @@ import {
 import NavigationBreadcrumb from "../../../components/Breadcrumb/NavigationBreadcrumb";
 import { api } from "../../../lib/api";
 import { useUserProfile } from "../../../hooks/useUserProfile";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./ChonThoiGian.css";
 
 const { Title, Text, Paragraph } = Typography;
@@ -48,6 +49,19 @@ const ChonThoiGian = () => {
   const location = useLocation();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState(null);
+
+  // Helper function to show custom confirm
+  const showConfirm = (message, onConfirm) => {
+    setConfirmConfig({
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmConfig(null);
+      },
+      onCancel: () => setConfirmConfig(null),
+    });
+  };
   const [timeSlotsLoading, setTimeSlotsLoading] = useState(false);
   const [doctor, setDoctor] = useState(null);
   const [specialization, setSpecialization] = useState(null);
@@ -481,27 +495,13 @@ const ChonThoiGian = () => {
       if (bookingFor === "me") {
         const validation = validateProfileComplete();
         if (!validation.isValid) {
-          Modal.confirm({
-            title: "Thông tin hồ sơ chưa đầy đủ",
-            icon: <ExclamationCircleOutlined />,
-            content: (
-              <div>
-                <p>
-                  Vui lòng cập nhật đầy đủ thông tin hồ sơ trước khi đặt lịch:
-                </p>
-                <ul style={{ marginTop: 8, marginBottom: 0 }}>
-                  {validation.missingFields.map((field) => (
-                    <li key={field}>{field}</li>
-                  ))}
-                </ul>
-              </div>
-            ),
-            okText: "Đi đến trang cài đặt",
-            cancelText: "Hủy",
-            onOk: () => {
+          const missingFieldsText = validation.missingFields.join(", ");
+          showConfirm(
+            `Thông tin hồ sơ chưa đầy đủ. Vui lòng cập nhật đầy đủ thông tin hồ sơ trước khi đặt lịch:\n\nThiếu: ${missingFieldsText}`,
+            () => {
               navigate("/benh-nhan/cai-dat");
-            },
-          });
+            }
+          );
           setLoading(false);
           return;
         }
@@ -1526,6 +1526,17 @@ const ChonThoiGian = () => {
           </Col>
         </Row>
       </div>
+
+      {/* Custom Confirm */}
+      {confirmConfig && (
+        <CustomAlert
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onClose={confirmConfig.onCancel}
+          title="Hệ thống MedConnect"
+          type="confirm"
+        />
+      )}
     </div>
   );
 };

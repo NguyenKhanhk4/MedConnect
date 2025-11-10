@@ -3,6 +3,7 @@ import { api } from "../../../lib/api";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { FileText, Search, Calendar, Download } from "lucide-react";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./QuanLyHoaDon.scss";
 
 export default function QuanLyHoaDon() {
@@ -15,6 +16,25 @@ export default function QuanLyHoaDon() {
   const [totalPages, setTotalPages] = useState(1);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [alertMessage, setAlertMessage] = useState(null);
+  const [confirmConfig, setConfirmConfig] = useState(null);
+
+  // Helper function to show custom alert
+  const showAlert = (message) => {
+    setAlertMessage(message);
+  };
+
+  // Helper function to show custom confirm
+  const showConfirm = (message, onConfirm) => {
+    setConfirmConfig({
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmConfig(null);
+      },
+      onCancel: () => setConfirmConfig(null),
+    });
+  };
 
   useEffect(() => {
     loadInvoices();
@@ -57,11 +77,11 @@ export default function QuanLyHoaDon() {
         setTotalPages(response.data.pagination?.pages || 1);
       } else {
         console.error("Failed to load invoices:", response.message);
-        alert("Không thể tải danh sách hóa đơn");
+        showAlert("Không thể tải danh sách hóa đơn");
       }
     } catch (error) {
       console.error("Error loading invoices:", error);
-      alert("Có lỗi xảy ra khi tải danh sách hóa đơn");
+      showAlert("Có lỗi xảy ra khi tải danh sách hóa đơn");
     } finally {
       setLoading(false);
     }
@@ -459,7 +479,7 @@ export default function QuanLyHoaDon() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading invoice:", error);
-      alert("Có lỗi khi tải xuống hóa đơn. Vui lòng thử lại.");
+      showAlert("Có lỗi khi tải xuống hóa đơn. Vui lòng thử lại.");
     }
   };
 
@@ -467,29 +487,27 @@ export default function QuanLyHoaDon() {
     // Xác nhận trước khi xóa
     const confirmMessage = `Bạn có chắc chắn muốn xóa hóa đơn "${invoice.invoiceNumber}"?\n\nLưu ý: Chỉ có thể xóa hóa đơn chưa thanh toán hoặc đã hủy.`;
 
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
+    showConfirm(confirmMessage, async () => {
+      try {
+        const response = await api.delete(
+          `/api/managers/invoices/${invoice._id}`
+        );
 
-    try {
-      const response = await api.delete(
-        `/api/managers/invoices/${invoice._id}`
-      );
-
-      if (response.success) {
-        alert("Xóa hóa đơn thành công");
-        // Reload danh sách hóa đơn
-        loadInvoices();
-      } else {
-        alert(response.message || "Có lỗi khi xóa hóa đơn");
+        if (response.success) {
+          showAlert("Xóa hóa đơn thành công");
+          // Reload danh sách hóa đơn
+          loadInvoices();
+        } else {
+          showAlert(response.message || "Có lỗi khi xóa hóa đơn");
+        }
+      } catch (error) {
+        console.error("Error deleting invoice:", error);
+        const errorMessage =
+          error.response?.data?.message ||
+          "Có lỗi khi xóa hóa đơn. Vui lòng thử lại.";
+        showAlert(errorMessage);
       }
-    } catch (error) {
-      console.error("Error deleting invoice:", error);
-      const errorMessage =
-        error.response?.data?.message ||
-        "Có lỗi khi xóa hóa đơn. Vui lòng thử lại.";
-      alert(errorMessage);
-    }
+    });
   };
 
   const filteredInvoices = invoices.filter((invoice) => {
@@ -639,6 +657,24 @@ export default function QuanLyHoaDon() {
             Sau
           </Button>
         </div>
+      )}
+
+      {/* Custom Alert */}
+      <CustomAlert
+        message={alertMessage}
+        onClose={() => setAlertMessage(null)}
+        title="Hệ thống MedConnect"
+      />
+
+      {/* Custom Confirm */}
+      {confirmConfig && (
+        <CustomAlert
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onClose={confirmConfig.onCancel}
+          title="Hệ thống MedConnect"
+          type="confirm"
+        />
       )}
     </div>
   );
