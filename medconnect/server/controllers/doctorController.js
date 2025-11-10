@@ -2694,9 +2694,15 @@ export async function getDoctorClinics(req, res) {
 
     // Add default clinic if exists
     if (doctor.clinicDefaultId) {
-      const defaultClinic = await Clinic.findById(doctor.clinicDefaultId);
+      const defaultClinic = await Clinic.findById(doctor.clinicDefaultId).lean();
       if (defaultClinic) {
-        clinics.push(defaultClinic);
+        // Format clinic data to include all necessary fields
+        const formattedClinic = {
+          ...defaultClinic,
+          id: defaultClinic._id,
+          coordinates: defaultClinic.geo?.coordinates,
+        };
+        clinics.push(formattedClinic);
       }
     }
 

@@ -7,6 +7,9 @@ import { BrowserRouter } from "react-router-dom";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+import 'leaflet/dist/leaflet.css';
+import './utils/leafletFix';
+
 // Polyfills for Node.js modules in browser
 import { Buffer } from "buffer";
 window.Buffer = Buffer;

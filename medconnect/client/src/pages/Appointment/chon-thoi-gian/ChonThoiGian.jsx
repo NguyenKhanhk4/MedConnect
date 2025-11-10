@@ -39,6 +39,7 @@ import {
   ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import NavigationBreadcrumb from "../../../components/Breadcrumb/NavigationBreadcrumb";
+import ClinicMap from "../../../components/ClinicMap/ClinicMap";
 import { api } from "../../../lib/api";
 import { useUserProfile } from "../../../hooks/useUserProfile";
 import "./ChonThoiGian.css";
@@ -349,7 +350,6 @@ const ChonThoiGian = () => {
 
           // Nếu đã cleanup appointments, refresh time slots và reset form để user có thể đặt lịch mới
           if (cleanedCount > 0) {
-
             // Thông báo cho user
             message.info(
               `Đã tự động hủy ${cleanedCount} lịch hẹn chưa thanh toán. Bạn có thể đặt lịch mới.`,
@@ -1482,34 +1482,52 @@ const ChonThoiGian = () => {
                     </Form.Item>
 
                     {selectedMode === "offline" && (
-                      <Form.Item label="Phòng khám">
-                        {clinicLoading ? (
-                          <div style={{ padding: "8px 0" }}>
-                            <Spin size="small" /> Đang tải thông tin phòng
-                            khám...
-                          </div>
-                        ) : defaultClinic ? (
-                          <div className="clinic-info-display">
-                            <div className="clinic-name">
-                              <EnvironmentOutlined style={{ marginRight: 8 }} />
-                              <strong>{defaultClinic.name}</strong>
+                      <>
+                        <Form.Item label="Phòng khám">
+                          {clinicLoading ? (
+                            <div style={{ padding: "8px 0" }}>
+                              <Spin size="small" /> Đang tải thông tin phòng
+                              khám...
                             </div>
-                            <div className="clinic-address">
-                              {defaultClinic.address}
-                            </div>
-                            {defaultClinic.phone && (
-                              <div className="clinic-phone">
-                                <PhoneOutlined style={{ marginRight: 8 }} />
-                                {defaultClinic.phone}
+                          ) : defaultClinic ? (
+                            <div className="clinic-info-display">
+                              <div className="clinic-name">
+                                <EnvironmentOutlined
+                                  style={{ marginRight: 8 }}
+                                />
+                                <strong>{defaultClinic.name}</strong>
                               </div>
-                            )}
-                          </div>
-                        ) : (
-                          <Text type="secondary">
-                            Không có thông tin phòng khám
-                          </Text>
+                              <div className="clinic-address">
+                                {defaultClinic.address}
+                              </div>
+                              {defaultClinic.phone && (
+                                <div className="clinic-phone">
+                                  <PhoneOutlined style={{ marginRight: 8 }} />
+                                  {defaultClinic.phone}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <Text type="secondary">
+                              Không có thông tin phòng khám
+                            </Text>
+                          )}
+                        </Form.Item>
+                        {defaultClinic && (
+                          <Form.Item>
+                            <ClinicMap
+                              clinic={defaultClinic}
+                              onGetDirections={(clinic) => {
+                                const address = encodeURIComponent(
+                                  clinic?.address || ""
+                                );
+                                const url = `https://www.google.com/maps/dir/?api=1&destination=${address}`;
+                                window.open(url, "_blank");
+                              }}
+                            />
+                          </Form.Item>
                         )}
-                      </Form.Item>
+                      </>
                     )}
 
                     {/* Price Table */}
