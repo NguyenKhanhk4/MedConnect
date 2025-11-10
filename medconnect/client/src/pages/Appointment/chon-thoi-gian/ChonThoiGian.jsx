@@ -35,6 +35,7 @@ import {
   ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import NavigationBreadcrumb from "../../../components/Breadcrumb/NavigationBreadcrumb";
+import ClinicMap from "../../../components/ClinicMap/ClinicMap";
 import { api } from "../../../lib/api";
 import { useUserProfile } from "../../../hooks/useUserProfile";
 import { CustomAlert } from "../../../components/ui/CustomAlert";
@@ -210,7 +211,6 @@ const ChonThoiGian = () => {
 
       // Cancel payment link (này sẽ tự động xóa appointment nếu chưa thanh toán)
       await cancelPayOSPayment(orderCode);
-      console.log("✅ Cleaned up unpaid appointment:", appointmentId);
 
       // Clear state và localStorage sau khi cleanup thành công
       setPendingAppointmentId(null);
@@ -218,13 +218,11 @@ const ChonThoiGian = () => {
       localStorage.removeItem("pendingAppointmentId");
       localStorage.removeItem("pendingOrderCode");
     } catch (error) {
-      console.error("❌ Error cleaning up unpaid appointment:", error);
       // Fallback: try to cancel appointment directly nếu cancel payment fail
       try {
         await api.put(`/api/patients/me/appointments/${appointmentId}/cancel`, {
           cancelReason: "Người dùng thoát trang trước khi thanh toán",
         });
-        console.log("✅ Fallback: Cancelled appointment directly");
 
         // Clear state và localStorage sau khi cleanup thành công
         setPendingAppointmentId(null);
@@ -232,7 +230,7 @@ const ChonThoiGian = () => {
         localStorage.removeItem("pendingAppointmentId");
         localStorage.removeItem("pendingOrderCode");
       } catch (cancelError) {
-        console.error("❌ Error cancelling appointment:", cancelError);
+        // Silent fail
       }
     }
   };
@@ -271,7 +269,6 @@ const ChonThoiGian = () => {
             }
           }
         } catch (error) {
-          console.error("Error checking pending appointment:", error);
           // Nếu không kiểm tra được, clear localStorage
           localStorage.removeItem("pendingAppointmentId");
           localStorage.removeItem("pendingOrderCode");
@@ -300,7 +297,6 @@ const ChonThoiGian = () => {
           let cleanedCount = 0;
           for (const apt of unpaidAppointments) {
             if (apt.pendingOrderCode) {
-              console.log(`🧹 Cleaning up unpaid appointment: ${apt._id}`);
               await cleanupUnpaidAppointment(apt._id, apt.pendingOrderCode);
               cleanedCount++;
             }
@@ -308,10 +304,6 @@ const ChonThoiGian = () => {
 
           // Nếu đã cleanup appointments, refresh time slots và reset form để user có thể đặt lịch mới
           if (cleanedCount > 0) {
-            console.log(
-              `🔄 Refreshing time slots after cleaning up ${cleanedCount} unpaid appointment(s)`
-            );
-
             // Thông báo cho user
             message.info(
               `Đã tự động hủy ${cleanedCount} lịch hẹn chưa thanh toán. Bạn có thể đặt lịch mới.`,
@@ -333,7 +325,7 @@ const ChonThoiGian = () => {
           }
         }
       } catch (error) {
-        console.error("Error checking all unpaid appointments:", error);
+        // Silent fail
       }
     };
 
@@ -345,8 +337,6 @@ const ChonThoiGian = () => {
     try {
       setTimeSlotsLoading(true);
       const dateStr = selectedDate.format("YYYY-MM-DD");
-      console.log("Doctor object:", doctor);
-      console.log("Doctor ID:", doctor?._id);
       const response = await api.get(
         `/api/patients/doctors/${doctor._id}/time-slots?date=${dateStr}`
       );
@@ -358,7 +348,6 @@ const ChonThoiGian = () => {
         setTimeSlots([]);
       }
     } catch (error) {
-      console.error("Error fetching time slots:", error);
       message.error("Có lỗi xảy ra khi tải khung giờ khám");
       setTimeSlots([]);
     } finally {
@@ -379,11 +368,9 @@ const ChonThoiGian = () => {
         // Lấy phòng khám đầu tiên làm phòng khám mặc định
         setDefaultClinic(response.data.clinics[0]);
       } else {
-        console.error("Error fetching clinics:", response.message);
         setDefaultClinic(null);
       }
     } catch (error) {
-      console.error("Error fetching clinics:", error);
       setDefaultClinic(null);
     } finally {
       setClinicLoading(false);
@@ -398,13 +385,10 @@ const ChonThoiGian = () => {
 
       if (response.success) {
         setDoctorPricing(response.data.pricing);
-        console.log("💰 Fetched doctor pricing:", response.data.pricing);
       } else {
-        console.log("No custom pricing, using default");
         setDoctorPricing(null);
       }
     } catch (error) {
-      console.error("Error fetching doctor pricing:", error);
       setDoctorPricing(null); // Fallback to default pricing
     }
   };
@@ -421,7 +405,6 @@ const ChonThoiGian = () => {
         setFamilyMembers([]);
       }
     } catch (error) {
-      console.error("Error fetching family members:", error);
       message.error("Có lỗi xảy ra khi tải danh sách người thân");
       setFamilyMembers([]);
     } finally {
@@ -540,7 +523,6 @@ const ChonThoiGian = () => {
             return;
           }
         } catch (error) {
-          console.error("Error adding family member:", error);
           message.error("Có lỗi xảy ra khi thêm người thân");
           setLoading(false);
           return;
@@ -632,11 +614,8 @@ const ChonThoiGian = () => {
                   cancelReason: "Không thể tạo link thanh toán",
                 }
               );
-              console.log(
-                "Appointment cancelled - payment link creation failed"
-              );
             } catch (cancelError) {
-              console.error("Error canceling appointment:", cancelError);
+              // Silent fail
             }
 
             setTimeout(() => {
@@ -646,7 +625,6 @@ const ChonThoiGian = () => {
             }, 2000);
           }
         } catch (paymentError) {
-          console.error("Error creating payment:", paymentError);
           message.error(
             "Có lỗi xảy ra khi tạo thanh toán. Đang hủy đặt lịch..."
           );
@@ -659,9 +637,8 @@ const ChonThoiGian = () => {
                 cancelReason: "Lỗi khi tạo thanh toán",
               }
             );
-            console.log("Appointment cancelled due to payment error");
           } catch (cancelError) {
-            console.error("Error canceling appointment:", cancelError);
+            // Silent fail
           }
 
           // Navigate back to time selection after 2 seconds
@@ -675,7 +652,6 @@ const ChonThoiGian = () => {
         message.error(response.message || "Có lỗi xảy ra khi đặt lịch");
       }
     } catch (error) {
-      console.error("Error booking appointment:", error);
       message.error("Có lỗi xảy ra khi đặt lịch. Vui lòng thử lại!");
     } finally {
       setLoading(false);
@@ -1200,34 +1176,52 @@ const ChonThoiGian = () => {
                     </Form.Item>
 
                     {selectedMode === "offline" && (
-                      <Form.Item label="Phòng khám">
-                        {clinicLoading ? (
-                          <div style={{ padding: "8px 0" }}>
-                            <Spin size="small" /> Đang tải thông tin phòng
-                            khám...
-                          </div>
-                        ) : defaultClinic ? (
-                          <div className="clinic-info-display">
-                            <div className="clinic-name">
-                              <EnvironmentOutlined style={{ marginRight: 8 }} />
-                              <strong>{defaultClinic.name}</strong>
+                      <>
+                        <Form.Item label="Phòng khám">
+                          {clinicLoading ? (
+                            <div style={{ padding: "8px 0" }}>
+                              <Spin size="small" /> Đang tải thông tin phòng
+                              khám...
                             </div>
-                            <div className="clinic-address">
-                              {defaultClinic.address}
-                            </div>
-                            {defaultClinic.phone && (
-                              <div className="clinic-phone">
-                                <PhoneOutlined style={{ marginRight: 8 }} />
-                                {defaultClinic.phone}
+                          ) : defaultClinic ? (
+                            <div className="clinic-info-display">
+                              <div className="clinic-name">
+                                <EnvironmentOutlined
+                                  style={{ marginRight: 8 }}
+                                />
+                                <strong>{defaultClinic.name}</strong>
                               </div>
-                            )}
-                          </div>
-                        ) : (
-                          <Text type="secondary">
-                            Không có thông tin phòng khám
-                          </Text>
+                              <div className="clinic-address">
+                                {defaultClinic.address}
+                              </div>
+                              {defaultClinic.phone && (
+                                <div className="clinic-phone">
+                                  <PhoneOutlined style={{ marginRight: 8 }} />
+                                  {defaultClinic.phone}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <Text type="secondary">
+                              Không có thông tin phòng khám
+                            </Text>
+                          )}
+                        </Form.Item>
+                        {defaultClinic && (
+                          <Form.Item>
+                            <ClinicMap
+                              clinic={defaultClinic}
+                              onGetDirections={(clinic) => {
+                                const address = encodeURIComponent(
+                                  clinic?.address || ""
+                                );
+                                const url = `https://www.google.com/maps/dir/?api=1&destination=${address}`;
+                                window.open(url, "_blank");
+                              }}
+                            />
+                          </Form.Item>
                         )}
-                      </Form.Item>
+                      </>
                     )}
 
                     {/* Price Table */}

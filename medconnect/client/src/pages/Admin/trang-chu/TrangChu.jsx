@@ -143,7 +143,7 @@ const TrangChu = () => {
       icon: <CalendarOutlined />,
       color: "#45c3d2",
       gradient: "linear-gradient(135deg, #40CCCC 0%, #45c3d2 100%)",
-      path: "/admin/appointments",
+      path: "/admin/lich-hen",
     },
     {
       title: "Tổng doanh thu",
@@ -206,6 +206,7 @@ const TrangChu = () => {
                 border: "none",
                 borderRadius: "16px",
                 overflow: "hidden",
+                "--card-bg": stat.gradient,
               }}
               onClick={() => navigate(stat.path)}
             >
