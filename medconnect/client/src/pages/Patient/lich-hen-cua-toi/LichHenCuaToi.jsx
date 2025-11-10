@@ -216,6 +216,9 @@ export function LichHenCuaToi() {
             <p className="page-subtitle">
               Quản lý và theo dõi các lịch hẹn khám bệnh
             </p>
+            <p className="page-note">
+              Lưu ý : Bạn chỉ có thể dời lịch trước 24h
+            </p>
           </div>
           {/* Doctor Search Filter */}
           <div className="doctor-search-filter-wrapper">

@@ -87,6 +87,22 @@ $white: #ffffff;
   font-weight: 400;
 }
 
+.page-note {
+  font-size: 0.875rem;
+  color: #dc2626;
+  margin: 0.5rem 0 0 0;
+  line-height: 1.4;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  
+  &::before {
+    content: "⚠️";
+    font-size: 1rem;
+  }
+}
+
 /* Search Filter */
 .doctor-search-filter-wrapper {
   display: flex;

@@ -834,6 +834,14 @@
         margin-top: 4px;
         max-height: 300px;
         overflow-y: auto;
+        
+        // Ẩn thanh trượt
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        
+        &::-webkit-scrollbar {
+          display: none;
+        }
 
         .patient-dropdown-loading {
           display: flex;
@@ -1358,6 +1366,14 @@
 
     .schedule-content {
       overflow-x: auto;
+      
+      // Ẩn thanh trượt
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      
+      &::-webkit-scrollbar {
+        display: none;
+      }
 
       .schedule-grid {
         min-width: 800px;

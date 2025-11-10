@@ -146,6 +146,14 @@
 
   .invoice-table-container {
     overflow-x: auto;
+    
+    // Ẩn thanh trượt
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 
   .invoice-table {
@@ -259,6 +267,14 @@
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    
+    // Ẩn thanh trượt
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    
+    &::-webkit-scrollbar {
+      display: none;
+    }
 
     .modal-header {
       display: flex;

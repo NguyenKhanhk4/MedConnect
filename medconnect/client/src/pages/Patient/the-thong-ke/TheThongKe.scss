@@ -18,19 +18,46 @@
   }
 }
 
-/* Stat Card - Force white background */
+/* Stat Card - Doctor style with #17B0D0 background */
 .stat-card {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
-  border: 2px solid #cbd5e1 !important;
-  border-radius: 0.75rem;
+  background: #17B0D0 !important;
+  background-color: #17B0D0 !important;
+  border: none !important;
+  border-radius: 16px;
   padding: 1.5rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(23, 176, 208, 0.3);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
 
   /* Override any other background styles */
   &[style*="background"] {
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    background-color: #17B0D0 !important;
+    background: #17B0D0 !important;
+  }
+  
+  * {
+    color: #ffffff !important;
+    opacity: 1 !important;
+  }
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
+    pointer-events: none;
+    opacity: 1 !important;
+  }
+  
+  &:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 30px rgba(23, 176, 208, 0.4);
+    background: #17B0D0 !important;
+    background-color: #17B0D0 !important;
   }
 
   &-loading {
@@ -55,21 +82,24 @@
   &-title {
     font-size: 0.875rem;
     font-weight: 600;
-    color: #374151;
+    color: #ffffff !important;
+    opacity: 1 !important;
     margin: 0;
   }
 
   &-value {
     font-size: 2rem;
     font-weight: 700;
-    color: #111827;
+    color: #ffffff !important;
+    opacity: 1 !important;
     margin: 0;
     line-height: 1;
   }
 
   &-description {
     font-size: 0.75rem;
-    color: #6b7280;
+    color: #ffffff !important;
+    opacity: 0.9 !important;
     margin: 0;
   }
 
@@ -91,21 +121,41 @@
 .stat-icon {
   width: 1.25rem;
   height: 1.25rem;
-  /* Color will be set inline from component */
+  color: #ffffff !important;
+  opacity: 1 !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
-/* Force white background for stat cards - highest priority */
+/* Stat card white - use doctor style with #17B0D0 background */
 .stat-card-white {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
+  background: #17B0D0 !important;
+  background-color: #17B0D0 !important;
+  border: none !important;
+  
+  * {
+    color: #ffffff !important;
+    opacity: 1 !important;
+  }
 }
 
 /* Override any teal/blue background - highest specificity */
 .stat-card.stat-card-white,
 .stat-card.stat-card-white.stat-card-loading,
 div.stat-card.stat-card-white {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
+  background: #17B0D0 !important;
+  background-color: #17B0D0 !important;
+  border: none !important;
+  box-shadow: 0 4px 20px rgba(23, 176, 208, 0.3);
+  
+  * {
+    color: #ffffff !important;
+    opacity: 1 !important;
+  }
+  
+  &:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 30px rgba(23, 176, 208, 0.4);
+  }
 }
 
 /* Override any other stat-card styles */
@@ -113,7 +163,13 @@ div.stat-card.stat-card-white {
   &,
   &.stat-card-loading,
   &[class*="stat-card"] {
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    background: #17B0D0 !important;
+    background-color: #17B0D0 !important;
+    border: none !important;
+    
+    * {
+      color: #ffffff !important;
+      opacity: 1 !important;
+    }
   }
 }
