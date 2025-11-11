@@ -257,24 +257,40 @@ export async function getCurrentPatientProfile(req, res) {
       _id: user._id,
       email: user.email,
       fullName: user.fullName,
+      role: user.role,
     });
 
-    // Find patient profile, create if not exists
-    let patient = await Patient.findOne({ userId: appUserId }).lean();
+    // IMPORTANT: Only find/create patient profile if user role is "patient"
+    // Doctors, admins, and managers should NOT have patient profiles
+    let patient = null;
+    
+    if (user.role === "patient") {
+      // Find patient profile, create if not exists (only for patients)
+      patient = await Patient.findOne({ userId: appUserId }).lean();
 
-    if (!patient) {
-      // Create a basic patient profile if it doesn't exist
-      console.log("Creating new patient profile for user:", appUserId);
-      const newPatient = new Patient({
-        userId: appUserId,
-        fullName: user.fullName || "Chưa cập nhật",
-        phone: user.phone || "",
-        isComplete: false,
-      });
+      if (!patient) {
+        // Create a basic patient profile if it doesn't exist
+        console.log("Creating new patient profile for user:", appUserId);
+        const newPatient = new Patient({
+          userId: appUserId,
+          fullName: user.fullName || "Chưa cập nhật",
+          phone: user.phone || "",
+          isComplete: false,
+        });
 
-      await newPatient.save();
-      patient = newPatient.toObject();
-      console.log("Created patient profile:", patient._id);
+        await newPatient.save();
+        patient = newPatient.toObject();
+        console.log("Created patient profile:", patient._id);
+      }
+    } else {
+      // For non-patient users (doctor, admin, manager), check if Patient exists and remove it
+      const existingPatient = await Patient.findOne({ userId: appUserId });
+      if (existingPatient) {
+        console.warn(`⚠️ Patient record found for ${user.role} user ${appUserId}, removing it...`);
+        await Patient.findByIdAndDelete(existingPatient._id);
+        console.log(`✅ Removed Patient record: ${existingPatient._id}`);
+      }
+      console.log(`ℹ️ User ${appUserId} is a ${user.role}, no patient profile needed`);
     }
 
     // Combine user and patient data
