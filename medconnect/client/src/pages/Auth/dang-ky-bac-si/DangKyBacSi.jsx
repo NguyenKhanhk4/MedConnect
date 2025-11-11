@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { registerDoctor, getAllSpecializations } from "../../../lib/api";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./DangKyBacSi.scss";
 
 export default function DangKyBacSi() {
@@ -27,6 +28,12 @@ export default function DangKyBacSi() {
   const [loadingSpecialties, setLoadingSpecialties] = useState(true);
   const [clinics, setClinics] = useState([]);
   const [loadingClinics, setLoadingClinics] = useState(true);
+  const [alertMessage, setAlertMessage] = useState(null);
+
+  // Helper function to show custom alert
+  const showAlert = (message) => {
+    setAlertMessage(message);
+  };
 
   const toE164 = (raw, country = "+84") => {
     const num = String(raw || "").replace(/\D/g, "");
@@ -255,7 +262,7 @@ export default function DangKyBacSi() {
       await registerDoctor(formDataToSend);
 
       // Show success message
-      alert(
+      showAlert(
         "Đăng ký thành công! Vui lòng đợi hệ thống xác nhận tài khoản của bạn. Bạn sẽ nhận được email thông báo khi tài khoản được xác nhận."
       );
 
@@ -615,6 +622,13 @@ export default function DangKyBacSi() {
           </Link>
         </div>
       </div>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        message={alertMessage}
+        onClose={() => setAlertMessage(null)}
+        title="Hệ thống MedConnect"
+      />
     </div>
   );
 }

@@ -26,6 +26,7 @@ import {
   updateAppointmentStatus,
 } from "../../../lib/api";
 import HoaDonDichVu from "../hoa-don-dich-vu/HoaDonDichVu";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./LichHen.scss";
 
 export default function LichHen() {
@@ -49,6 +50,25 @@ export default function LichHen() {
   const [showServiceInvoice, setShowServiceInvoice] = useState(false);
   const [selectedInvoiceAppointment, setSelectedInvoiceAppointment] =
     useState(null);
+  const [alertMessage, setAlertMessage] = useState(null);
+  const [confirmConfig, setConfirmConfig] = useState(null);
+
+  // Helper function to show custom alert
+  const showAlert = (message) => {
+    setAlertMessage(message);
+  };
+
+  // Helper function to show custom confirm
+  const showConfirm = (message, onConfirm) => {
+    setConfirmConfig({
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmConfig(null);
+      },
+      onCancel: () => setConfirmConfig(null),
+    });
+  };
 
   // Filter and sort states
   const [filters, setFilters] = useState({
@@ -295,6 +315,15 @@ export default function LichHen() {
   };
 
   const handleAccept = async (appointment) => {
+    const patientName =
+      appointment.patientId?.fullName ||
+      appointment.patient?.fullName ||
+      "bệnh nhân";
+
+    // Thêm thông báo xác nhận với nút Hủy và Xác nhận
+    showConfirm(
+      `Bạn có chắc chắn muốn chấp nhận lịch hẹn với ${patientName}?`,
+      async () => {
     setUpdatingAppointments((prev) => new Set(prev).add(appointment._id));
     try {
       await updateAppointmentStatus(appointment._id, "accepted");
@@ -306,12 +335,8 @@ export default function LichHen() {
         )
       );
 
-      alert(
-        `Đã chấp nhận lịch hẹn với ${
-          appointment.patientId?.fullName ||
-          appointment.patient?.fullName ||
-          "bệnh nhân"
-        }`
+          showAlert(
+            `Đã chấp nhận lịch hẹn với ${patientName}`
       );
 
       // Refresh appointments list để đảm bảo đồng bộ
@@ -331,7 +356,7 @@ export default function LichHen() {
         }
       }, 1000);
     } catch (error) {
-      alert("Có lỗi xảy ra khi chấp nhận lịch hẹn: " + error.message);
+          showAlert("Có lỗi xảy ra khi chấp nhận lịch hẹn: " + error.message);
     } finally {
       setUpdatingAppointments((prev) => {
         const newSet = new Set(prev);
@@ -339,6 +364,8 @@ export default function LichHen() {
         return newSet;
       });
     }
+      }
+    );
   };
 
   const handleViewDetails = (appointment) => {
@@ -369,7 +396,7 @@ export default function LichHen() {
           )
         );
 
-        alert(
+        showAlert(
           `Đã từ chối lịch hẹn với ${
             selectedAppointment.patientId?.fullName ||
             selectedAppointment.patient?.fullName ||
@@ -397,7 +424,7 @@ export default function LichHen() {
           }
         }, 1000);
       } catch (error) {
-        alert("Có lỗi xảy ra khi từ chối lịch hẹn: " + error.message);
+        showAlert("Có lỗi xảy ra khi từ chối lịch hẹn: " + error.message);
       }
     }
   };
@@ -409,15 +436,21 @@ export default function LichHen() {
       "bệnh nhân";
 
     // Thêm thông báo xác nhận
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn bắt đầu khám cho ${patientName}?`
-    );
-
-    if (!confirmed) {
-      return; // Nếu người dùng không xác nhận, không thực hiện hành động
-    }
-
+    showConfirm(
+      `Bạn có chắc chắn muốn bắt đầu khám cho ${patientName}?`,
+      async () => {
     try {
+      // Đối với appointments ở trạng thái pending_doctor (cả online và offline), tự động accept trước khi bắt đầu khám
+      if (appointment.status === "pending_doctor") {
+        await updateAppointmentStatus(appointment._id, "accepted");
+        // Cập nhật trạng thái trong UI
+        setAppointments((prevAppointments) =>
+          prevAppointments.map((apt) =>
+            apt._id === appointment._id ? { ...apt, status: "accepted" } : apt
+          )
+        );
+      }
+
       await updateAppointmentStatus(appointment._id, "in_progress");
 
       // Cập nhật trạng thái ngay lập tức trong UI
@@ -427,7 +460,7 @@ export default function LichHen() {
         )
       );
 
-      alert(`Đã bắt đầu khám cho ${patientName}`);
+      showAlert(`Đã bắt đầu khám cho ${patientName}`);
 
       // Refresh appointments list để đảm bảo đồng bộ
       setTimeout(async () => {
@@ -446,8 +479,10 @@ export default function LichHen() {
         }
       }, 1000);
     } catch (error) {
-      alert("Có lỗi xảy ra khi bắt đầu khám: " + error.message);
+          showAlert("Có lỗi xảy ra khi bắt đầu khám: " + error.message);
     }
+      }
+    );
   };
 
   const handleComplete = (appointment) => {
@@ -457,14 +492,9 @@ export default function LichHen() {
       "bệnh nhân";
 
     // Thêm thông báo xác nhận
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn lưu hồ sơ cho ${patientName}?`
-    );
-
-    if (!confirmed) {
-      return; // Nếu người dùng không xác nhận, không thực hiện hành động
-    }
-
+    showConfirm(
+      `Bạn có chắc chắn muốn lưu hồ sơ cho ${patientName}?`,
+      () => {
     console.log("🔍 handleComplete called with appointment:", appointment);
     console.log("🔍 Appointment ID:", appointment?._id);
     console.log("🔍 Appointment mode:", appointment?.mode);
@@ -473,7 +503,7 @@ export default function LichHen() {
 
     // Validate appointment data
     if (!appointment?._id) {
-      alert("Lỗi: Không tìm thấy ID của lịch hẹn");
+      showAlert("Lỗi: Không tìm thấy ID của lịch hẹn");
       return;
     }
 
@@ -499,8 +529,10 @@ export default function LichHen() {
       );
       navigate(`/bac-si/tu-van-truc-tuyen/${appointment._id}`);
     } else {
-      alert("Lỗi: Không xác định được loại khám (online/offline)");
+      showAlert("Lỗi: Không xác định được loại khám (online/offline)");
     }
+      }
+    );
   };
 
   const handleNoService = async (appointment) => {
@@ -510,14 +542,9 @@ export default function LichHen() {
       "bệnh nhân";
 
     // Thêm thông báo xác nhận
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn hoàn thành khám cho ${patientName} mà không có dịch vụ?`
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
+    showConfirm(
+      `Bạn có chắc chắn muốn hoàn thành khám cho ${patientName} mà không có dịch vụ?`,
+      async () => {
     setUpdatingAppointments((prev) => new Set(prev).add(appointment._id));
     try {
       await updateAppointmentStatus(appointment._id, "done");
@@ -529,10 +556,10 @@ export default function LichHen() {
         )
       );
 
-      alert(`Đã hoàn thành khám cho ${patientName}`);
+      showAlert(`Đã hoàn thành khám cho ${patientName}`);
     } catch (error) {
       console.error("Error updating appointment status:", error);
-      alert("Có lỗi xảy ra khi cập nhật trạng thái: " + error.message);
+      showAlert("Có lỗi xảy ra khi cập nhật trạng thái: " + error.message);
     } finally {
       setUpdatingAppointments((prev) => {
         const next = new Set(prev);
@@ -540,6 +567,8 @@ export default function LichHen() {
         return next;
       });
     }
+      }
+    );
   };
 
   const handleNoShow = async (appointment) => {
@@ -549,14 +578,9 @@ export default function LichHen() {
       "bệnh nhân";
 
     // Thêm thông báo xác nhận
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn đánh dấu ${patientName} là không đến khám?`
-    );
-
-    if (!confirmed) {
-      return; // Nếu người dùng không xác nhận, không thực hiện hành động
-    }
-
+    showConfirm(
+      `Bạn có chắc chắn muốn đánh dấu ${patientName} là không đến khám?`,
+      async () => {
     try {
       await updateAppointmentStatus(
         appointment._id,
@@ -571,7 +595,7 @@ export default function LichHen() {
         )
       );
 
-      alert(`Đã đánh dấu ${patientName} là không đến khám`);
+      showAlert(`Đã đánh dấu ${patientName} là không đến khám`);
 
       // Refresh appointments list để đảm bảo đồng bộ
       setTimeout(async () => {
@@ -590,26 +614,27 @@ export default function LichHen() {
         }
       }, 1000);
     } catch (error) {
-      alert("Có lỗi xảy ra khi đánh dấu không đến khám: " + error.message);
+          showAlert("Có lỗi xảy ra khi đánh dấu không đến khám: " + error.message);
     }
+      }
+    );
   };
 
-  // Accept all pending appointments
+  // Accept all pending appointments (cả online và offline)
   const handleAcceptAll = async () => {
+    // Lấy tất cả appointments đang chờ xác nhận (cả online và offline)
     const pendingAppointments = appointments.filter(
       (apt) => apt.status === "pending_doctor"
     );
 
     if (pendingAppointments.length === 0) {
-      alert("Không có lịch hẹn nào đang chờ xác nhận");
+      showAlert("Không có lịch hẹn nào đang chờ xác nhận");
       return;
     }
 
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn chấp nhận tất cả ${pendingAppointments.length} lịch hẹn đang chờ xác nhận?`
-    );
-    if (!confirmed) return;
-
+    showConfirm(
+      `Bạn có chắc chắn muốn chấp nhận tất cả ${pendingAppointments.length} lịch hẹn đang chờ xác nhận?`,
+      async () => {
     try {
       // Add all pending appointment IDs to updating set
       setUpdatingAppointments(
@@ -631,7 +656,7 @@ export default function LichHen() {
         )
       );
 
-      alert(`Đã chấp nhận ${pendingAppointments.length} lịch hẹn`);
+      showAlert(`Đã chấp nhận ${pendingAppointments.length} lịch hẹn`);
 
       // Refresh appointments list
       setTimeout(async () => {
@@ -650,7 +675,7 @@ export default function LichHen() {
         }
       }, 1000);
     } catch (error) {
-      alert("Có lỗi xảy ra khi chấp nhận toàn bộ lịch hẹn: " + error.message);
+          showAlert("Có lỗi xảy ra khi chấp nhận toàn bộ lịch hẹn: " + error.message);
     } finally {
       // Clear updating state
       setUpdatingAppointments((prev) => {
@@ -659,6 +684,8 @@ export default function LichHen() {
         return newSet;
       });
     }
+      }
+    );
   };
 
   const handleViewRescheduleInfo = (appointment) => {
@@ -673,7 +700,7 @@ export default function LichHen() {
     let originalAppointment = null;
 
     if (!appointment.rescheduledFromId) {
-      alert("Không tìm thấy thông tin lịch cũ (rescheduledFromId không có)");
+      showAlert("Không tìm thấy thông tin lịch cũ (rescheduledFromId không có)");
       return;
     }
 
@@ -704,7 +731,7 @@ export default function LichHen() {
         if (typeof appointment.rescheduledFromId === "object") {
           originalAppointment = appointment.rescheduledFromId;
         } else {
-          alert(
+          showAlert(
             "Không tìm thấy thông tin lịch cũ. Lịch cũ có thể đã bị lọc bỏ do trạng thái 'rescheduled'."
           );
           return;
@@ -719,7 +746,7 @@ export default function LichHen() {
       });
       setIsRescheduleInfoOpen(true);
     } else {
-      alert("Không tìm thấy thông tin lịch cũ");
+      showAlert("Không tìm thấy thông tin lịch cũ");
     }
   };
 
@@ -926,8 +953,17 @@ export default function LichHen() {
                           apt.patientId.relationshipToOwner !== "self" && (
                             <div style={{ marginTop: "8px" }}>
                               <Badge
-                                className="!bg-blue-100 !text-blue-700 !border-blue-300 cursor-pointer"
-                                style={{ marginBottom: 4 }}
+                                className="cursor-pointer"
+                                style={{ 
+                                  marginBottom: 4,
+                                  backgroundColor: "#3b82f6",
+                                  color: "#ffffff",
+                                  borderColor: "#2563eb",
+                                  fontWeight: 600,
+                                  fontSize: "13px",
+                                  padding: "4px 12px",
+                                  borderRadius: "6px"
+                                }}
                                 onClick={() =>
                                   handleViewRepresentativeInfo(apt)
                                 }
@@ -996,25 +1032,28 @@ export default function LichHen() {
                     </td>
                     <td className="appointment-list-td appointment-list-actions">
                       <div className="appointment-list-action-buttons">
+                        {/* Cả online và offline: Bỏ qua bước xác nhận, vào thẳng bắt đầu khám/không đến khám */}
                         {apt.status === "pending_doctor" && (
                           <>
                             <Button
                               size="sm"
-                              className="appointment-list-accept-btn"
-                              onClick={() => handleAccept(apt)}
+                              variant="secondary"
+                              onClick={() => handleStart(apt)}
                               disabled={updatingAppointments.has(apt._id)}
                             >
                               {updatingAppointments.has(apt._id)
                                 ? "Đang xử lý..."
-                                : "Chấp nhận"}
+                                : "Bắt đầu khám"}
                             </Button>
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => handleReject(apt)}
+                              onClick={() => handleNoShow(apt)}
                               disabled={updatingAppointments.has(apt._id)}
                             >
-                              Từ chối
+                              {updatingAppointments.has(apt._id)
+                                ? "Đang xử lý..."
+                                : "Không đến khám"}
                             </Button>
                           </>
                         )}
@@ -1227,27 +1266,28 @@ export default function LichHen() {
                   <div className="appointment-detail-actions">
                     <h4>Thay đổi trạng thái</h4>
                     <div className="appointment-status-buttons">
+                      {/* Cả online và offline: Bỏ qua bước xác nhận, vào thẳng bắt đầu khám/không đến khám */}
                       {selectedAppointment.status === "pending_doctor" && (
                         <>
                           <Button
                             size="sm"
-                            className="appointment-list-accept-btn"
+                            variant="secondary"
                             onClick={() => {
-                              handleAccept(selectedAppointment);
+                              handleStart(selectedAppointment);
                               setIsDetailDialogOpen(false);
                             }}
                           >
-                            Chấp nhận
+                            Bắt đầu khám
                           </Button>
                           <Button
                             size="sm"
                             variant="destructive"
                             onClick={() => {
-                              handleReject(selectedAppointment);
+                              handleNoShow(selectedAppointment);
                               setIsDetailDialogOpen(false);
                             }}
                           >
-                            Từ chối
+                            Không đến khám
                           </Button>
                         </>
                       )}
@@ -1256,27 +1296,22 @@ export default function LichHen() {
                           <Button
                             size="sm"
                             variant="secondary"
-                            onClick={async () => {
+                            onClick={() => {
                               const patientName =
                                 selectedAppointment.patientId?.fullName ||
                                 selectedAppointment.patient?.fullName ||
                                 "bệnh nhân";
 
                               // Thêm thông báo xác nhận
-                              const confirmed = window.confirm(
-                                `Bạn có chắc chắn muốn bắt đầu khám cho ${patientName}?`
-                              );
-
-                              if (!confirmed) {
-                                return; // Nếu người dùng không xác nhận, không thực hiện hành động
-                              }
-
+                              showConfirm(
+                                `Bạn có chắc chắn muốn bắt đầu khám cho ${patientName}?`,
+                                async () => {
                               try {
                                 await updateAppointmentStatus(
                                   selectedAppointment._id,
                                   "in_progress"
                                 );
-                                alert(`Đã bắt đầu khám cho ${patientName}`);
+                                    showAlert(`Đã bắt đầu khám cho ${patientName}`);
                                 setIsDetailDialogOpen(false);
                                 // Refresh appointments
                                 const updatedAppointments =
@@ -1292,8 +1327,10 @@ export default function LichHen() {
                                   );
                                 }
                               } catch (error) {
-                                alert("Có lỗi xảy ra: " + error.message);
+                                    showAlert("Có lỗi xảy ra: " + error.message);
                               }
+                                }
+                              );
                             }}
                           >
                             Bắt đầu khám
@@ -1301,28 +1338,23 @@ export default function LichHen() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={async () => {
+                            onClick={() => {
                               const patientName =
                                 selectedAppointment.patientId?.fullName ||
                                 selectedAppointment.patient?.fullName ||
                                 "bệnh nhân";
 
                               // Thêm thông báo xác nhận
-                              const confirmed = window.confirm(
-                                `Bạn có chắc chắn muốn đánh dấu ${patientName} là không đến khám?`
-                              );
-
-                              if (!confirmed) {
-                                return; // Nếu người dùng không xác nhận, không thực hiện hành động
-                              }
-
+                              showConfirm(
+                                `Bạn có chắc chắn muốn đánh dấu ${patientName} là không đến khám?`,
+                                async () => {
                               try {
                                 await updateAppointmentStatus(
                                   selectedAppointment._id,
                                   "no_show",
                                   "Bệnh nhân không đến khám"
                                 );
-                                alert(
+                                    showAlert(
                                   `Đã đánh dấu ${patientName} là không đến khám`
                                 );
                                 setIsDetailDialogOpen(false);
@@ -1340,8 +1372,10 @@ export default function LichHen() {
                                   );
                                 }
                               } catch (error) {
-                                alert("Có lỗi xảy ra: " + error.message);
+                                    showAlert("Có lỗi xảy ra: " + error.message);
                               }
+                                }
+                              );
                             }}
                           >
                             Không đến khám
@@ -1674,6 +1708,24 @@ export default function LichHen() {
             setShowServiceInvoice(false);
             setSelectedInvoiceAppointment(null);
           }}
+        />
+      )}
+
+      {/* Custom Alert */}
+      <CustomAlert
+        message={alertMessage}
+        onClose={() => setAlertMessage(null)}
+        title="Hệ thống MedConnect"
+      />
+
+      {/* Custom Confirm */}
+      {confirmConfig && (
+        <CustomAlert
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onClose={confirmConfig.onCancel}
+          title="Hệ thống MedConnect"
+          type="confirm"
         />
       )}
     </Card>

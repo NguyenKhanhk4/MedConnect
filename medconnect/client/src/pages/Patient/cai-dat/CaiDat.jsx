@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { User, Lock, CreditCard, Upload, Eye, EyeOff } from "lucide-react";
+import { User, Lock, Upload, Eye, EyeOff } from "lucide-react";
 import { useUserProfile } from "../../../hooks/useUserProfile";
 import { updateCurrentPatientProfile, changePassword } from "../../../lib/api";
 import {
@@ -23,6 +23,7 @@ import {
   validateTextLength,
 } from "../../../utils/validationUtils";
 import { resizeImage, validateImageFile } from "../../../utils/imageUtils";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./CaiDat.scss";
 
 export function CaiDat() {
@@ -76,6 +77,12 @@ export function CaiDat() {
     new: false,
     confirm: false,
   });
+  const [alertMessage, setAlertMessage] = useState(null);
+
+  // Helper function to show custom alert
+  const showAlert = (message) => {
+    setAlertMessage(message);
+  };
 
   const togglePasswordVisibility = (field) => {
     setPasswordVisibility((prev) => ({
@@ -96,7 +103,6 @@ export function CaiDat() {
   const tabs = [
     { id: "profile", label: "Hồ sơ", icon: User },
     { id: "security", label: "Bảo mật", icon: Lock },
-    { id: "payment", label: "Thanh toán", icon: CreditCard },
   ];
 
   const validateField = (field, value) => {
@@ -348,7 +354,7 @@ export function CaiDat() {
       // Validate form data
       const validationErrors = validateForm();
       if (Object.keys(validationErrors).length > 0) {
-        alert(
+        showAlert(
           "Vui lòng kiểm tra lại thông tin:\n" +
             Object.values(validationErrors).join("\n")
         );
@@ -396,10 +402,10 @@ export function CaiDat() {
       await refreshProfile();
 
       // Show success message
-      alert("Cập nhật thông tin thành công!");
+      showAlert("Cập nhật thông tin thành công!");
     } catch (error) {
       console.error("Error saving profile:", error);
-      alert("Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.");
+      showAlert("Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.");
     } finally {
       setIsSaving(false);
     }
@@ -467,7 +473,7 @@ export function CaiDat() {
           confirmPassword: null,
         }));
 
-        alert("Đổi mật khẩu thành công!");
+        showAlert("Đổi mật khẩu thành công!");
       } catch (error) {
         // Handle API errors
         if (error.status === 400 && error.response?.message) {
@@ -484,10 +490,10 @@ export function CaiDat() {
               newPassword: "Mật khẩu mới phải khác mật khẩu hiện tại",
             });
           } else {
-            alert(errorMessage || "Có lỗi xảy ra khi đổi mật khẩu");
+            showAlert(errorMessage || "Có lỗi xảy ra khi đổi mật khẩu");
           }
         } else {
-          alert(
+          showAlert(
             error.response?.message ||
               error.message ||
               "Có lỗi xảy ra khi đổi mật khẩu. Vui lòng thử lại."
@@ -511,7 +517,7 @@ export function CaiDat() {
     // Validate image file
     const validation = validateImageFile(file);
     if (!validation.isValid) {
-      alert(validation.error);
+      showAlert(validation.error);
       return;
     }
 
@@ -529,10 +535,10 @@ export function CaiDat() {
       // Dispatch custom event to update sidebar/header if needed
       window.dispatchEvent(new CustomEvent("avatarUpdated"));
 
-      alert("Cập nhật ảnh đại diện thành công!");
+      showAlert("Cập nhật ảnh đại diện thành công!");
     } catch (error) {
       console.error("Error updating avatar:", error);
-      alert("Có lỗi xảy ra khi cập nhật ảnh đại diện");
+      showAlert("Có lỗi xảy ra khi cập nhật ảnh đại diện");
     } finally {
       setUploadingAvatar(false);
       // Reset file input
@@ -1058,49 +1064,14 @@ export function CaiDat() {
           </div>
         )}
 
-        {activeTab === "payment" && (
-          <div className="payment-section">
-            <div className="section-header">
-              <h2 className="section-title">Thông tin thanh toán</h2>
-              <p className="section-subtitle">
-                Quản lý phương thức thanh toán và hóa đơn
-              </p>
-            </div>
-
-            <div className="payment-settings">
-              <div className="payment-item">
-                <div className="payment-info">
-                  <h3 className="payment-title">Phương thức thanh toán</h3>
-                  <p className="payment-description">
-                    Quản lý thẻ tín dụng, ví điện tử
-                  </p>
-                </div>
-                <button className="payment-button">Quản lý</button>
-              </div>
-
-              <div className="payment-item">
-                <div className="payment-info">
-                  <h3 className="payment-title">Lịch sử thanh toán</h3>
-                  <p className="payment-description">
-                    Xem tất cả giao dịch và hóa đơn
-                  </p>
-                </div>
-                <button className="payment-button">Xem lịch sử</button>
-              </div>
-
-              <div className="payment-item">
-                <div className="payment-info">
-                  <h3 className="payment-title">Hóa đơn điện tử</h3>
-                  <p className="payment-description">
-                    Tải xuống hóa đơn và biên lai
-                  </p>
-                </div>
-                <button className="payment-button">Tải xuống</button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        message={alertMessage}
+        onClose={() => setAlertMessage(null)}
+        title="Hệ thống MedConnect"
+      />
     </div>
   );
 }

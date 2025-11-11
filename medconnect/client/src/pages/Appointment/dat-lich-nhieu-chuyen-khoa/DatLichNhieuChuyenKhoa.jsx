@@ -41,6 +41,7 @@ import {
 } from "@ant-design/icons";
 import NavigationBreadcrumb from "../../../components/Breadcrumb/NavigationBreadcrumb";
 import { api } from "../../../lib/api";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./DatLichNhieuChuyenKhoa.css";
 
 const { Title, Text, Paragraph } = Typography;
@@ -54,6 +55,19 @@ const DatLichNhieuChuyenKhoa = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [visitDate, setVisitDate] = useState(null);
   const [visitId, setVisitId] = useState(null); // Will be set when visit is created
+  const [confirmConfig, setConfirmConfig] = useState(null);
+
+  // Helper function to show custom confirm
+  const showConfirm = (message, onConfirm) => {
+    setConfirmConfig({
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmConfig(null);
+      },
+      onCancel: () => setConfirmConfig(null),
+    });
+  };
   const [selectedSpecializations, setSelectedSpecializations] = useState([]);
   const [specializations, setSpecializations] = useState([]);
   const [appointments, setAppointments] = useState([]); // Local appointments, not saved to DB yet
@@ -972,12 +986,9 @@ const DatLichNhieuChuyenKhoa = () => {
   ];
 
   const handleCancelAppointment = async (appointmentId) => {
-    Modal.confirm({
-      title: "Xác nhận hủy lịch hẹn",
-      content: "Bạn có chắc chắn muốn hủy lịch hẹn này?",
-      okText: "Hủy lịch",
-      cancelText: "Không",
-      onOk: async () => {
+    showConfirm(
+      "Bạn có chắc chắn muốn hủy lịch hẹn này?",
+      async () => {
         try {
           const response = await api.post(
             "/api/medical-visits/cancel-appointment",
@@ -993,8 +1004,8 @@ const DatLichNhieuChuyenKhoa = () => {
         } catch (error) {
           message.error("Không thể hủy lịch hẹn");
         }
-      },
-    });
+      }
+    );
   };
 
   return (
@@ -2423,6 +2434,17 @@ const DatLichNhieuChuyenKhoa = () => {
           )}
         </Modal>
       </div>
+
+      {/* Custom Confirm */}
+      {confirmConfig && (
+        <CustomAlert
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onClose={confirmConfig.onCancel}
+          title="Hệ thống MedConnect"
+          type="confirm"
+        />
+      )}
     </div>
   );
 };

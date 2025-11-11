@@ -1,91 +1,77 @@
-import React, { useState, useEffect } from "react";
-import { api } from "../../../lib/api";
+import { useState, useEffect, useCallback } from "react";
+import { getPatientPayments } from "../../../lib/api";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { FileText, Search, Calendar, Download } from "lucide-react";
 import { CustomAlert } from "../../../components/ui/CustomAlert";
-import "./QuanLyHoaDon.scss";
+import "./ThanhToan.scss";
 
-export default function QuanLyHoaDon() {
+export default function ThanhToan() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all"); // all, booking, service
-  const [statusFilter, setStatusFilter] = useState("all"); // all, captured, failed, etc.
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [alertMessage, setAlertMessage] = useState(null);
-  const [confirmConfig, setConfirmConfig] = useState(null);
 
   // Helper function to show custom alert
   const showAlert = (message) => {
     setAlertMessage(message);
   };
 
-  // Helper function to show custom confirm
-  const showConfirm = (message, onConfirm) => {
-    setConfirmConfig({
-      message,
-      onConfirm: () => {
-        onConfirm();
-        setConfirmConfig(null);
-      },
-      onCancel: () => setConfirmConfig(null),
-    });
-  };
-
-  useEffect(() => {
-    loadInvoices();
-  }, [activeTab, statusFilter, page, startDate, endDate]);
-
-  const loadInvoices = async () => {
+  const loadInvoices = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
+      const params = {};
 
       // Set invoiceType based on active tab
       if (activeTab === "booking") {
-        params.append("invoiceType", "booking");
+        params.invoiceType = "booking";
       } else if (activeTab === "service") {
-        params.append("invoiceType", "service");
+        params.invoiceType = "service";
       }
       // "all" tab doesn't filter by invoiceType
 
-      if (statusFilter !== "all") {
-        params.append("status", statusFilter);
-      }
-
       if (startDate) {
-        params.append("startDate", startDate);
+        params.startDate = startDate;
       }
 
       if (endDate) {
-        params.append("endDate", endDate);
+        params.endDate = endDate;
       }
 
-      params.append("page", page.toString());
-      params.append("limit", "20");
+      params.page = page.toString();
+      params.limit = "20";
 
-      const response = await api.get(
-        `/api/managers/invoices?${params.toString()}`
-      );
+      const response = await getPatientPayments(params);
 
-      if (response.success) {
-        setInvoices(response.data.invoices || []);
-        setTotalPages(response.data.pagination?.pages || 1);
+      // Handle different response structures
+      if (response.success !== false) {
+        // Response from ok() helper: { success: true, data: { invoices, pagination } }
+        // or direct: { invoices, pagination }
+        const invoices = response.data?.invoices || response.invoices || [];
+        const pagination = response.data?.pagination || response.pagination || {};
+        
+        setInvoices(invoices);
+        setTotalPages(pagination.pages || 1);
       } else {
         console.error("Failed to load invoices:", response.message);
-        showAlert("Không thể tải danh sách hóa đơn");
+        showAlert("Không thể tải danh sách thanh toán");
       }
     } catch (error) {
       console.error("Error loading invoices:", error);
-      showAlert("Có lỗi xảy ra khi tải danh sách hóa đơn");
+      showAlert("Có lỗi xảy ra khi tải danh sách thanh toán");
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, page, startDate, endDate]);
+
+  useEffect(() => {
+    loadInvoices();
+  }, [loadInvoices]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -106,23 +92,14 @@ export default function QuanLyHoaDon() {
     });
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      captured: "bg-green-500 text-white",
-      initiated: "bg-yellow-500 text-white",
-      failed: "bg-red-500 text-white",
-      refunded: "bg-gray-500 text-white",
-      cancelled: "bg-gray-400 text-white",
-    };
-    return colors[status] || "bg-gray-300 text-gray-800";
-  };
-
   const getStatusText = (status) => {
     const texts = {
       pending_manager: "Yêu cầu thanh toán",
       captured: "Đã thanh toán",
       initiated: "Đang xử lý",
-      
+      failed: "Thất bại",
+      refunded: "Đã hoàn tiền",
+      cancelled: "Đã hủy",
     };
     return texts[status] || status;
   };
@@ -160,13 +137,13 @@ export default function QuanLyHoaDon() {
       : "Chưa thanh toán";
     const patientDob = invoice.patientDateOfBirth
       ? formatDateOnlyForDoc(invoice.patientDateOfBirth)
-      : "Không";
+      : "N/A";
     const genderText =
       invoice.patientGender === "male"
         ? "Nam"
         : invoice.patientGender === "female"
         ? "Nữ"
-        : invoice.patientGender || "Không";
+        : invoice.patientGender || "N/A";
 
     const itemsRows =
       invoice.items
@@ -433,9 +410,7 @@ export default function QuanLyHoaDon() {
           <h2>Tổng thanh toán</h2>
           <div class="info-row total-row">
             <span class="total-label">Tổng cộng:</span>
-            <span class="total-value">${formatCurrency(
-              invoice.total || 0
-            )}</span>
+            <span class="total-value">${formatCurrency(invoice.total || 0)}</span>
           </div>
           ${
             invoice.discount > 0
@@ -481,33 +456,6 @@ export default function QuanLyHoaDon() {
     }
   };
 
-  const handleDeleteInvoice = async (invoice) => {
-    // Xác nhận trước khi xóa
-    const confirmMessage = `Bạn có chắc chắn muốn xóa hóa đơn "${invoice.invoiceNumber}"?\n\nLưu ý: Chỉ có thể xóa hóa đơn chưa thanh toán hoặc đã hủy.`;
-
-    showConfirm(confirmMessage, async () => {
-      try {
-        const response = await api.delete(
-          `/api/managers/invoices/${invoice._id}`
-        );
-
-        if (response.success) {
-          showAlert("Xóa hóa đơn thành công");
-          // Reload danh sách hóa đơn
-          loadInvoices();
-        } else {
-          showAlert(response.message || "Có lỗi khi xóa hóa đơn");
-        }
-      } catch (error) {
-        console.error("Error deleting invoice:", error);
-        const errorMessage =
-          error.response?.data?.message ||
-          "Có lỗi khi xóa hóa đơn. Vui lòng thử lại.";
-        showAlert(errorMessage);
-      }
-    });
-  };
-
   const filteredInvoices = invoices.filter((invoice) => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
@@ -525,11 +473,8 @@ export default function QuanLyHoaDon() {
         <div className="header-left">
           <h1>
             <FileText className="icon" />
-            Quản lý hóa đơn
+            Thanh toán
           </h1>
-        </div>
-        <div className="header-right">
-          {/* Add action buttons here if needed */}
         </div>
       </div>
 
@@ -540,7 +485,7 @@ export default function QuanLyHoaDon() {
             <Search className="w-4 h-4" />
             <Input
               type="text"
-              placeholder="Tìm theo mã hóa đơn, tên bệnh nhân, bác sĩ..."
+              placeholder="Tìm theo mã hóa đơn, tên bác sĩ..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
@@ -568,22 +513,6 @@ export default function QuanLyHoaDon() {
               }}
               className="date-input"
             />
-          </div>
-
-          <div className="filter-item">
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
-              className="status-select"
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="captured">Đã thanh toán</option>
-              <option value="initiated">Đang xử lý</option>
-              
-            </select>
           </div>
         </div>
       </div>
@@ -628,6 +557,7 @@ export default function QuanLyHoaDon() {
             formatDate={formatDate}
             getInvoiceTypeText={getInvoiceTypeText}
             handleDownloadInvoice={handleDownloadInvoice}
+            getStatusText={getStatusText}
           />
         </div>
       </div>
@@ -661,17 +591,6 @@ export default function QuanLyHoaDon() {
         onClose={() => setAlertMessage(null)}
         title="Hệ thống MedConnect"
       />
-
-      {/* Custom Confirm */}
-      {confirmConfig && (
-        <CustomAlert
-          message={confirmConfig.message}
-          onConfirm={confirmConfig.onConfirm}
-          onClose={confirmConfig.onCancel}
-          title="Hệ thống MedConnect"
-          type="confirm"
-        />
-      )}
     </div>
   );
 }
@@ -683,11 +602,12 @@ function InvoiceTable({
   formatDate,
   getInvoiceTypeText,
   handleDownloadInvoice,
+  getStatusText,
 }) {
   if (loading) {
     return (
       <div className="loading-state">
-        <p>Đang tải danh sách hóa đơn...</p>
+        <p>Đang tải danh sách thanh toán...</p>
       </div>
     );
   }
@@ -708,10 +628,10 @@ function InvoiceTable({
           <tr>
             <th>Mã hóa đơn</th>
             <th>Loại</th>
-            <th>Bệnh nhân</th>
             <th>Bác sĩ</th>
             <th>Ngày tạo</th>
             <th>Tổng tiền</th>
+            <th>Trạng thái</th>
             <th>Chi tiết</th>
           </tr>
         </thead>
@@ -724,15 +644,19 @@ function InvoiceTable({
                   {getInvoiceTypeText(invoice.invoiceType)}
                 </span>
               </td>
-              <td>{invoice.patientName}</td>
               <td>{invoice.doctorName}</td>
               <td>{formatDate(invoice.createdAt)}</td>
               <td className="amount-cell">{formatCurrency(invoice.total)}</td>
               <td>
+                <span className={`status-badge ${invoice.status}`}>
+                  {getStatusText(invoice.status)}
+                </span>
+              </td>
+              <td>
                 <div
                   style={{ display: "flex", gap: "8px", alignItems: "center" }}
                 >
-                  <InvoiceDetailModal invoice={invoice} />
+                  <InvoiceDetailModal invoice={invoice} getStatusText={getStatusText} />
                   <Button
                     size="sm"
                     variant="outline"
@@ -751,7 +675,7 @@ function InvoiceTable({
   );
 }
 
-function InvoiceDetailModal({ invoice }) {
+function InvoiceDetailModal({ invoice, getStatusText }) {
   const [showModal, setShowModal] = useState(false);
 
   const formatCurrency = (amount) => {
@@ -781,20 +705,6 @@ function InvoiceDetailModal({ invoice }) {
       month: "2-digit",
       day: "2-digit",
     });
-  };
-
-  const getStatusText = (status) => {
-    const texts = {
-      pending_manager: "Yêu cầu thanh toán",
-      captured: "Đã thanh toán",
-      initiated: "Đang xử lý",
-      authorized: "Đã ủy quyền",
-      failed: "Thất bại",
-      refunded: "Đã hoàn tiền",
-      voided: "Đã hủy",
-      cancelled: "Đã hủy",
-    };
-    return texts[status] || status;
   };
 
   return (
@@ -951,3 +861,4 @@ function InvoiceDetailModal({ invoice }) {
     </>
   );
 }
+

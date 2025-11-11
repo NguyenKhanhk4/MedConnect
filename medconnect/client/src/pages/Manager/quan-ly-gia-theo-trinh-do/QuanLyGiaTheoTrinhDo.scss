@@ -4,29 +4,50 @@
   min-height: 100vh;
 
   .page-header {
+    margin: 0 !important;
+    margin-top: -24px !important;
+    margin-bottom: 1.5rem !important;
+    margin-left: -24px !important;
+    margin-right: -24px !important;
+    padding: 1.5rem 24px !important;
+    width: calc(100% + 48px) !important;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    gap: 32px;
+    background: linear-gradient(135deg, #e0f7f9 0%, #fff4e6 100%) !important;
+    border-radius: 12px !important;
+    border: none !important;
+    border-bottom: 2px solid #f3f4f6 !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    z-index: 1 !important;
+    box-shadow: none !important;
 
     h1 {
-      margin: 0;
-      font-size: 24px;
-      font-weight: 600;
-      color: #262626;
+      margin: 0 !important;
+      font-size: 2rem !important;
+      font-weight: 800 !important;
+      margin-bottom: 0.25rem !important;
+      letter-spacing: -0.03em !important;
+      background: linear-gradient(135deg, #4db8c4 0%, #3a9ba8 100%) !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      background-clip: text !important;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 0.5rem;
+      line-height: 1.2 !important;
 
       .anticon {
-        color: #1890ff;
+        color: #4db8c4 !important;
       }
     }
 
     p {
-      margin: 4px 0 0 0;
-      color: #8c8c8c;
-      font-size: 14px;
+      margin: 0 !important;
+      color: #6b7280 !important;
+      font-size: 1rem !important;
     }
   }
 

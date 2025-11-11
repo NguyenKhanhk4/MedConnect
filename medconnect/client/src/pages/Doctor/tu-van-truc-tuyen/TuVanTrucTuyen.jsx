@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { getDoctorAppointmentsWithFallback } from "../../../lib/api";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./TuVanTrucTuyen.scss";
 
 export default function TuVanTrucTuyen() {
@@ -20,6 +21,25 @@ export default function TuVanTrucTuyen() {
     diagnoses: [{ name: "" }],
     medications: [{ name: "", instruction: "", quantity: "" }],
   });
+  const [alertMessage, setAlertMessage] = useState(null);
+  const [confirmConfig, setConfirmConfig] = useState(null);
+
+  // Helper function to show custom alert
+  const showAlert = (message) => {
+    setAlertMessage(message);
+  };
+
+  // Helper function to show custom confirm
+  const showConfirm = (message, onConfirm) => {
+    setConfirmConfig({
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmConfig(null);
+      },
+      onCancel: () => setConfirmConfig(null),
+    });
+  };
 
   useEffect(() => {
     const fetchAppointment = async () => {
@@ -33,14 +53,14 @@ export default function TuVanTrucTuyen() {
           if (found) {
             setAppointment(found);
           } else {
-            alert("Không tìm thấy lịch hẹn");
-            navigate("/bac-si/lich-hen");
+            showAlert("Không tìm thấy lịch hẹn");
+            setTimeout(() => navigate("/bac-si/lich-hen"), 1000);
           }
         }
       } catch (error) {
         console.error("Error fetching appointment:", error);
-        alert("Có lỗi xảy ra khi tải dữ liệu");
-        navigate("/bac-si/lich-hen");
+        showAlert("Có lỗi xảy ra khi tải dữ liệu");
+        setTimeout(() => navigate("/bac-si/lich-hen"), 1000);
       } finally {
         setLoading(false);
       }
@@ -92,14 +112,14 @@ export default function TuVanTrucTuyen() {
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
     if (!allowedTypes.includes(file.type)) {
-      alert("Chỉ được upload file ảnh (JPG, PNG, WebP), PDF hoặc DOC!");
+      showAlert("Chỉ được upload file ảnh (JPG, PNG, WebP), PDF hoặc DOC!");
       e.target.value = "";
       return;
     }
 
     // Validate file size (10MB)
     if (file.size > 10 * 1024 * 1024) {
-      alert("Kích thước file không được vượt quá 10MB!");
+      showAlert("Kích thước file không được vượt quá 10MB!");
       e.target.value = "";
       return;
     }
@@ -130,17 +150,17 @@ export default function TuVanTrucTuyen() {
             attachmentFileSize: file.size,
             attachmentFileType: file.type,
           });
-          alert("Tải file lên thành công!");
+          showAlert("Tải file lên thành công!");
         } else {
-          alert("Có lỗi xảy ra khi lưu file");
+          showAlert("Có lỗi xảy ra khi lưu file");
         }
       } else {
         const errorData = await response.json();
-        alert(`Lỗi upload: ${errorData.message || "Không thể upload file"}`);
+        showAlert(`Lỗi upload: ${errorData.message || "Không thể upload file"}`);
       }
     } catch (error) {
       console.error("Error uploading file:", error);
-      alert("Có lỗi xảy ra khi upload file");
+      showAlert("Có lỗi xảy ra khi upload file");
     } finally {
       setUploadingFile(false);
       e.target.value = "";
@@ -171,92 +191,90 @@ export default function TuVanTrucTuyen() {
       (d) => d.name && d.name.trim()
     );
     if (validDiagnoses.length === 0) {
-      alert("Vui lòng nhập ít nhất một chẩn đoán!");
+      showAlert("Vui lòng nhập ít nhất một chẩn đoán!");
       return;
     }
 
     // Kiểm tra ghi chú tư vấn bắt buộc
     if (!formData.notes || !formData.notes.trim()) {
-      alert("Vui lòng nhập ghi chú tư vấn!");
+      showAlert("Vui lòng nhập ghi chú tư vấn!");
       return;
     }
 
     // Thêm thông báo xác nhận
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn lưu hồ sơ cho ${patientName}?`
+    showConfirm(
+      `Bạn có chắc chắn muốn lưu hồ sơ cho ${patientName}?`,
+      async () => {
+
+        const submitData = {
+          appointmentId: appointment._id,
+          notes: formData.notes || undefined,
+          attachmentUrl: formData.attachmentUrl || undefined,
+          diagnoses: validDiagnoses,
+          medications:
+            formData.medications.length > 0 ? formData.medications : undefined,
+        };
+
+        try {
+          const response = await fetch(
+            `${
+              import.meta.env.VITE_API_URL || "http://localhost:3000"
+            }/api/doctors/me/consultation-advice`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              credentials: "include",
+              body: JSON.stringify(submitData),
+            }
+          );
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to submit consultation");
+          }
+
+          await fetch(
+            `${
+              import.meta.env.VITE_API_URL || "http://localhost:3000"
+            }/api/doctors/me/appointments/${appointmentId}/status`,
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              credentials: "include",
+              body: JSON.stringify({ status: "done" }),
+            }
+          );
+
+          // End video call if it exists
+          try {
+            const VideoCallAPI = await import("../../../services/videoCallAPI");
+            console.log(
+              "🔍 TuVanTrucTuyen - Attempting to end video call for appointmentId:",
+              appointmentId
+            );
+            await VideoCallAPI.default.endCallByAppointmentId(appointmentId);
+            console.log("✅ TuVanTrucTuyen - Video call ended successfully");
+          } catch (videoCallError) {
+            console.warn(
+              "⚠️ TuVanTrucTuyen - Could not end video call:",
+              videoCallError.message
+            );
+            console.error("⚠️ TuVanTrucTuyen - Full error:", videoCallError);
+            // Don't fail the whole process if video call ending fails
+          }
+
+          showAlert("Đã lưu hồ sơ thành công!");
+          setTimeout(() => navigate("/bac-si/lich-hen"), 1000);
+        } catch (error) {
+          console.error("Error submitting consultation:", error);
+          showAlert("Có lỗi xảy ra: " + error.message);
+        }
+      }
     );
-
-    if (!confirmed) {
-      return; // Nếu người dùng không xác nhận, không thực hiện hành động
-    }
-
-    const submitData = {
-      appointmentId: appointment._id,
-      notes: formData.notes || undefined,
-      attachmentUrl: formData.attachmentUrl || undefined,
-      diagnoses: validDiagnoses,
-      medications:
-        formData.medications.length > 0 ? formData.medications : undefined,
-    };
-
-    try {
-      const response = await fetch(
-        `${
-          import.meta.env.VITE_API_URL || "http://localhost:3000"
-        }/api/doctors/me/consultation-advice`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify(submitData),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to submit consultation");
-      }
-
-      await fetch(
-        `${
-          import.meta.env.VITE_API_URL || "http://localhost:3000"
-        }/api/doctors/me/appointments/${appointmentId}/status`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({ status: "done" }),
-        }
-      );
-
-      // End video call if it exists
-      try {
-        const VideoCallAPI = await import("../../../services/videoCallAPI");
-        console.log(
-          "🔍 TuVanTrucTuyen - Attempting to end video call for appointmentId:",
-          appointmentId
-        );
-        await VideoCallAPI.default.endCallByAppointmentId(appointmentId);
-        console.log("✅ TuVanTrucTuyen - Video call ended successfully");
-      } catch (videoCallError) {
-        console.warn(
-          "⚠️ TuVanTrucTuyen - Could not end video call:",
-          videoCallError.message
-        );
-        console.error("⚠️ TuVanTrucTuyen - Full error:", videoCallError);
-        // Don't fail the whole process if video call ending fails
-      }
-
-      alert("Đã lưu hồ sơ thành công!");
-      navigate("/bac-si/lich-hen");
-    } catch (error) {
-      console.error("Error submitting consultation:", error);
-      alert("Có lỗi xảy ra: " + error.message);
-    }
   };
 
   if (loading) {
@@ -604,6 +622,24 @@ export default function TuVanTrucTuyen() {
           </form>
         </div>
       </div>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        message={alertMessage}
+        onClose={() => setAlertMessage(null)}
+        title="Hệ thống MedConnect"
+      />
+
+      {/* Custom Confirm */}
+      {confirmConfig && (
+        <CustomAlert
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onClose={confirmConfig.onCancel}
+          title="Hệ thống MedConnect"
+          type="confirm"
+        />
+      )}
     </div>
   );
 }

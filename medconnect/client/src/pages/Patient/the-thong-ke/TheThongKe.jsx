@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useEffect } from "react";
 import { Calendar, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { Spin } from "antd";
 import { useAppointments } from "../../../hooks/useAppointments";
@@ -64,10 +64,49 @@ const DEFAULT_ERROR_STATS = STAT_CONFIG.map((config) => ({
 // Stat Card Component
 const StatCard = ({ stat }) => {
   const Icon = stat.icon;
+  const iconRef = useRef(null);
   // If value is "0", show red text, otherwise show black/dark gray
   const valueNum = parseInt(stat.value) || 0;
   const trendColor = valueNum === 0 ? "#dc2626" : "#374151";
   const iconColor = stat.iconColor || "#2563eb"; // Default blue if not specified
+
+  // Create a lighter background color for the icon container
+  const getIconBackgroundColor = (color) => {
+    // Convert hex to rgba with opacity for background
+    const hex = color.replace("#", "");
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    // Increase opacity slightly for better visibility (0.15 instead of 0.1)
+    return `rgba(${r}, ${g}, ${b}, 0.15)`;
+  };
+
+  const iconBackgroundColor = getIconBackgroundColor(iconColor);
+
+  // Force icon color after render to override any CSS
+  useEffect(() => {
+    if (iconRef.current) {
+      const svg = iconRef.current.querySelector("svg");
+      if (svg) {
+        // Set color and stroke directly on SVG
+        svg.setAttribute("stroke", iconColor);
+        svg.setAttribute("color", iconColor);
+        svg.style.stroke = iconColor;
+        svg.style.color = iconColor;
+
+        // Set stroke on all path elements
+        const paths = svg.querySelectorAll(
+          "path, circle, rect, line, polyline, polygon"
+        );
+        paths.forEach((path) => {
+          path.setAttribute("stroke", iconColor);
+          path.style.stroke = iconColor;
+          path.setAttribute("fill", "none");
+          path.style.fill = "none";
+        });
+      }
+    }
+  }, [iconColor]);
 
   return (
     <div
@@ -84,8 +123,24 @@ const StatCard = ({ stat }) => {
           <p className="stat-card-value">{stat.value}</p>
           <p className="stat-card-description">{stat.description}</p>
         </div>
-        <div className="stat-card-icon">
-          <Icon className="stat-icon" style={{ color: iconColor }} />
+        <div
+          ref={iconRef}
+          className="stat-card-icon"
+          style={{
+            backgroundColor: iconBackgroundColor,
+            "--icon-color": iconColor,
+          }}
+        >
+          <Icon
+            className="stat-icon"
+            color={iconColor}
+            strokeWidth={2.5}
+            size={28}
+            style={{
+              color: iconColor,
+              stroke: iconColor,
+            }}
+          />
         </div>
       </div>
       <div className="stat-card-trend">

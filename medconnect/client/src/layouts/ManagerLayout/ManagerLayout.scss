@@ -216,6 +216,61 @@
       padding: 24px;
       background: #ffffff;
       min-height: calc(100vh - 64px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      
+      // Ẩn thanh trượt
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      
+      &::-webkit-scrollbar {
+        display: none;
+      }
+      
+      // Ẩn scrollbar cho tất cả phần tử con
+      * {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        
+        &::-webkit-scrollbar {
+          display: none;
+        }
+      }
+    }
+  }
+}
+
+/* Ẩn scrollbar cho tất cả các phần tử trong Manager layout */
+.manager-layout,
+.manager-main,
+.manager-content,
+.manager-content * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Ẩn scrollbar cho các phần tử có overflow */
+.manager-content {
+  [class*="overflow"],
+  [style*="overflow"],
+  div[style*="overflow"],
+  section[style*="overflow"],
+  main[style*="overflow"],
+  .overflow-auto,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-scroll,
+  .overflow-y-scroll,
+  .overflow-x-scroll {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    
+    &::-webkit-scrollbar {
+      display: none !important;
     }
   }
 }

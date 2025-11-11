@@ -23,6 +23,7 @@ import {
   addFavoriteDoctor,
   removeFavoriteDoctor,
   getDoctorVisitCount,
+  getPatientPayments,
   calculatePaymentSummaryForSingleAppointment,
   createPaymentForSingleAppointment,
 } from "../controllers/patientController.js";
@@ -207,5 +208,8 @@ router.delete(
 
 // Get visit count for a specific doctor
 router.get("/me/doctors/:doctorId/visit-count", authGuard, getDoctorVisitCount);
+
+// Get patient payments (invoices)
+router.get("/me/payments", authGuard, getPatientPayments);
 
 export default router;

@@ -4,6 +4,23 @@
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   margin-bottom: 1.3rem;
+
+  /* Set colors for left border accent based on card order */
+  .stat-card:nth-child(1)::before {
+    background-color: #3b82f6 !important; /* Blue for confirmed */
+  }
+
+  .stat-card:nth-child(2)::before {
+    background-color: #f97316 !important; /* Orange for pending */
+  }
+
+  .stat-card:nth-child(3)::before {
+    background-color: #22c55e !important; /* Green for completed */
+  }
+
+  .stat-card:nth-child(4)::before {
+    background-color: #ef4444 !important; /* Red for cancelled */
+  }
 }
 
 @media (min-width: 640px) {
@@ -18,14 +35,80 @@
   }
 }
 
-/* Stat Card - Force white background */
+/* Stat Card - Force white background, no hover/active effects */
 .stat-card {
   background-color: #ffffff !important;
   background: #ffffff !important;
   border: 2px solid #cbd5e1 !important;
   border-radius: 0.75rem;
   padding: 1.5rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: all 0.3s ease !important;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+
+  /* Add subtle left border accent based on card type */
+  &::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background-color: #cbd5e1;
+    opacity: 0.5;
+    transition: opacity 0.3s ease;
+  }
+
+  /* Color accent for different card types */
+  &[class*="confirmed"]::before,
+  &:nth-child(1)::before {
+    background-color: #3b82f6; /* Blue for confirmed */
+    opacity: 1;
+  }
+
+  &[class*="pending"]::before,
+  &:nth-child(2)::before {
+    background-color: #f97316; /* Orange for pending */
+    opacity: 1;
+  }
+
+  &[class*="completed"]::before,
+  &:nth-child(3)::before {
+    background-color: #22c55e; /* Green for completed */
+    opacity: 1;
+  }
+
+  &[class*="cancelled"]::before,
+  &:nth-child(4)::before {
+    background-color: #ef4444; /* Red for cancelled */
+    opacity: 1;
+  }
+
+  /* Hover effect - lift up with shadow */
+  &:hover {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    transform: translateY(-4px) !important;
+    box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15), 0 2px 4px 0 rgba(0, 0, 0, 0.1) !important;
+    outline: none !important;
+  }
+
+  /* Active state */
+  &:active {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.12), 0 1px 2px 0 rgba(0, 0, 0, 0.08) !important;
+  }
+
+  /* Focus state */
+  &:focus,
+  &:focus-within {
+    outline: 2px solid #3b82f6 !important;
+    outline-offset: 2px !important;
+  }
 
   /* Override any other background styles */
   &[style*="background"] {
@@ -44,6 +127,8 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
   }
 
   &-content {
@@ -55,57 +140,198 @@
   &-title {
     font-size: 0.875rem;
     font-weight: 600;
-    color: #374151;
+    color: #374151 !important;
     margin: 0;
   }
 
   &-value {
-    font-size: 2rem;
+    font-size: 2.25rem;
     font-weight: 700;
-    color: #111827;
-    margin: 0;
+    color: #111827 !important;
+    margin: 0.25rem 0;
     line-height: 1;
+    letter-spacing: -0.02em;
   }
 
   &-description {
     font-size: 0.75rem;
-    color: #6b7280;
+    color: #6b7280 !important;
     margin: 0;
   }
 
   &-icon {
-    background-color: transparent;
-    border-radius: 0.5rem;
-    padding: 0.75rem;
+    border-radius: 50%;
+    padding: 0.875rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    min-width: 3.5rem;
+    min-height: 3.5rem;
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+    /* Background color will be set inline from component */
+    /* Default fallback */
+    background-color: rgba(0, 0, 0, 0.02);
+
+    /* Icon SVG styling - let inline styles control color */
+    svg {
+      width: 1.75rem !important;
+      height: 1.75rem !important;
+      flex-shrink: 0;
+      /* DO NOT set color or stroke here - let inline style and React prop control it */
+    }
+
+    /* Hover effect for icon container - slight scale */
+    .stat-card:hover & {
+      transform: scale(1.05);
+    }
   }
 
   &-trend {
-    margin-top: 1rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
     font-size: 0.75rem;
+    color: #374151 !important;
+    font-weight: 500;
+
+    span {
+      color: inherit !important;
+    }
   }
 }
 
 .stat-icon {
-  width: 1.25rem;
-  height: 1.25rem;
-  /* Color will be set inline from component */
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  transition: all 0.3s ease;
+  display: block;
+  flex-shrink: 0;
+
+  /* DO NOT set color or stroke - let inline style and React prop control it */
+  /* Inline styles have highest specificity */
+
+  /* Only ensure no fill on SVG paths */
+  path,
+  circle,
+  rect,
+  line,
+  polyline,
+  polygon {
+    fill: none !important;
+    /* stroke comes from inline style or React prop */
+  }
 }
 
 /* Force white background for stat cards - highest priority */
 .stat-card-white {
   background-color: #ffffff !important;
   background: #ffffff !important;
+  transition: all 0.3s ease !important;
+
+  /* Hover effect - lift up */
+  &:hover {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    transform: translateY(-4px) !important;
+    box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15), 0 2px 4px 0 rgba(0, 0, 0, 0.1) !important;
+    outline: none !important;
+  }
+
+  /* Active state */
+  &:active {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.12) !important;
+  }
+
+  /* Focus state */
+  &:focus,
+  &:focus-within {
+    outline: 2px solid #3b82f6 !important;
+    outline-offset: 2px !important;
+  }
 }
 
 /* Override any teal/blue background - highest specificity */
-.stat-card.stat-card-white,
+/* Use very specific selectors to override PatientDashboard.scss */
+.stats-grid .stat-card.stat-card-white,
+.stats-grid div.stat-card.stat-card-white,
+div.stats-grid .stat-card.stat-card-white,
 .stat-card.stat-card-white.stat-card-loading,
-div.stat-card.stat-card-white {
+div.stat-card.stat-card-white,
+div.stat-card.stat-card-white:hover,
+div.stat-card.stat-card-white:active,
+div.stat-card.stat-card-white:focus,
+div.stat-card.stat-card-white:focus-within,
+div.stat-card.stat-card-white:visited {
   background-color: #ffffff !important;
   background: #ffffff !important;
+  border: 2px solid #cbd5e1 !important;
+  border-color: #cbd5e1 !important;
+  transition: all 0.3s ease !important;
+  position: relative !important;
+  cursor: pointer !important;
+
+  /* Keep left border accent visible */
+  &::before {
+    content: "" !important;
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 4px !important;
+    opacity: 1 !important;
+    z-index: 1 !important;
+    border-radius: 0.75rem 0 0 0.75rem;
+  }
+
+  /* Remove any other pseudo-elements */
+  &::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  /* Ensure text elements have correct colors */
+  .stat-card-title {
+    color: #374151 !important;
+  }
+
+  .stat-card-value {
+    color: #111827 !important;
+  }
+
+  .stat-card-description {
+    color: #6b7280 !important;
+  }
+
+  .stat-card-trend {
+    color: #374151 !important;
+
+    span {
+      color: #374151 !important;
+    }
+  }
+
+  /* Ensure icon container and icon preserve their colors from inline styles */
+  /* Icon colors are set via React prop, inline style, and DOM manipulation */
+  .stat-card-icon {
+    /* Background color is set inline from component */
+    /* Icon color is set via React prop, inline style, and useEffect */
+
+    /* Only ensure no fill on SVG paths */
+    svg path,
+    svg circle,
+    svg rect,
+    svg line,
+    svg polyline,
+    svg polygon {
+      fill: none !important;
+    }
+  }
 }
 
 /* Override any other stat-card styles */
@@ -115,5 +341,44 @@ div.stat-card.stat-card-white {
   &[class*="stat-card"] {
     background-color: #ffffff !important;
     background: #ffffff !important;
+    transition: all 0.3s ease !important;
+
+    &:hover {
+      background-color: #ffffff !important;
+      background: #ffffff !important;
+      border-color: #cbd5e1 !important;
+      transform: translateY(-4px) !important;
+      box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15),
+        0 2px 4px 0 rgba(0, 0, 0, 0.1) !important;
+      outline: none !important;
+    }
+
+    &:active {
+      transform: translateY(-2px) !important;
+      box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.12) !important;
+    }
+
+    &:focus,
+    &:focus-within {
+      outline: 2px solid #3b82f6 !important;
+      outline-offset: 2px !important;
+    }
   }
+}
+
+/* Ensure text colors are always dark/black */
+.stat-card-white .stat-card-title,
+.stat-card-white .stat-card-value,
+.stat-card-white .stat-card-description,
+.stat-card-white .stat-card-trend,
+.stat-card-white .stat-card-trend span {
+  color: #111827 !important;
+}
+
+.stat-card-white .stat-card-title {
+  color: #374151 !important;
+}
+
+.stat-card-white .stat-card-description {
+  color: #6b7280 !important;
 }

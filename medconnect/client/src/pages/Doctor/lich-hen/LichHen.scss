@@ -724,6 +724,14 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   border-radius: 1rem;
   border: 2px solid $gray-100;
   box-shadow: $shadow-sm;
+  
+  // Ẩn thanh trượt
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .appointment-list-table {
@@ -769,7 +777,11 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   } /* Lý do */
   &:nth-child(5) {
     width: 32%;
+    text-align: center !important;
   } /* Trạng thái */
+  &:nth-child(6) {
+    text-align: center !important;
+  } /* Hành động */
 }
 
 .appointment-list-tbody {
@@ -830,22 +842,33 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
 .appointment-list-status {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.25rem;
 
-  // Badge styling
-  .badge {
-    border-radius: 0.75rem !important;
-    padding: 0.5rem 1rem !important;
-    font-weight: 700 !important;
-    font-size: 0.875rem !important;
-    border: none !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-    transition: all 0.3s ease !important;
+  // Make icon smaller
+  svg {
+    width: 0.625rem !important;
+    height: 0.625rem !important;
+    flex-shrink: 0 !important;
+  }
+}
 
-    &:hover {
-      transform: translateY(-1px) !important;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
-    }
+// Override Badge component rounded-full for status badges
+.appointment-list-table .badge,
+.appointment-list-td .badge,
+.appointment-list-card .badge {
+  border-radius: 0.75rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.25rem !important;
+  padding: 0.25rem 0.5rem !important;
+  font-size: 0.75rem !important;
+
+  svg {
+    width: 0.625rem !important;
+    height: 0.625rem !important;
+    flex-shrink: 0 !important;
   }
 }
 
@@ -856,17 +879,28 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
 .appointment-list-card .bg-orange-500,
 .appointment-list-card .bg-blue-500,
 .appointment-list-card .bg-emerald-500,
-.appointment-list-card .bg-gray-500 {
+.appointment-list-card .bg-gray-500,
+.appointment-list-card [class*="bg-"].rounded-full,
+.appointment-list-card .badge[class*="bg-"],
+.appointment-list-td .badge[class*="bg-"] {
   color: white !important;
   border: none !important;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
   border-radius: 0.75rem !important;
-  padding: 0.5rem 1rem !important;
+  padding: 0.25rem 0.5rem !important;
   font-weight: 700 !important;
-  font-size: 0.875rem !important;
+  font-size: 0.75rem !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 0.375rem !important;
+  justify-content: center !important;
+  gap: 0.25rem !important;
+
+  // Make icon smaller in badges
+  svg {
+    width: 0.625rem !important;
+    height: 0.625rem !important;
+    flex-shrink: 0 !important;
+  }
 }
 
 // Specific colors for each status - Direct CSS approach
@@ -909,44 +943,60 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
 }
 
 // Force colors by data attributes
-.appointment-list-card [data-status="accepted"] {
+.appointment-list-card [data-status="accepted"],
+.appointment-list-td [data-status="accepted"] {
   background-color: #0af7cf !important;
   color: white !important;
+  border-radius: 0.75rem !important;
 }
 
-.appointment-list-card [data-status="pending_doctor"] {
+.appointment-list-card [data-status="pending_doctor"],
+.appointment-list-td [data-status="pending_doctor"] {
   background-color: #45c3d2 !important;
   color: white !important;
+  border-radius: 0.75rem !important;
 }
 
-.appointment-list-card [data-status="rejected"] {
+.appointment-list-card [data-status="rejected"],
+.appointment-list-td [data-status="rejected"] {
   background-color: #ef4444 !important;
   color: white !important;
+  border-radius: 0.75rem !important;
 }
 
-.appointment-list-card [data-status="cancelled"] {
+.appointment-list-card [data-status="cancelled"],
+.appointment-list-td [data-status="cancelled"] {
   background-color: #f97316 !important;
   color: white !important;
+  border-radius: 0.75rem !important;
 }
 
-.appointment-list-card [data-status="in_progress"] {
+.appointment-list-card [data-status="in_progress"],
+.appointment-list-td [data-status="in_progress"] {
   background-color: #3b82f6 !important;
   color: white !important;
+  border-radius: 0.75rem !important;
 }
 
-.appointment-list-card [data-status="done"] {
+.appointment-list-card [data-status="done"],
+.appointment-list-td [data-status="done"] {
   background-color: #10b981 !important;
   color: white !important;
+  border-radius: 0.75rem !important;
 }
 
-.appointment-list-card [data-status="no_show"] {
+.appointment-list-card [data-status="no_show"],
+.appointment-list-td [data-status="no_show"] {
   background-color: #526282 !important;
   color: white !important;
+  border-radius: 0.75rem !important;
 }
 
-.appointment-list-card [data-status="rescheduled"] {
+.appointment-list-card [data-status="rescheduled"],
+.appointment-list-td [data-status="rescheduled"] {
   background-color: #6366f1 !important;
   color: white !important;
+  border-radius: 0.75rem !important;
 }
 
 .appointment-list-action-buttons {
@@ -1102,6 +1152,14 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   overflow-y: auto;
   animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid $gray-100;
+  
+  // Ẩn thanh trượt
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @keyframes slideUp {
@@ -1372,6 +1430,14 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
+  
+  // Ẩn thanh trượt
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .appointment-detail-dialog-header {
@@ -1637,9 +1703,11 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   } /* Lý do */
   &:nth-child(5) {
     width: 15%;
+    text-align: center !important;
   } /* Trạng thái */
   &:nth-child(6) {
     width: 25%;
+    text-align: center !important;
   } /* Hành động */
 }
 
@@ -1662,10 +1730,18 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.25rem;
 
   // Hide any buttons that might be in status column
   button {
     display: none !important;
+  }
+
+  // Make icon smaller
+  svg {
+    width: 0.625rem !important;
+    height: 0.625rem !important;
+    flex-shrink: 0 !important;
   }
 }
 
@@ -1678,9 +1754,21 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
     display: none !important;
   }
 
-  // Only show badge
+  // Only show badge with rounded corners (override rounded-full)
   .badge {
     display: inline-flex !important;
+    border-radius: 0.75rem !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.25rem !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.75rem !important;
+
+    svg {
+      width: 0.625rem !important;
+      height: 0.625rem !important;
+      flex-shrink: 0 !important;
+    }
   }
 }
 

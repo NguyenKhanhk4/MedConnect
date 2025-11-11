@@ -908,7 +908,8 @@ export async function bookAppointment(req, res) {
     //   return fail(res, 400, ERROR_CODES.PAYMENT_REQUIRED, "Payment is required for this appointment");
     // }
 
-    // Create appointment with pending_doctor status and unpaid paymentStatus
+    // Create appointment
+    // Both online and offline appointments: automatically accepted (no approval needed)
     const appointment = new Appointment({
       patientId: patient._id,
       doctorId: doctorId,
@@ -917,7 +918,7 @@ export async function bookAppointment(req, res) {
       clinicId: mode === "offline" ? clinicId : undefined,
       scheduledStart: new Date(scheduledStart),
       scheduledEnd: new Date(scheduledEnd),
-      status: "pending_doctor", // Waiting for doctor approval
+      status: "accepted", // Auto-accepted for both online and offline (no approval needed)
       paymentStatus: "unpaid", // Initially unpaid
       // paymentDeadline không set - không giới hạn thời gian thanh toán
       reason: reason,
@@ -951,7 +952,7 @@ export async function bookAppointment(req, res) {
       .lean();
 
     return ok(res, {
-      message: "Appointment booked successfully. Waiting for doctor approval.",
+      message: "Appointment booked successfully.",
       appointment: populatedAppointment,
     });
   } catch (error) {
@@ -2813,11 +2814,8 @@ MedConnect
 }
 
 /**
- * Calculate payment summary for single appointment (pre-payment flow)
- * POST /api/patients/appointments/calculate-payment-summary
- * 
- * Tính toán payment summary cho single appointment mà chưa tạo appointment trong DB
- * Tương tự calculatePaymentSummary cho nhiều lịch nhưng chỉ có 1 appointment
+ * Helper function: Calculate appointment booking fee
+ * Tính toán phí đặt lịch dựa trên education level và mode
  */
 async function calculateAppointmentBookingFee(appointment) {
   try {
@@ -2882,6 +2880,139 @@ async function calculateAppointmentBookingFee(appointment) {
   }
 }
 
+/**
+ * Get patient payments (invoices)
+ * GET /api/patients/me/payments?invoiceType=booking&page=1&limit=20&status=captured&startDate=...&endDate=...
+ */
+export async function getPatientPayments(req, res) {
+  try {
+    const claims = req.user || {};
+    const appUserId = claims.app_user_id;
+
+    if (!appUserId) {
+      return fail(
+        res,
+        401,
+        ERROR_CODES.UNAUTHORIZED,
+        "User ID not found in token"
+      );
+    }
+
+    // Find patient by user ID
+    const patient = await Patient.findOne({ userId: appUserId });
+    if (!patient) {
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient not found");
+    }
+
+    const {
+      invoiceType,
+      page = 1,
+      limit = 20,
+      status,
+      startDate,
+      endDate,
+    } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build query - only get payments for this patient
+    const query = {
+      "billTo.patientId": patient._id,
+    };
+
+    // Filter by invoiceType (booking or service)
+    if (invoiceType && invoiceType !== "all") {
+      query.invoiceType = invoiceType;
+    }
+
+    // Filter by status
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    // Filter by date range
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      query.createdAt = { $gte: start, $lte: end };
+    }
+
+    // Get payments with populated data
+    const payments = await Payment.find(query)
+      .populate("appointmentId", "scheduledStart status mode")
+      .populate("billTo.patientId", "fullName phone dob gender")
+      .populate("billFrom.doctorId", "fullName")
+      .populate("billFrom.clinicId", "name")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await Payment.countDocuments(query);
+
+    // Format invoices for response
+    const formattedInvoices = payments.map((payment) => ({
+      _id: payment._id,
+      invoiceNumber: payment.invoiceNumber,
+      invoiceType: payment.invoiceType,
+      orderCode: payment.orderCode || payment.pendingOrderCode || null,
+      appointmentId: payment.appointmentId?._id,
+      appointmentDate: payment.appointmentId?.scheduledStart,
+      appointmentStatus: payment.appointmentId?.status,
+      appointmentMode: payment.appointmentId?.mode,
+      patientName:
+        payment.billTo?.name || payment.billTo?.patientId?.fullName || "N/A",
+      patientPhone:
+        payment.billTo?.phone || payment.billTo?.patientId?.phone || null,
+      patientDateOfBirth: payment.billTo?.patientId?.dob || null,
+      patientGender: payment.billTo?.patientId?.gender || null,
+      doctorName:
+        payment.billFrom?.doctorName ||
+        payment.billFrom?.doctorId?.fullName ||
+        "N/A",
+      clinicName:
+        payment.billFrom?.clinicName ||
+        payment.billFrom?.clinicId?.name ||
+        null,
+      items: payment.items || [],
+      subtotal: payment.subtotal,
+      discount: payment.discount || 0,
+      total: payment.total,
+      gateway: payment.gateway,
+      method: payment.method,
+      status: payment.status,
+      paidAt: payment.paidAt || payment.capturedAt || payment.createdAt,
+      createdAt: payment.createdAt,
+      currency: payment.currency || "VND",
+    }));
+
+    return ok(res, {
+      invoices: formattedInvoices,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching patient payments:", error);
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || "Lỗi khi tải danh sách thanh toán"
+    );
+  }
+}
+
+/**
+ * Calculate payment summary for single appointment (pre-payment flow)
+ * POST /api/patients/appointments/calculate-payment-summary
+ * 
+ * Tính toán payment summary cho single appointment mà chưa tạo appointment trong DB
+ * Tương tự calculatePaymentSummary cho nhiều lịch nhưng chỉ có 1 appointment
+ */
 export async function calculatePaymentSummaryForSingleAppointment(req, res) {
   try {
     const claims = req.user || {};
@@ -2903,7 +3034,7 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
       return fail(
         res,
         400,
-        ERROR_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
         "Missing required fields: doctorId, slotId, mode, scheduledStart, scheduledEnd"
       );
     }
@@ -2913,7 +3044,7 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
       return fail(
         res,
         400,
-        ERROR_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
         "Mode must be 'online' or 'offline'"
       );
     }
@@ -2923,7 +3054,7 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
       return fail(
         res,
         400,
-        ERROR_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
         "clinicId is required for offline appointments"
       );
     }
@@ -2974,7 +3105,7 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
       return fail(
         res,
         400,
-        ERROR_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
         "Time slot does not belong to the selected doctor"
       );
     }
@@ -2992,8 +3123,8 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
     if (activeAppointments.length > 0) {
       return fail(
         res,
-        409,
-        ERROR_CODES.CONFLICT,
+        400,
+        ERROR_CODES.INVALID_INPUT,
         "Time slot is no longer available"
       );
     }
@@ -3105,7 +3236,7 @@ export async function createPaymentForSingleAppointment(req, res) {
       return fail(
         res,
         400,
-        ERROR_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
         "Missing required fields: doctorId, slotId, mode, scheduledStart, scheduledEnd"
       );
     }
@@ -3115,7 +3246,7 @@ export async function createPaymentForSingleAppointment(req, res) {
       return fail(
         res,
         400,
-        ERROR_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
         "Mode must be 'online' or 'offline'"
       );
     }
@@ -3125,7 +3256,7 @@ export async function createPaymentForSingleAppointment(req, res) {
       return fail(
         res,
         400,
-        ERROR_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
         "clinicId is required for offline appointments"
       );
     }
@@ -3177,7 +3308,7 @@ export async function createPaymentForSingleAppointment(req, res) {
       return fail(
         res,
         400,
-        ERROR_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
         "Time slot does not belong to the selected doctor"
       );
     }
@@ -3195,8 +3326,8 @@ export async function createPaymentForSingleAppointment(req, res) {
     if (activeAppointments.length > 0) {
       return fail(
         res,
-        409,
-        ERROR_CODES.CONFLICT,
+        400,
+        ERROR_CODES.INVALID_INPUT,
         "Time slot is no longer available"
       );
     }
@@ -3226,7 +3357,7 @@ export async function createPaymentForSingleAppointment(req, res) {
       return fail(
         res,
         400,
-        ERROR_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
         "scheduledStart is not a valid date"
       );
     }
@@ -3235,7 +3366,7 @@ export async function createPaymentForSingleAppointment(req, res) {
       return fail(
         res,
         400,
-        ERROR_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
         "scheduledEnd is not a valid date"
       );
     }
@@ -3245,7 +3376,7 @@ export async function createPaymentForSingleAppointment(req, res) {
       return fail(
         res,
         400,
-        ERROR_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
         "scheduledEnd must be after scheduledStart"
       );
     }
