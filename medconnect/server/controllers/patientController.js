@@ -1768,9 +1768,15 @@ export async function getFamilyMembers(req, res) {
       );
     }
 
-    // Get all patients under this userId
-    const familyMembers = await Patient.find({ userId: appUserId })
-      .select("_id fullName dob gender relationshipToOwner phone avatarUrl")
+    // Get only family members (exclude "self" - the user's own profile)
+    // Chỉ lấy những patient có relationshipToOwner là family member hợp lệ
+    const familyMembers = await Patient.find({ 
+      userId: appUserId,
+      relationshipToOwner: { 
+        $in: ["father", "mother", "spouse", "child", "grandparent", "other"] 
+      } // Chỉ lấy người thân, loại bỏ "self" và null/undefined
+    })
+      .select("_id fullName dob gender relationshipToOwner phone avatarUrl citizenId address ethnicity occupation bloodType allergyNotes medicalHistory")
       .sort({ relationshipToOwner: 1, createdAt: 1 })
       .lean();
 
