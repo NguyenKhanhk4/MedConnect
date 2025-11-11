@@ -42,6 +42,7 @@ import {
 import NavigationBreadcrumb from "../../../components/Breadcrumb/NavigationBreadcrumb";
 import { api } from "../../../lib/api";
 import { CustomAlert } from "../../../components/ui/CustomAlert";
+import ClinicMap from "../../../components/ClinicMap/ClinicMap";
 import "./DatLichNhieuChuyenKhoa.css";
 
 const { Title, Text, Paragraph } = Typography;
@@ -1844,6 +1845,25 @@ const DatLichNhieuChuyenKhoa = () => {
                         <Text type="secondary">
                           Không có thông tin phòng khám
                         </Text>
+                      )}
+                      
+                      {/* Map - Show when clinic is available */}
+                      {defaultClinic && (
+                        <div style={{ marginTop: 16 }}>
+                          <ClinicMap 
+                            clinic={defaultClinic}
+                            onGetDirections={(clinic) => {
+                              if (clinic?.latitude && clinic?.longitude) {
+                                const url = `https://www.google.com/maps/dir/?api=1&destination=${clinic.latitude},${clinic.longitude}`;
+                                window.open(url, "_blank");
+                              } else if (clinic?.address) {
+                                const address = encodeURIComponent(clinic.address);
+                                const url = `https://www.google.com/maps/dir/?api=1&destination=${address}`;
+                                window.open(url, "_blank");
+                              }
+                            }}
+                          />
+                        </div>
                       )}
                     </div>
                   )}
