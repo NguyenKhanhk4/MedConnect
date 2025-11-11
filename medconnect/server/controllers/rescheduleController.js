@@ -873,3 +873,279 @@ MedConnect
     // Không throw error để không ảnh hưởng đến flow chính
   }
 }
+
+/**
+ * Helper function: Send reschedule notification email to doctor
+ */
+export async function sendDoctorRescheduledEmail(
+  originalAppointment,
+  newAppointment,
+  reason,
+  doctor,
+  isOriginalDoctor = true,
+  newDoctor = null
+) {
+  try {
+    console.log(`📧 sendDoctorRescheduledEmail called with:`, {
+      originalAppointmentId: originalAppointment?._id,
+      newAppointmentId: newAppointment?._id,
+      doctorId: doctor?._id,
+      isOriginalDoctor,
+    });
+
+    // Lấy email từ Doctor userId
+    let doctorEmail = null;
+
+    if (
+      doctor?.userId &&
+      typeof doctor.userId === "object" &&
+      doctor.userId.email
+    ) {
+      // userId đã được populate
+      doctorEmail = doctor.userId.email;
+      console.log(`📧 Found email from populated userId: ${doctorEmail}`);
+    } else if (doctor?.userId) {
+      // userId là ObjectId, cần query
+      console.log(`📧 Querying User for email, userId: ${doctor.userId}`);
+      const doctorUser = await User.findById(doctor.userId)
+        .select("email fullName")
+        .lean();
+      if (doctorUser) {
+        doctorEmail = doctorUser.email;
+        console.log(`📧 Found email from User query: ${doctorEmail}`);
+      } else {
+        console.log(`⚠️ User not found for userId: ${doctor.userId}`);
+      }
+    }
+
+    // Nếu vẫn không có email, không gửi
+    if (!doctorEmail) {
+      console.log(
+        "⚠️ Doctor email not found, skipping reschedule email notification. Doctor data:",
+        {
+          doctorId: doctor?._id,
+          userId: doctor?.userId,
+        }
+      );
+      return;
+    }
+
+    console.log(`📧 Sending reschedule email to doctor: ${doctorEmail}`);
+
+    // Format thời gian
+    const oldScheduledStart = new Date(originalAppointment.scheduledStart);
+    const oldScheduledEnd = new Date(originalAppointment.scheduledEnd);
+    const newScheduledStart = new Date(newAppointment.scheduledStart);
+    const newScheduledEnd = new Date(newAppointment.scheduledEnd);
+
+    const oldDateStr = oldScheduledStart.toLocaleDateString("vi-VN", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const oldTimeStr = `${oldScheduledStart.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })} - ${oldScheduledEnd.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+
+    const newDateStr = newScheduledStart.toLocaleDateString("vi-VN", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const newTimeStr = `${newScheduledStart.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })} - ${newScheduledEnd.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+
+    const oldModeText =
+      originalAppointment.mode === "online"
+        ? "Tư vấn online"
+        : "Khám tại phòng khám";
+    const newModeText =
+      newAppointment.mode === "online"
+        ? "Tư vấn online"
+        : "Khám tại phòng khám";
+
+    // Lấy tên bệnh nhân
+    const patientName = originalAppointment.patientId?.fullName || "Bệnh nhân";
+
+    // Lấy tên bác sĩ
+    const doctorName = doctor?.fullName || doctor?.userId?.fullName || "Bác sĩ";
+
+    // Title và message khác nhau cho bác sĩ cũ và bác sĩ mới
+    let emailTitle = "";
+    let emailIntro = "";
+    let emailBody = "";
+
+    if (isOriginalDoctor) {
+      // Email cho bác sĩ cũ
+      emailTitle = "Lịch hẹn đã được dời - MedConnect";
+      emailIntro = `Xin chào BS. ${doctorName},<br><br>Chúng tôi xin thông báo rằng lịch hẹn của bạn đã được quản lý dời sang thời gian mới.`;
+
+      if (newDoctor && newDoctor._id.toString() !== doctor._id.toString()) {
+        emailBody = `
+          <p><strong>Lưu ý:</strong> Lịch hẹn này đã được chuyển sang bác sĩ khác (BS. ${
+            newDoctor.fullName || newDoctor.userId?.fullName || "Bác sĩ"
+          }).</p>
+        `;
+      }
+    } else {
+      // Email cho bác sĩ mới
+      emailTitle =
+        "Bạn có lịch hẹn mới được chuyển từ bác sĩ khác - MedConnect";
+      emailIntro = `Xin chào BS. ${doctorName},<br><br>Chúng tôi xin thông báo rằng bạn có một lịch hẹn mới được quản lý chuyển từ bác sĩ khác.`;
+
+      const originalDoctorName =
+        originalAppointment.doctorId?.fullName ||
+        originalAppointment.doctorId?.userId?.fullName ||
+        "Bác sĩ";
+      emailBody = `
+        <p><strong>Lưu ý:</strong> Lịch hẹn này đã được chuyển từ BS. ${originalDoctorName}.</p>
+      `;
+    }
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+          ${emailTitle}
+        </h2>
+        
+        <div style="margin-top: 20px; line-height: 1.6;">
+          ${emailIntro}
+          
+          <div style="margin-top: 30px; background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
+            <h3 style="color: #2c3e50; margin-top: 0;">Thông tin bệnh nhân:</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li style="margin-bottom: 10px;"><strong>Bệnh nhân:</strong> ${patientName}</li>
+              ${
+                originalAppointment.reason
+                  ? `<li style="margin-bottom: 10px;"><strong>Lý do khám:</strong> ${originalAppointment.reason}</li>`
+                  : ""
+              }
+            </ul>
+          </div>
+
+          <div style="margin-top: 30px; background-color: #fff3cd; padding: 20px; border-radius: 5px; border-left: 4px solid #ffc107;">
+            <h3 style="color: #856404; margin-top: 0;">Thời gian cũ (đã hủy):</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li style="margin-bottom: 10px;"><strong>Ngày:</strong> ${oldDateStr}</li>
+              <li style="margin-bottom: 10px;"><strong>Giờ:</strong> ${oldTimeStr}</li>
+              <li style="margin-bottom: 10px;"><strong>Hình thức:</strong> ${oldModeText}</li>
+            </ul>
+          </div>
+
+          <div style="margin-top: 30px; background-color: #d4edda; padding: 20px; border-radius: 5px; border-left: 4px solid #28a745;">
+            <h3 style="color: #155724; margin-top: 0;">Thời gian mới:</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li style="margin-bottom: 10px;"><strong>Ngày:</strong> ${newDateStr}</li>
+              <li style="margin-bottom: 10px;"><strong>Giờ:</strong> ${newTimeStr}</li>
+              <li style="margin-bottom: 10px;"><strong>Hình thức:</strong> ${newModeText}</li>
+              <li style="margin-bottom: 10px;"><strong>Trạng thái:</strong> Đã xác nhận</li>
+            </ul>
+          </div>
+
+          ${emailBody}
+
+          ${
+            reason
+              ? `<div style="margin-top: 30px; background-color: #e7f3ff; padding: 15px; border-radius: 5px;">
+                  <p style="margin: 0;"><strong>Lý do dời lịch:</strong> ${reason}</p>
+                </div>`
+              : ""
+          }
+        </div>
+
+        <p style="margin-top: 30px;">Cảm ơn bạn đã sử dụng dịch vụ của MedConnect.</p>
+        
+        <p style="margin-top: 30px;">Trân trọng,<br><strong>MedConnect</strong></p>
+      </div>
+    `;
+
+    const textContent = `
+${emailTitle}
+
+Xin chào BS. ${doctorName},
+
+${
+  isOriginalDoctor
+    ? "Chúng tôi xin thông báo rằng lịch hẹn của bạn đã được quản lý dời sang thời gian mới."
+    : "Chúng tôi xin thông báo rằng bạn có một lịch hẹn mới được quản lý chuyển từ bác sĩ khác."
+}
+
+Thông tin bệnh nhân:
+- Bệnh nhân: ${patientName}
+${
+  originalAppointment.reason
+    ? `- Lý do khám: ${originalAppointment.reason}`
+    : ""
+}
+
+Thời gian cũ (đã hủy):
+- Ngày: ${oldDateStr}
+- Giờ: ${oldTimeStr}
+- Hình thức: ${oldModeText}
+
+Thời gian mới:
+- Ngày: ${newDateStr}
+- Giờ: ${newTimeStr}
+- Hình thức: ${newModeText}
+- Trạng thái: Đã xác nhận
+
+${reason ? `Lý do dời lịch: ${reason}` : ""}
+
+${
+  isOriginalDoctor &&
+  newDoctor &&
+  newDoctor._id.toString() !== doctor._id.toString()
+    ? `Lưu ý: Lịch hẹn này đã được chuyển sang bác sĩ khác (BS. ${
+        newDoctor.fullName || newDoctor.userId?.fullName || "Bác sĩ"
+      }).`
+    : !isOriginalDoctor
+    ? `Lưu ý: Lịch hẹn này đã được chuyển từ BS. ${
+        originalAppointment.doctorId?.fullName ||
+        originalAppointment.doctorId?.userId?.fullName ||
+        "Bác sĩ"
+      }.`
+    : ""
+}
+
+Cảm ơn bạn đã sử dụng dịch vụ của MedConnect.
+
+Trân trọng,
+MedConnect
+    `;
+
+    console.log(
+      `📧 Attempting to send doctor reschedule email via sendMail...`
+    );
+    const emailResult = await sendMail({
+      to: doctorEmail,
+      subject: emailTitle,
+      text: textContent,
+      html: htmlContent,
+    });
+
+    console.log(
+      `✅ Doctor reschedule email sent successfully to ${doctorEmail}`
+    );
+    console.log(`📧 Email result:`, {
+      messageId: emailResult?.messageId,
+      response: emailResult?.response,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Error sending doctor reschedule email:",
+      error?.message || error
+    );
+    // Không throw error để không ảnh hưởng đến flow chính
+  }
+}

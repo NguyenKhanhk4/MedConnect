@@ -8,25 +8,32 @@ const { Schema, model } = mongoose;
 // Item dịch vụ (snapshot tại thời điểm bác sĩ chọn)
 const AppointmentServiceItemSchema = new Schema(
   {
-    serviceId: { type: Schema.Types.ObjectId, ref: "ServicePrice", required: true, index: true },
+    serviceId: {
+      type: Schema.Types.ObjectId,
+      ref: "ServicePrice",
+      required: true,
+      index: true,
+    },
     serviceName: { type: String, required: true, trim: true }, // snapshot
-    unitPrice: { // VND (integer), snapshot
+    unitPrice: {
+      // VND (integer), snapshot
       type: Number,
       required: true,
       min: 0,
       validate: {
         validator: Number.isInteger,
-        message: 'unitPrice must be an integer'
+        message: "unitPrice must be an integer",
       },
     },
     quantity: { type: Number, required: true, min: 1, default: 1 },
-    lineTotal: { // unitPrice * quantity
+    lineTotal: {
+      // unitPrice * quantity
       type: Number,
       required: true,
       min: 0,
       validate: {
         validator: Number.isInteger,
-        message: 'lineTotal must be an integer'
+        message: "lineTotal must be an integer",
       },
     },
   },
@@ -36,16 +43,26 @@ const AppointmentServiceItemSchema = new Schema(
 const AppointmentSchema = new Schema(
   {
     // (giữ các field cũ)
-    visitId: { type: Schema.Types.ObjectId, ref: "MedicalVisit", default: null },
+    visitId: {
+      type: Schema.Types.ObjectId,
+      ref: "MedicalVisit",
+      default: null,
+    },
     patientId: { type: Schema.Types.ObjectId, ref: "Patient", required: true },
     doctorId: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
-    slotId: { type: Schema.Types.ObjectId, ref: "DoctorTimeSlot", required: true },
+    slotId: {
+      type: Schema.Types.ObjectId,
+      ref: "DoctorTimeSlot",
+      required: true,
+    },
 
     mode: { type: String, enum: ["online", "offline"], required: true },
     clinicId: {
       type: Schema.Types.ObjectId,
       ref: "Clinic",
-      required: function () { return this.mode === "offline"; },
+      required: function () {
+        return this.mode === "offline";
+      },
     },
 
     scheduledStart: { type: Date, required: true },
@@ -66,10 +83,10 @@ const AppointmentSchema = new Schema(
       default: "pending_doctor",
     },
 
-    reason: { 
-      type: String, 
+    reason: {
+      type: String,
       maxlength: 100,
-      trim: true 
+      trim: true,
     },
     cancelledAt: Date,
     cancelledBy: { type: Schema.Types.ObjectId, ref: "User" },
@@ -81,6 +98,18 @@ const AppointmentSchema = new Schema(
     rescheduleReason: String,
     rescheduledBy: { type: Schema.Types.ObjectId, ref: "User" },
     rescheduledAt: Date,
+    // Reschedule type: "doctor_busy" (bác sĩ bận), "patient_request" (bệnh nhân yêu cầu), "manager_initiated" (manager tự động)
+    rescheduleType: {
+      type: String,
+      enum: ["doctor_busy", "patient_request", "manager_initiated"],
+      default: null,
+    },
+    // Original requester: who originally requested the reschedule (before manager processed it)
+    rescheduleRequestedBy: {
+      type: String,
+      enum: ["doctor", "patient", "manager"],
+      default: null,
+    },
 
     acceptedBy: { type: Schema.Types.ObjectId, ref: "Doctor" },
     rejectedBy: { type: Schema.Types.ObjectId, ref: "Doctor" },
@@ -100,7 +129,7 @@ const AppointmentSchema = new Schema(
       default: 0,
       validate: {
         validator: Number.isInteger,
-        message: 'totalPay must be an integer'
+        message: "totalPay must be an integer",
       },
     },
 
@@ -112,7 +141,7 @@ const AppointmentSchema = new Schema(
       default: 0,
       validate: {
         validator: Number.isInteger,
-        message: 'amountPaid must be an integer'
+        message: "amountPaid must be an integer",
       },
     },
 
@@ -155,10 +184,17 @@ AppointmentSchema.pre("validate", function (next) {
     return next();
   }
 
-  if (this.scheduledStart && this.scheduledEnd && this.scheduledStart >= this.scheduledEnd) {
-    this.invalidate("scheduledEnd", "scheduledEnd must be after scheduledStart");
+  if (
+    this.scheduledStart &&
+    this.scheduledEnd &&
+    this.scheduledStart >= this.scheduledEnd
+  ) {
+    this.invalidate(
+      "scheduledEnd",
+      "scheduledEnd must be after scheduledStart"
+    );
   }
-  
+
   // For new appointments with status "pending_doctor", skip future validation
   // because these appointments are created before doctor approval, and the slot time
   // might be in the past due to timezone differences or when doctor reviews later.
@@ -168,14 +204,14 @@ AppointmentSchema.pre("validate", function (next) {
     const now = new Date();
     const bufferMs = 5 * 60 * 1000; // 5 minutes buffer to handle timezone and clock skew
     const minAllowedTime = new Date(now.getTime() - bufferMs);
-    
+
     // Only validate if scheduledStart is significantly in the past (more than buffer)
     if (this.scheduledStart.getTime() < minAllowedTime.getTime()) {
       const scheduledStartStr = this.scheduledStart.toISOString();
       const nowStr = now.toISOString();
       const timeDiffMs = now.getTime() - this.scheduledStart.getTime();
       const timeDiffMinutes = Math.round(timeDiffMs / (60 * 1000));
-      
+
       console.error("[Appointment Validation] scheduledStart is in the past:", {
         scheduledStart: scheduledStartStr,
         now: nowStr,
@@ -184,9 +220,9 @@ AppointmentSchema.pre("validate", function (next) {
         bufferMs: bufferMs,
         status: this.status,
       });
-      
+
       this.invalidate(
-        "scheduledStart", 
+        "scheduledStart",
         `scheduledStart must be in the future. Scheduled: ${scheduledStartStr}, Now: ${nowStr}, Difference: ${timeDiffMinutes} minutes ago`
       );
     }
@@ -241,7 +277,7 @@ AppointmentSchema.pre("save", function (next) {
     if (this.amountPaid !== 0) this.amountPaid = 0;
     this.paymentStatus = this.paymentStatus || "unpaid";
   } else {
-    this.paymentStatus = (this.amountPaid >= this.totalPay) ? "paid" : "unpaid";
+    this.paymentStatus = this.amountPaid >= this.totalPay ? "paid" : "unpaid";
   }
 
   next();
@@ -253,7 +289,9 @@ AppointmentSchema.virtual("balance").get(function () {
 });
 
 AppointmentSchema.virtual("paidInFull").get(function () {
-  return (this.totalPay || 0) > 0 && (this.amountPaid || 0) >= (this.totalPay || 0);
+  return (
+    (this.totalPay || 0) > 0 && (this.amountPaid || 0) >= (this.totalPay || 0)
+  );
 });
 
 // Index hay dùng (giữ nguyên + bổ sung)

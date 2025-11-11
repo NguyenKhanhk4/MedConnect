@@ -853,7 +853,9 @@ export async function rescheduleAppointmentByManager(
   newDateTime,
   reason,
   mode,
-  clinicId
+  clinicId,
+  newDoctorId,
+  rescheduleType
 ) {
   const r = await fetch(
     `${BASE}/api/managers/appointments/${appointmentId}/reschedule`,
@@ -861,7 +863,14 @@ export async function rescheduleAppointmentByManager(
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ newDateTime, reason, mode, clinicId }),
+      body: JSON.stringify({
+        newDateTime,
+        reason,
+        mode,
+        clinicId,
+        newDoctorId,
+        rescheduleType,
+      }),
     }
   );
   if (!r.ok) throw new Error(await r.text());

@@ -324,46 +324,45 @@ export default function LichHen() {
     showConfirm(
       `Bạn có chắc chắn muốn chấp nhận lịch hẹn với ${patientName}?`,
       async () => {
-    setUpdatingAppointments((prev) => new Set(prev).add(appointment._id));
-    try {
-      await updateAppointmentStatus(appointment._id, "accepted");
-
-      // Cập nhật trạng thái ngay lập tức trong UI
-      setAppointments((prevAppointments) =>
-        prevAppointments.map((apt) =>
-          apt._id === appointment._id ? { ...apt, status: "accepted" } : apt
-        )
-      );
-
-          showAlert(
-            `Đã chấp nhận lịch hẹn với ${patientName}`
-      );
-
-      // Refresh appointments list để đảm bảo đồng bộ
-      setTimeout(async () => {
+        setUpdatingAppointments((prev) => new Set(prev).add(appointment._id));
         try {
-          const updatedAppointments = await getDoctorAppointmentsWithFallback({
-            limit: 1000,
-          });
-          if (
-            updatedAppointments.success &&
-            updatedAppointments.data?.appointments
-          ) {
-            setAppointments(updatedAppointments.data.appointments);
-          }
+          await updateAppointmentStatus(appointment._id, "accepted");
+
+          // Cập nhật trạng thái ngay lập tức trong UI
+          setAppointments((prevAppointments) =>
+            prevAppointments.map((apt) =>
+              apt._id === appointment._id ? { ...apt, status: "accepted" } : apt
+            )
+          );
+
+          showAlert(`Đã chấp nhận lịch hẹn với ${patientName}`);
+
+          // Refresh appointments list để đảm bảo đồng bộ
+          setTimeout(async () => {
+            try {
+              const updatedAppointments =
+                await getDoctorAppointmentsWithFallback({
+                  limit: 1000,
+                });
+              if (
+                updatedAppointments.success &&
+                updatedAppointments.data?.appointments
+              ) {
+                setAppointments(updatedAppointments.data.appointments);
+              }
+            } catch (error) {
+              // Silent error handling
+            }
+          }, 1000);
         } catch (error) {
-          // Silent error handling
-        }
-      }, 1000);
-    } catch (error) {
           showAlert("Có lỗi xảy ra khi chấp nhận lịch hẹn: " + error.message);
-    } finally {
-      setUpdatingAppointments((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(appointment._id);
-        return newSet;
-      });
-    }
+        } finally {
+          setUpdatingAppointments((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(appointment._id);
+            return newSet;
+          });
+        }
       }
     );
   };
@@ -439,48 +438,53 @@ export default function LichHen() {
     showConfirm(
       `Bạn có chắc chắn muốn bắt đầu khám cho ${patientName}?`,
       async () => {
-    try {
-      // Đối với appointments ở trạng thái pending_doctor (cả online và offline), tự động accept trước khi bắt đầu khám
-      if (appointment.status === "pending_doctor") {
-        await updateAppointmentStatus(appointment._id, "accepted");
-        // Cập nhật trạng thái trong UI
-        setAppointments((prevAppointments) =>
-          prevAppointments.map((apt) =>
-            apt._id === appointment._id ? { ...apt, status: "accepted" } : apt
-          )
-        );
-      }
-
-      await updateAppointmentStatus(appointment._id, "in_progress");
-
-      // Cập nhật trạng thái ngay lập tức trong UI
-      setAppointments((prevAppointments) =>
-        prevAppointments.map((apt) =>
-          apt._id === appointment._id ? { ...apt, status: "in_progress" } : apt
-        )
-      );
-
-      showAlert(`Đã bắt đầu khám cho ${patientName}`);
-
-      // Refresh appointments list để đảm bảo đồng bộ
-      setTimeout(async () => {
         try {
-          const updatedAppointments = await getDoctorAppointmentsWithFallback({
-            limit: 1000,
-          });
-          if (
-            updatedAppointments.success &&
-            updatedAppointments.data?.appointments
-          ) {
-            setAppointments(updatedAppointments.data.appointments);
+          // Đối với appointments ở trạng thái pending_doctor (cả online và offline), tự động accept trước khi bắt đầu khám
+          if (appointment.status === "pending_doctor") {
+            await updateAppointmentStatus(appointment._id, "accepted");
+            // Cập nhật trạng thái trong UI
+            setAppointments((prevAppointments) =>
+              prevAppointments.map((apt) =>
+                apt._id === appointment._id
+                  ? { ...apt, status: "accepted" }
+                  : apt
+              )
+            );
           }
+
+          await updateAppointmentStatus(appointment._id, "in_progress");
+
+          // Cập nhật trạng thái ngay lập tức trong UI
+          setAppointments((prevAppointments) =>
+            prevAppointments.map((apt) =>
+              apt._id === appointment._id
+                ? { ...apt, status: "in_progress" }
+                : apt
+            )
+          );
+
+          showAlert(`Đã bắt đầu khám cho ${patientName}`);
+
+          // Refresh appointments list để đảm bảo đồng bộ
+          setTimeout(async () => {
+            try {
+              const updatedAppointments =
+                await getDoctorAppointmentsWithFallback({
+                  limit: 1000,
+                });
+              if (
+                updatedAppointments.success &&
+                updatedAppointments.data?.appointments
+              ) {
+                setAppointments(updatedAppointments.data.appointments);
+              }
+            } catch (error) {
+              // Silent error handling
+            }
+          }, 1000);
         } catch (error) {
-          // Silent error handling
-        }
-      }, 1000);
-    } catch (error) {
           showAlert("Có lỗi xảy ra khi bắt đầu khám: " + error.message);
-    }
+        }
       }
     );
   };
@@ -492,47 +496,44 @@ export default function LichHen() {
       "bệnh nhân";
 
     // Thêm thông báo xác nhận
-    showConfirm(
-      `Bạn có chắc chắn muốn lưu hồ sơ cho ${patientName}?`,
-      () => {
-    console.log("🔍 handleComplete called with appointment:", appointment);
-    console.log("🔍 Appointment ID:", appointment?._id);
-    console.log("🔍 Appointment mode:", appointment?.mode);
-    console.log("🔍 Appointment status:", appointment?.status);
-    console.log("🔍 Rescheduled from ID:", appointment?.rescheduledFromId);
+    showConfirm(`Bạn có chắc chắn muốn lưu hồ sơ cho ${patientName}?`, () => {
+      console.log("🔍 handleComplete called with appointment:", appointment);
+      console.log("🔍 Appointment ID:", appointment?._id);
+      console.log("🔍 Appointment mode:", appointment?.mode);
+      console.log("🔍 Appointment status:", appointment?.status);
+      console.log("🔍 Rescheduled from ID:", appointment?.rescheduledFromId);
 
-    // Validate appointment data
-    if (!appointment?._id) {
-      showAlert("Lỗi: Không tìm thấy ID của lịch hẹn");
-      return;
-    }
-
-    // If this is a rescheduled appointment, make sure we're using the NEW appointment ID
-    if (appointment.rescheduledFromId) {
-      console.log(
-        "✅ This is a rescheduled appointment. Using new appointment ID:",
-        appointment._id
-      );
-    }
-
-    // Navigate to the appropriate consultation page based on mode
-    if (appointment?.mode === "offline") {
-      console.log(
-        "✅ Navigating to OFFLINE consultation:",
-        `/bac-si/kham-truc-tiep/${appointment._id}`
-      );
-      navigate(`/bac-si/kham-truc-tiep/${appointment._id}`);
-    } else if (appointment?.mode === "online") {
-      console.log(
-        "✅ Navigating to ONLINE consultation:",
-        `/bac-si/tu-van-truc-tuyen/${appointment._id}`
-      );
-      navigate(`/bac-si/tu-van-truc-tuyen/${appointment._id}`);
-    } else {
-      showAlert("Lỗi: Không xác định được loại khám (online/offline)");
-    }
+      // Validate appointment data
+      if (!appointment?._id) {
+        showAlert("Lỗi: Không tìm thấy ID của lịch hẹn");
+        return;
       }
-    );
+
+      // If this is a rescheduled appointment, make sure we're using the NEW appointment ID
+      if (appointment.rescheduledFromId) {
+        console.log(
+          "✅ This is a rescheduled appointment. Using new appointment ID:",
+          appointment._id
+        );
+      }
+
+      // Navigate to the appropriate consultation page based on mode
+      if (appointment?.mode === "offline") {
+        console.log(
+          "✅ Navigating to OFFLINE consultation:",
+          `/bac-si/kham-truc-tiep/${appointment._id}`
+        );
+        navigate(`/bac-si/kham-truc-tiep/${appointment._id}`);
+      } else if (appointment?.mode === "online") {
+        console.log(
+          "✅ Navigating to ONLINE consultation:",
+          `/bac-si/tu-van-truc-tuyen/${appointment._id}`
+        );
+        navigate(`/bac-si/tu-van-truc-tuyen/${appointment._id}`);
+      } else {
+        showAlert("Lỗi: Không xác định được loại khám (online/offline)");
+      }
+    });
   };
 
   const handleNoService = async (appointment) => {
@@ -545,28 +546,28 @@ export default function LichHen() {
     showConfirm(
       `Bạn có chắc chắn muốn hoàn thành khám cho ${patientName} mà không có dịch vụ?`,
       async () => {
-    setUpdatingAppointments((prev) => new Set(prev).add(appointment._id));
-    try {
-      await updateAppointmentStatus(appointment._id, "done");
+        setUpdatingAppointments((prev) => new Set(prev).add(appointment._id));
+        try {
+          await updateAppointmentStatus(appointment._id, "done");
 
-      // Cập nhật trạng thái ngay lập tức trong UI
-      setAppointments((prevAppointments) =>
-        prevAppointments.map((apt) =>
-          apt._id === appointment._id ? { ...apt, status: "done" } : apt
-        )
-      );
+          // Cập nhật trạng thái ngay lập tức trong UI
+          setAppointments((prevAppointments) =>
+            prevAppointments.map((apt) =>
+              apt._id === appointment._id ? { ...apt, status: "done" } : apt
+            )
+          );
 
-      showAlert(`Đã hoàn thành khám cho ${patientName}`);
-    } catch (error) {
-      console.error("Error updating appointment status:", error);
-      showAlert("Có lỗi xảy ra khi cập nhật trạng thái: " + error.message);
-    } finally {
-      setUpdatingAppointments((prev) => {
-        const next = new Set(prev);
-        next.delete(appointment._id);
-        return next;
-      });
-    }
+          showAlert(`Đã hoàn thành khám cho ${patientName}`);
+        } catch (error) {
+          console.error("Error updating appointment status:", error);
+          showAlert("Có lỗi xảy ra khi cập nhật trạng thái: " + error.message);
+        } finally {
+          setUpdatingAppointments((prev) => {
+            const next = new Set(prev);
+            next.delete(appointment._id);
+            return next;
+          });
+        }
       }
     );
   };
@@ -581,41 +582,44 @@ export default function LichHen() {
     showConfirm(
       `Bạn có chắc chắn muốn đánh dấu ${patientName} là không đến khám?`,
       async () => {
-    try {
-      await updateAppointmentStatus(
-        appointment._id,
-        "no_show",
-        "Bệnh nhân không đến khám"
-      );
-
-      // Cập nhật trạng thái ngay lập tức trong UI
-      setAppointments((prevAppointments) =>
-        prevAppointments.map((apt) =>
-          apt._id === appointment._id ? { ...apt, status: "no_show" } : apt
-        )
-      );
-
-      showAlert(`Đã đánh dấu ${patientName} là không đến khám`);
-
-      // Refresh appointments list để đảm bảo đồng bộ
-      setTimeout(async () => {
         try {
-          const updatedAppointments = await getDoctorAppointmentsWithFallback({
-            limit: 1000,
-          });
-          if (
-            updatedAppointments.success &&
-            updatedAppointments.data?.appointments
-          ) {
-            setAppointments(updatedAppointments.data.appointments);
-          }
+          await updateAppointmentStatus(
+            appointment._id,
+            "no_show",
+            "Bệnh nhân không đến khám"
+          );
+
+          // Cập nhật trạng thái ngay lập tức trong UI
+          setAppointments((prevAppointments) =>
+            prevAppointments.map((apt) =>
+              apt._id === appointment._id ? { ...apt, status: "no_show" } : apt
+            )
+          );
+
+          showAlert(`Đã đánh dấu ${patientName} là không đến khám`);
+
+          // Refresh appointments list để đảm bảo đồng bộ
+          setTimeout(async () => {
+            try {
+              const updatedAppointments =
+                await getDoctorAppointmentsWithFallback({
+                  limit: 1000,
+                });
+              if (
+                updatedAppointments.success &&
+                updatedAppointments.data?.appointments
+              ) {
+                setAppointments(updatedAppointments.data.appointments);
+              }
+            } catch (error) {
+              // Silent error handling
+            }
+          }, 1000);
         } catch (error) {
-          // Silent error handling
+          showAlert(
+            "Có lỗi xảy ra khi đánh dấu không đến khám: " + error.message
+          );
         }
-      }, 1000);
-    } catch (error) {
-          showAlert("Có lỗi xảy ra khi đánh dấu không đến khám: " + error.message);
-    }
       }
     );
   };
@@ -635,55 +639,60 @@ export default function LichHen() {
     showConfirm(
       `Bạn có chắc chắn muốn chấp nhận tất cả ${pendingAppointments.length} lịch hẹn đang chờ xác nhận?`,
       async () => {
-    try {
-      // Add all pending appointment IDs to updating set
-      setUpdatingAppointments(
-        (prev) =>
-          new Set([...prev, ...pendingAppointments.map((apt) => apt._id)])
-      );
-
-      // Update all appointments
-      const updatePromises = pendingAppointments.map((appointment) =>
-        updateAppointmentStatus(appointment._id, "accepted")
-      );
-
-      await Promise.all(updatePromises);
-
-      // Update UI immediately
-      setAppointments((prevAppointments) =>
-        prevAppointments.map((apt) =>
-          apt.status === "pending_doctor" ? { ...apt, status: "accepted" } : apt
-        )
-      );
-
-      showAlert(`Đã chấp nhận ${pendingAppointments.length} lịch hẹn`);
-
-      // Refresh appointments list
-      setTimeout(async () => {
         try {
-          const updatedAppointments = await getDoctorAppointmentsWithFallback({
-            limit: 1000,
-          });
-          if (
-            updatedAppointments.success &&
-            updatedAppointments.data?.appointments
-          ) {
-            setAppointments(updatedAppointments.data.appointments);
-          }
+          // Add all pending appointment IDs to updating set
+          setUpdatingAppointments(
+            (prev) =>
+              new Set([...prev, ...pendingAppointments.map((apt) => apt._id)])
+          );
+
+          // Update all appointments
+          const updatePromises = pendingAppointments.map((appointment) =>
+            updateAppointmentStatus(appointment._id, "accepted")
+          );
+
+          await Promise.all(updatePromises);
+
+          // Update UI immediately
+          setAppointments((prevAppointments) =>
+            prevAppointments.map((apt) =>
+              apt.status === "pending_doctor"
+                ? { ...apt, status: "accepted" }
+                : apt
+            )
+          );
+
+          showAlert(`Đã chấp nhận ${pendingAppointments.length} lịch hẹn`);
+
+          // Refresh appointments list
+          setTimeout(async () => {
+            try {
+              const updatedAppointments =
+                await getDoctorAppointmentsWithFallback({
+                  limit: 1000,
+                });
+              if (
+                updatedAppointments.success &&
+                updatedAppointments.data?.appointments
+              ) {
+                setAppointments(updatedAppointments.data.appointments);
+              }
+            } catch (error) {
+              console.error("Error refreshing appointments:", error);
+            }
+          }, 1000);
         } catch (error) {
-          console.error("Error refreshing appointments:", error);
+          showAlert(
+            "Có lỗi xảy ra khi chấp nhận toàn bộ lịch hẹn: " + error.message
+          );
+        } finally {
+          // Clear updating state
+          setUpdatingAppointments((prev) => {
+            const newSet = new Set(prev);
+            pendingAppointments.forEach((apt) => newSet.delete(apt._id));
+            return newSet;
+          });
         }
-      }, 1000);
-    } catch (error) {
-          showAlert("Có lỗi xảy ra khi chấp nhận toàn bộ lịch hẹn: " + error.message);
-    } finally {
-      // Clear updating state
-      setUpdatingAppointments((prev) => {
-        const newSet = new Set(prev);
-        pendingAppointments.forEach((apt) => newSet.delete(apt._id));
-        return newSet;
-      });
-    }
       }
     );
   };
@@ -700,7 +709,9 @@ export default function LichHen() {
     let originalAppointment = null;
 
     if (!appointment.rescheduledFromId) {
-      showAlert("Không tìm thấy thông tin lịch cũ (rescheduledFromId không có)");
+      showAlert(
+        "Không tìm thấy thông tin lịch cũ (rescheduledFromId không có)"
+      );
       return;
     }
 
@@ -954,7 +965,7 @@ export default function LichHen() {
                             <div style={{ marginTop: "8px" }}>
                               <Badge
                                 className="cursor-pointer"
-                                style={{ 
+                                style={{
                                   marginBottom: 4,
                                   backgroundColor: "#3b82f6",
                                   color: "#ffffff",
@@ -962,7 +973,7 @@ export default function LichHen() {
                                   fontWeight: 600,
                                   fontSize: "13px",
                                   padding: "4px 12px",
-                                  borderRadius: "6px"
+                                  borderRadius: "6px",
                                 }}
                                 onClick={() =>
                                   handleViewRepresentativeInfo(apt)
@@ -1006,17 +1017,28 @@ export default function LichHen() {
                       </Badge>
                     </td>
                     <td className="appointment-list-td appointment-list-reason">
-                      <div>
+                      <div style={{ color: "#374151" }}>
                         {apt.rescheduledFromId && (
                           <Badge
-                            className="!bg-indigo-100 !text-indigo-700 !border-indigo-300 cursor-pointer"
-                            style={{ marginRight: 8 }}
+                            className="cursor-pointer"
+                            style={{
+                              marginRight: 8,
+                              backgroundColor: "#3b82f6", // Nền xanh
+                              color: "#000000", // Chữ đen
+                              borderColor: "#2563eb",
+                              fontWeight: 600,
+                              fontSize: "13px",
+                              padding: "4px 12px",
+                              borderRadius: "6px",
+                            }}
                             onClick={() => handleViewRescheduleInfo(apt)}
                           >
                             📅 Đã dời lịch
                           </Badge>
                         )}
-                        {apt.notes || apt.reason || "Không có"}
+                        <span style={{ color: "#374151" }}>
+                          {apt.notes || apt.reason || "Không có"}
+                        </span>
                       </div>
                     </td>
                     <td className="appointment-list-td appointment-list-status">
@@ -1306,29 +1328,33 @@ export default function LichHen() {
                               showConfirm(
                                 `Bạn có chắc chắn muốn bắt đầu khám cho ${patientName}?`,
                                 async () => {
-                              try {
-                                await updateAppointmentStatus(
-                                  selectedAppointment._id,
-                                  "in_progress"
-                                );
-                                    showAlert(`Đã bắt đầu khám cho ${patientName}`);
-                                setIsDetailDialogOpen(false);
-                                // Refresh appointments
-                                const updatedAppointments =
-                                  await getDoctorAppointmentsWithFallback({
-                                    limit: 1000,
-                                  });
-                                if (
-                                  updatedAppointments.success &&
-                                  updatedAppointments.data?.appointments
-                                ) {
-                                  setAppointments(
-                                    updatedAppointments.data.appointments
-                                  );
-                                }
-                              } catch (error) {
-                                    showAlert("Có lỗi xảy ra: " + error.message);
-                              }
+                                  try {
+                                    await updateAppointmentStatus(
+                                      selectedAppointment._id,
+                                      "in_progress"
+                                    );
+                                    showAlert(
+                                      `Đã bắt đầu khám cho ${patientName}`
+                                    );
+                                    setIsDetailDialogOpen(false);
+                                    // Refresh appointments
+                                    const updatedAppointments =
+                                      await getDoctorAppointmentsWithFallback({
+                                        limit: 1000,
+                                      });
+                                    if (
+                                      updatedAppointments.success &&
+                                      updatedAppointments.data?.appointments
+                                    ) {
+                                      setAppointments(
+                                        updatedAppointments.data.appointments
+                                      );
+                                    }
+                                  } catch (error) {
+                                    showAlert(
+                                      "Có lỗi xảy ra: " + error.message
+                                    );
+                                  }
                                 }
                               );
                             }}
@@ -1348,32 +1374,34 @@ export default function LichHen() {
                               showConfirm(
                                 `Bạn có chắc chắn muốn đánh dấu ${patientName} là không đến khám?`,
                                 async () => {
-                              try {
-                                await updateAppointmentStatus(
-                                  selectedAppointment._id,
-                                  "no_show",
-                                  "Bệnh nhân không đến khám"
-                                );
+                                  try {
+                                    await updateAppointmentStatus(
+                                      selectedAppointment._id,
+                                      "no_show",
+                                      "Bệnh nhân không đến khám"
+                                    );
                                     showAlert(
-                                  `Đã đánh dấu ${patientName} là không đến khám`
-                                );
-                                setIsDetailDialogOpen(false);
-                                // Refresh appointments
-                                const updatedAppointments =
-                                  await getDoctorAppointmentsWithFallback({
-                                    limit: 1000,
-                                  });
-                                if (
-                                  updatedAppointments.success &&
-                                  updatedAppointments.data?.appointments
-                                ) {
-                                  setAppointments(
-                                    updatedAppointments.data.appointments
-                                  );
-                                }
-                              } catch (error) {
-                                    showAlert("Có lỗi xảy ra: " + error.message);
-                              }
+                                      `Đã đánh dấu ${patientName} là không đến khám`
+                                    );
+                                    setIsDetailDialogOpen(false);
+                                    // Refresh appointments
+                                    const updatedAppointments =
+                                      await getDoctorAppointmentsWithFallback({
+                                        limit: 1000,
+                                      });
+                                    if (
+                                      updatedAppointments.success &&
+                                      updatedAppointments.data?.appointments
+                                    ) {
+                                      setAppointments(
+                                        updatedAppointments.data.appointments
+                                      );
+                                    }
+                                  } catch (error) {
+                                    showAlert(
+                                      "Có lỗi xảy ra: " + error.message
+                                    );
+                                  }
                                 }
                               );
                             }}

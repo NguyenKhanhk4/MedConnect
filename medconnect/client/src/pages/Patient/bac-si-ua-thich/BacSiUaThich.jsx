@@ -34,10 +34,18 @@ const BacSiUaThich = () => {
     useFavoriteDoctors();
 
   const handleBookAppointment = (doctor) => {
+    // API now returns both specializationIds and specializations for compatibility
+    // Ensure specializationIds is available (fallback to specializations if needed)
+    const normalizedDoctor = {
+      ...doctor,
+      specializationIds:
+        doctor.specializationIds || doctor.specializations || [],
+    };
+
     navigate("/dat-lich/chon-thoi-gian", {
       state: {
-        doctor: doctor,
-        specialization: doctor.specializations?.[0] || null,
+        doctor: normalizedDoctor,
+        specialization: normalizedDoctor.specializationIds?.[0] || null,
       },
     });
   };

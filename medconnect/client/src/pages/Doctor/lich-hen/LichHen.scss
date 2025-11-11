@@ -46,15 +46,15 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   overflow-y: visible;
   flex: 1;
   max-width: 100%;
-  
+
   /* Ẩn scrollbar nếu có */
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
-  
+
   &::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Opera */
   }
-  
+
   // Full màn hình, không có scrollbar riêng, không có margin
 }
 
@@ -538,11 +538,11 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   box-sizing: border-box;
   flex: 1;
   max-width: 100%;
-  
+
   /* Ẩn scrollbar nếu có */
   scrollbar-width: none !important; /* Firefox */
   -ms-overflow-style: none !important; /* IE and Edge */
-  
+
   &::-webkit-scrollbar {
     display: none !important; /* Chrome, Safari, Opera */
   }
@@ -724,11 +724,11 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   border-radius: 1rem;
   border: 2px solid $gray-100;
   box-shadow: $shadow-sm;
-  
+
   // Ẩn thanh trượt
   scrollbar-width: none;
   -ms-overflow-style: none;
-  
+
   &::-webkit-scrollbar {
     display: none;
   }
@@ -837,6 +837,22 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
 .appointment-list-reason {
   color: $gray-600;
   font-weight: 500;
+
+  // Đảm bảo text trong cột lý do có màu tối, dễ nhìn
+  div {
+    color: $gray-700 !important;
+  }
+
+  // Đảm bảo text "Không có" hoặc lý do khám có màu tối
+  span,
+  p {
+    color: $gray-700 !important;
+  }
+
+  // Badge "Đã dời lịch" giữ nguyên màu indigo
+  .badge {
+    color: inherit !important; // Badge sẽ tự quản lý màu của nó
+  }
 }
 
 .appointment-list-status {
@@ -1152,11 +1168,11 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   overflow-y: auto;
   animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid $gray-100;
-  
+
   // Ẩn thanh trượt
   scrollbar-width: none;
   -ms-overflow-style: none;
-  
+
   &::-webkit-scrollbar {
     display: none;
   }
@@ -1430,11 +1446,11 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
-  
+
   // Ẩn thanh trượt
   scrollbar-width: none;
   -ms-overflow-style: none;
-  
+
   &::-webkit-scrollbar {
     display: none;
   }
