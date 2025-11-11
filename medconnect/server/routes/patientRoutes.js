@@ -77,7 +77,7 @@ router.put(
 // Get appointment details by ID
 router.get("/me/appointments/:appointmentId", authGuard, getAppointmentDetails);
 
-// Get patient stats (for dashboard)
+// Get patient stats 
 router.get("/me/stats", authGuard, async (req, res) => {
   try {
     const claims = req.user || {};

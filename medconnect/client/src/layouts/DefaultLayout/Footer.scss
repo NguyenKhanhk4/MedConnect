@@ -3,6 +3,25 @@
 /* =========================================== */
 
 /* ==== FOOTER ==== */
+@import "./Variables.scss";
+
+.app-footer {
+  .ant-space-item {
+    width: 100%;
+  }
+
+  a[href*="/co-so-y-te"] {
+    transition: color 0.2s ease;
+    
+    &:hover {
+      color: var(--color-brand-dark, #45c3d2) !important;
+      
+      .anticon {
+        color: var(--color-brand-dark, #45c3d2);
+      }
+    }
+  }
+}
 .footer {
   background: #f5f7fa;
   padding: 40px 0 20px;

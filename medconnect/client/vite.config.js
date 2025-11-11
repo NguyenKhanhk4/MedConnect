@@ -9,6 +9,7 @@ export default defineConfig({
       process.env.VITE_API_URL || "http://localhost:3000"
     ),
     global: "globalThis",
+    // giữ nguyên cấu trúc process.env bạn đang dùng
     process: {
       env: {
         VITE_SIGNALING_SERVER_URL: JSON.stringify(
@@ -40,7 +41,26 @@ export default defineConfig({
       buffer: "buffer",
     },
   },
+
+  // ==== quan trọng: xử lý dependency gây lỗi (immer/recharts)
   optimizeDeps: {
-    include: ["simple-peer", "buffer"],
+    // buộc pre-bundle khi dev để esbuild hiểu module
+    include: ["simple-peer", "buffer", "immer", "recharts"],
   },
+
+  // Đảm bảo build (Rollup + @rollup/plugin-commonjs) xử lý đúng các module trong node_modules
+  build: {
+    commonjsOptions: {
+      // include toàn bộ node_modules (an toàn) — giúp xử lý các .mjs/.cjs trong deps
+      include: [/node_modules/],
+      // nếu cần, có thể bỏ comment và thêm namedExports/transformMixedEsModules tuỳ lib
+      // transformMixedEsModules: true,
+    },
+  },
+
+  // Nếu bạn dùng SSR trên Vercel hoặc target bundle có SSR, bất cứ khi nào
+  // một dependency cần được đóng gói thay vì external, dùng noExternal:
+  // ssr: {
+  //   noExternal: ['recharts', 'immer']
+  // }
 });
