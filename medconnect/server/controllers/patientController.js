@@ -2870,11 +2870,14 @@ export async function getPatientPayments(req, res) {
       );
     }
 
-    // Find patient by user ID
-    const patient = await Patient.findOne({ userId: appUserId });
-    if (!patient) {
+    // Find all patients belonging to this user (including family members)
+    const patients = await Patient.find({ userId: appUserId });
+    if (!patients || patients.length === 0) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient not found");
     }
+
+    // Get all patient IDs (including family members)
+    const patientIds = patients.map((p) => p._id);
 
     const {
       invoiceType,
@@ -2886,9 +2889,10 @@ export async function getPatientPayments(req, res) {
     } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Build query - only get payments for this patient
+    // Build query - get payments for all patients belonging to this user
+    // This includes payments for the user themselves and payments for family members they booked for
     const query = {
-      "billTo.patientId": patient._id,
+      "billTo.patientId": { $in: patientIds },
     };
 
     // Filter by invoiceType (booking or service)
