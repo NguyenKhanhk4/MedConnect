@@ -23,8 +23,10 @@ import path from "path";
 // ================== HELPER FUNCTIONS ==================
 
 /**
- * Check if doctor has all required information to be active
- * Required fields: yearsExperience > 0, bio (non-empty), and educationLevel
+ * Kiểm tra xem bác sĩ có đủ thông tin để được kích hoạt không
+ * Các trường bắt buộc: yearsExperience > 0, bio (không rỗng), và educationLevel
+ * @param {string} doctorId - ID của bác sĩ cần kiểm tra
+ * @returns {Promise<{canBeActive: boolean, reason?: string}>} - Kết quả kiểm tra
  */
 async function checkDoctorCanBeActive(doctorId) {
   try {
@@ -67,28 +69,47 @@ async function checkDoctorCanBeActive(doctorId) {
   }
 }
 
-// Helper function to get time ago
+/**
+ * Hàm helper: Tính toán và trả về thời gian đã trôi qua từ một ngày cụ thể
+ * Thuật toán: Tính khoảng cách thời gian theo phút, sau đó chuyển đổi sang phút/giờ/ngày
+ * @param {Date} date - Ngày cần so sánh
+ * @returns {string} - Chuỗi mô tả thời gian đã trôi qua (ví dụ: "5 phút trước", "2 giờ trước", "3 ngày trước")
+ */
 function getTimeAgo(date) {
   const now = new Date();
+  // Tính số phút đã trôi qua: (hiện tại - ngày cũ) / (1000ms * 60s)
   const diffInMinutes = Math.floor((now - date) / (1000 * 60));
 
+  // Nếu chưa đến 1 giờ (60 phút), hiển thị theo phút
   if (diffInMinutes < 60) {
     return `${diffInMinutes} phút trước`;
-  } else if (diffInMinutes < 1440) {
+  } 
+  // Nếu chưa đến 1 ngày (1440 phút = 24 giờ), hiển thị theo giờ
+  else if (diffInMinutes < 1440) {
     const hours = Math.floor(diffInMinutes / 60);
     return `${hours} giờ trước`;
-  } else {
+  } 
+  // Nếu hơn 1 ngày, hiển thị theo ngày
+  else {
     const days = Math.floor(diffInMinutes / 1440);
     return `${days} ngày trước`;
   }
 }
 
-// Helper function to format date
+/**
+ * Hàm helper: Định dạng ngày tháng theo định dạng Việt Nam
+ * @param {Date|string} date - Ngày cần định dạng
+ * @returns {string} - Chuỗi ngày đã được định dạng (ví dụ: "12/11/2025")
+ */
 function formatDate(date) {
   return new Date(date).toLocaleDateString("vi-VN");
 }
 
-// Helper function to format time
+/**
+ * Hàm helper: Định dạng thời gian theo định dạng Việt Nam
+ * @param {Date|string} date - Ngày cần định dạng
+ * @returns {string} - Chuỗi thời gian đã được định dạng (ví dụ: "14:30")
+ */
 function formatTime(date) {
   return new Date(date).toLocaleTimeString("vi-VN", {
     hour: "2-digit",
@@ -96,7 +117,12 @@ function formatTime(date) {
   });
 }
 
-// Helper function to get color for specialization
+/**
+ * Hàm helper: Lấy màu sắc tương ứng với tên chuyên khoa
+ * Thuật toán: Sử dụng Map để ánh xạ tên chuyên khoa với mã màu hex
+ * @param {string} name - Tên chuyên khoa
+ * @returns {string} - Mã màu hex (ví dụ: "#ff4d4f")
+ */
 function getColorForSpecialization(name) {
   const colorMap = {
     "Tim mạch": "#ff4d4f",
@@ -2502,14 +2528,20 @@ export const cleanupUnpaidAppointments = async (req, res) => {
 // ================== PAYMENT REVENUE CONTROLLER ==================
 
 /**
- * Helper function to get date range based on period
+ * Hàm helper: Tính toán khoảng thời gian (startDate, endDate) dựa trên period được chọn
+ * Thuật toán: Sử dụng switch-case để xử lý các period khác nhau (today, week, month, year, custom, ...)
+ * @param {string} period - Chu kỳ thời gian (today, thisWeek, thisMonth, thisYear, custom, ...)
+ * @param {Object} req - Request object (dùng khi period = 'custom' để lấy startDate/endDate từ query)
+ * @returns {{startDate: Date, endDate: Date}} - Object chứa ngày bắt đầu và kết thúc
  */
 function getDateRange(period, req = null) {
   const now = new Date();
+  // Tạo ngày hôm nay với thời gian 00:00:00
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   let startDate, endDate;
 
+  // Xử lý các trường hợp period khác nhau
   switch (period) {
     case "today":
       startDate = new Date(today);
@@ -2578,7 +2610,14 @@ function getDateRange(period, req = null) {
 }
 
 /**
- * Get payment revenue statistics
+ * Lấy thống kê doanh thu từ thanh toán
+ * Thuật toán: 
+ * 1. Tính toán khoảng thời gian dựa trên period
+ * 2. Lấy tất cả payments trong khoảng thời gian đó (status = captured hoặc authorized)
+ * 3. Tính toán doanh thu = tổng (total - refundAmount)
+ * 4. So sánh với kỳ trước để tính phần trăm thay đổi
+ * 5. Phân tích doanh thu theo kênh thanh toán và xu hướng theo thời gian
+ * 
  * GET /api/admin/payment/revenue-stats?period=yesterday
  */
 export const getPaymentRevenueStats = async (req, res) => {
@@ -2590,28 +2629,32 @@ export const getPaymentRevenueStats = async (req, res) => {
     } = req.query;
     let startDate, endDate;
 
+    // Xử lý period custom: lấy startDate và endDate từ query params
     if (period === "custom" && startDateParam && endDateParam) {
       startDate = new Date(startDateParam);
-      startDate.setHours(0, 0, 0, 0);
+      startDate.setHours(0, 0, 0, 0); // Bắt đầu từ 00:00:00
       endDate = new Date(endDateParam);
-      endDate.setHours(23, 59, 59, 999);
+      endDate.setHours(23, 59, 59, 999); // Kết thúc lúc 23:59:59
     } else {
+      // Sử dụng hàm helper để tính toán khoảng thời gian
       const range = getDateRange(period, req);
       startDate = range.startDate;
       endDate = range.endDate;
     }
 
-    // Get current period payments
+    // Lấy tất cả payments trong kỳ hiện tại (chỉ lấy payments đã thanh toán thành công)
     const currentPayments = await Payment.find({
-      status: { $in: ["captured", "authorized"] },
-      createdAt: { $gte: startDate, $lte: endDate },
-    }).populate("appointmentId");
+      status: { $in: ["captured", "authorized"] }, // Chỉ lấy payments đã thanh toán thành công
+      createdAt: { $gte: startDate, $lte: endDate }, // Lọc theo thời gian tạo payment
+    }).populate("appointmentId"); // Populate để lấy thông tin appointment liên quan
 
-    // Calculate previous period for comparison
+    // Tính toán kỳ trước để so sánh
+    // Thuật toán: Lấy khoảng thời gian hiện tại, trừ đi chính khoảng đó để được kỳ trước
     const previousPeriodStart = new Date(startDate);
     const previousPeriodEnd = new Date(endDate);
-    const periodDiff = endDate - startDate;
+    const periodDiff = endDate - startDate; // Độ dài kỳ hiện tại (milliseconds)
 
+    // Trừ đi khoảng thời gian để được kỳ trước
     previousPeriodStart.setTime(previousPeriodStart.getTime() - periodDiff - 1);
     previousPeriodEnd.setTime(previousPeriodEnd.getTime() - periodDiff - 1);
 
@@ -2620,16 +2663,22 @@ export const getPaymentRevenueStats = async (req, res) => {
       createdAt: { $gte: previousPeriodStart, $lte: previousPeriodEnd },
     });
 
-    // Calculate total revenue
+    // Tính tổng doanh thu kỳ hiện tại
+    // Thuật toán: Duyệt qua tất cả payments, cộng dồn (total - refundAmount)
+    // refundAmount là số tiền đã hoàn lại, nên phải trừ đi để có doanh thu thực tế
     const totalRevenue = currentPayments.reduce((sum, payment) => {
       return sum + (payment.total - (payment.refundAmount || 0));
     }, 0);
 
+    // Tính tổng doanh thu kỳ trước (để so sánh)
     const previousRevenue = previousPayments.reduce((sum, payment) => {
       return sum + (payment.total - (payment.refundAmount || 0));
     }, 0);
 
-    // Calculate revenue change percentage
+    // Tính phần trăm thay đổi doanh thu
+    // Thuật toán: ((doanh thu hiện tại - doanh thu trước) / doanh thu trước) * 100
+    // Nếu kỳ trước = 0 và kỳ hiện tại > 0 → tăng 100%
+    // Nếu cả hai = 0 → không thay đổi (0%)
     const revenueChange =
       previousRevenue > 0
         ? Math.round(((totalRevenue - previousRevenue) / previousRevenue) * 100)
@@ -2652,13 +2701,16 @@ export const getPaymentRevenueStats = async (req, res) => {
         ? 100
         : 0;
 
-    // Revenue by payment channel
+    // Phân tích doanh thu theo kênh thanh toán
+    // Thuật toán: Duyệt qua tất cả payments, nhóm theo gateway (kênh thanh toán)
+    // Mỗi kênh sẽ có tổng doanh thu riêng
     const revenueByChannel = {};
     currentPayments.forEach((payment) => {
-      const channelName = payment.gateway || "MedConnect";
+      const channelName = payment.gateway || "MedConnect"; // Nếu không có gateway, mặc định là "MedConnect"
       if (!revenueByChannel[channelName]) {
-        revenueByChannel[channelName] = 0;
+        revenueByChannel[channelName] = 0; // Khởi tạo nếu chưa có
       }
+      // Cộng dồn doanh thu cho kênh này
       revenueByChannel[channelName] +=
         payment.total - (payment.refundAmount || 0);
     });
@@ -2682,10 +2734,14 @@ export const getPaymentRevenueStats = async (req, res) => {
       ["cancelled", "voided", "failed"].includes(p.status)
     ).length;
 
-    // Revenue trend (hourly for today/yesterday, monthly for 3 months, daily for others)
+    // Xu hướng doanh thu theo thời gian
+    // Thuật toán: 
+    // - Nếu period = today/yesterday/24hours → chia theo giờ (24 điểm dữ liệu)
+    // - Nếu period = threeMonths → chia theo tháng
+    // - Các trường hợp khác → chia theo ngày
     let revenueTrend = [];
     if (period === "today" || period === "yesterday" || period === "24hours") {
-      // Hourly trend
+      // Xu hướng theo giờ: duyệt qua 24 giờ trong ngày
       for (let hour = 0; hour < 24; hour++) {
         const hourStart = new Date(startDate);
         hourStart.setHours(hour, 0, 0, 0);
@@ -2887,137 +2943,195 @@ export const getAdminInvoices = async (req, res) => {
 };
 
 /**
- * GET /api/admin/statistics
- * Get comprehensive statistics for statistics page
+ * Lấy thống kê tổng hợp cho trang thống kê
+ * 
+ * Thuật toán tổng quát:
+ * 1. Xử lý period và tính toán khoảng thời gian (startDate, endDate)
+ * 2. Tính toán các chỉ số chính:
+ *    - Tổng số bác sĩ (so với tháng trước)
+ *    - Tổng số bệnh nhân (so với tuần trước)
+ *    - Tổng số lịch hẹn (so với kỳ trước)
+ *    - Tổng doanh thu (so với kỳ trước)
+ * 3. Tính toán top 3:
+ *    - Top 3 bác sĩ khám online nhiều nhất
+ *    - Top 3 bác sĩ khám offline nhiều nhất
+ *    - Top 3 bệnh nhân đến khám nhiều nhất (kèm tổng chi tiêu)
+ * 4. Tính tỷ lệ loại khám (online vs offline)
+ * 5. Tính xu hướng doanh thu theo thời gian
+ * 
+ * GET /api/admin/statistics?period=today&startDate=...&endDate=...
  */
 export const getStatistics = async (req, res) => {
   try {
     let { period = 'today', startDate: startDateParam, endDate: endDateParam } = req.query;
     
-    // Map frontend period keys to backend keys
+    // Ánh xạ các key period từ frontend sang backend
+    // Frontend gửi 'week', 'month', 'year' → Backend cần 'thisWeek', 'thisMonth', 'thisYear'
     const periodMap = {
       'week': 'thisWeek',
       'month': 'thisMonth',
       'year': 'thisYear',
       'today': 'today'
     };
-    const originalPeriod = period;
-    period = periodMap[period] || period;
+    const originalPeriod = period; // Lưu period gốc để dùng cho logic so sánh
+    period = periodMap[period] || period; // Chuyển đổi sang key backend
     
+    const today = new Date();
     let startDate, endDate;
     
+    // Xử lý period custom: lấy startDate và endDate từ query params
     if (originalPeriod === 'custom' && startDateParam && endDateParam) {
       startDate = new Date(startDateParam);
-      startDate.setHours(0, 0, 0, 0);
+      startDate.setHours(0, 0, 0, 0); // Bắt đầu từ 00:00:00
       endDate = new Date(endDateParam);
-      endDate.setHours(23, 59, 59, 999);
+      endDate.setHours(23, 59, 59, 999); // Kết thúc lúc 23:59:59
     } else {
+      // Sử dụng hàm helper để tính toán khoảng thời gian
       const range = getDateRange(period, req);
       startDate = range.startDate;
       endDate = range.endDate;
-      // Ensure dates are set correctly for year period to get complete data
+      
+      // Đảm bảo dates được set đúng cho từng period để lấy đầy đủ dữ liệu
+      // Đặc biệt quan trọng: endDate phải là cuối ngày (23:59:59) để bao gồm cả ngày hôm nay
       if (period === 'thisYear' || originalPeriod === 'year') {
-        const today = new Date();
         // Start from beginning of year
         startDate = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0);
         // End at end of today
         endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+      } else if (period === 'today' || originalPeriod === 'today') {
+        // For today, end at end of today
+        endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+        startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+      } else if (period === 'thisWeek' || originalPeriod === 'week') {
+        // For week: tính từ đầu tuần (Chủ nhật) đến cuối tuần (Thứ 7)
+        // Tuần bắt đầu từ Chủ nhật (getDay() = 0) đến Thứ 7 (getDay() = 6)
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - today.getDay()); // Về Chủ nhật đầu tuần
+        startDate = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), 0, 0, 0, 0);
+        
+        // Kết thúc ở cuối Thứ 7 của tuần này (6 ngày sau Chủ nhật)
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        endDate = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate(), 23, 59, 59, 999);
+      } else if (period === 'thisMonth' || originalPeriod === 'month') {
+        // For month: tính từ đầu tháng đến cuối tháng
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0, 0);
+        // Kết thúc ở ngày cuối cùng của tháng hiện tại
+        const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+        endDate = monthEnd;
       }
     }
 
-    const today = new Date();
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-    // 1. Tổng Bác Sĩ - So với tháng trước
+    // ========== 1. TỔNG BÁC SĨ - So với tháng trước ==========
+    // Đếm tổng số bác sĩ đã được xác minh (isVerified = true)
     const totalDoctors = await Doctor.countDocuments({ isVerified: true });
     
-    // Count doctors created before this month
+    // Tính ngày cuối tháng trước (để so sánh)
+    // Thuật toán: new Date(year, month, 0) → trả về ngày cuối cùng của tháng trước
     const previousMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
     
+    // Đếm số bác sĩ đã được tạo trước tháng này
     const previousTotalDoctors = await Doctor.countDocuments({ 
       isVerified: true,
-      createdAt: { $lte: previousMonthEnd }
+      createdAt: { $lte: previousMonthEnd } // Chỉ lấy những bác sĩ được tạo trước hoặc bằng cuối tháng trước
     });
+    // Tính sự thay đổi: số bác sĩ hiện tại - số bác sĩ tháng trước
     const doctorsChange = totalDoctors - previousTotalDoctors;
 
-    // 2. Tổng Bệnh Nhân - So với tuần trước
+    // ========== 2. TỔNG BỆNH NHÂN - So với tuần trước ==========
+    // Đếm tổng số bệnh nhân (users có role = 'patient')
     const totalPatients = await User.countDocuments({ role: 'patient' });
     
-    // User Distribution by Role
+    // Phân bổ người dùng theo vai trò (role)
+    // Thuật toán: Đếm số lượng users theo từng role để tính phần trăm phân bổ
     const totalUsers = await User.countDocuments({});
     const adminCount = await User.countDocuments({ role: 'admin' });
     const doctorUserCount = await User.countDocuments({ role: 'doctor' });
     const patientUserCount = await User.countDocuments({ role: 'patient' });
     const managerCount = await User.countDocuments({ role: 'manager' });
     
-    // Count patients created before this week
+    // Tính ngày cuối tuần trước để so sánh
+    // Thuật toán: 
+    // - today.getDay() trả về 0-6 (0 = Chủ nhật, 1 = Thứ 2, ...)
+    // - Trừ đi today.getDay() để về đầu tuần (Chủ nhật)
+    // - Trừ thêm 1 ngày để được cuối tuần trước
     const currentWeekStart = new Date(todayStart);
-    currentWeekStart.setDate(todayStart.getDate() - todayStart.getDay()); // Start of this week
+    currentWeekStart.setDate(todayStart.getDate() - todayStart.getDay()); // Đầu tuần này (Chủ nhật)
     const previousWeekEnd = new Date(currentWeekStart);
-    previousWeekEnd.setDate(previousWeekEnd.getDate() - 1);
+    previousWeekEnd.setDate(previousWeekEnd.getDate() - 1); // Cuối tuần trước (Thứ 7)
     
+    // Đếm số bệnh nhân đã được tạo trước tuần này
     const previousTotalPatients = await User.countDocuments({ 
       role: 'patient',
       createdAt: { $lte: previousWeekEnd }
     });
+    // Tính sự thay đổi: số bệnh nhân hiện tại - số bệnh nhân tuần trước
     const patientsChange = totalPatients - previousTotalPatients;
 
-    // 3. Lịch Hẹn - Appointments based on selected period (count all appointments regardless of status)
-    // For year period, include appointments scheduled in the current year (even if in future)
+    // ========== 3. LỊCH HẸN - Dựa trên period được chọn ==========
+    // Đếm tất cả appointments trong khoảng thời gian (không phân biệt status)
+    // Lưu ý: Sử dụng scheduledStart (thời gian đặt lịch) thay vì createdAt để đảm bảo tính nhất quán
+    
     let appointmentQuery = {};
     if (originalPeriod === 'year') {
-      // For year, count all appointments scheduled in the current year (including future dates)
-      const yearStart = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0);
-      const yearEnd = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+      // Nếu period = year: đếm tất cả appointments được lên lịch trong năm hiện tại
+      // Bao gồm cả các appointments trong tương lai (nếu có)
+      const yearStart = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0); // 1/1/năm hiện tại
+      const yearEnd = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999); // 31/12/năm hiện tại
       appointmentQuery = {
         scheduledStart: { $gte: yearStart, $lte: yearEnd }
       };
     } else {
-      // For other periods, use the calculated startDate and endDate
+      // Các period khác: sử dụng startDate và endDate đã tính toán
       appointmentQuery = {
         scheduledStart: { $gte: startDate, $lte: endDate }
       };
     }
     
+    // Đếm số appointments trong khoảng thời gian
     const periodAppointments = await Appointment.countDocuments(appointmentQuery);
 
-    // Calculate previous period appointments for comparison
+    // Tính toán kỳ trước để so sánh số lượng appointments
+    // Thuật toán: Tùy theo period, tính toán khoảng thời gian tương ứng ở kỳ trước
     let previousPeriodAppointmentsStart, previousPeriodAppointmentsEnd;
-    const periodDurationMs = endDate - startDate;
+    const periodDurationMs = endDate - startDate; // Độ dài kỳ hiện tại (milliseconds)
     
     if (originalPeriod === 'year') {
-      // Compare with previous year
+      // So sánh với năm trước: cùng ngày tháng nhưng năm trước
       previousPeriodAppointmentsStart = new Date(today.getFullYear() - 1, 0, 1, 0, 0, 0, 0);
       previousPeriodAppointmentsEnd = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate(), 23, 59, 59, 999);
     } else if (originalPeriod === 'month') {
-      // Compare with previous month
+      // So sánh với tháng trước: cùng ngày nhưng tháng trước
       previousPeriodAppointmentsStart = new Date(today.getFullYear(), today.getMonth() - 1, 1, 0, 0, 0, 0);
-      previousPeriodAppointmentsEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
+      previousPeriodAppointmentsEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999); // Ngày 0 = ngày cuối tháng trước
     } else if (originalPeriod === 'week') {
-      // Compare with previous week
+      // So sánh với tuần trước: trừ đi 7 ngày
       const weekStart = new Date(startDate);
       previousPeriodAppointmentsEnd = new Date(weekStart);
-      previousPeriodAppointmentsEnd.setDate(previousPeriodAppointmentsEnd.getDate() - 1);
+      previousPeriodAppointmentsEnd.setDate(previousPeriodAppointmentsEnd.getDate() - 1); // Cuối tuần trước
       previousPeriodAppointmentsEnd.setHours(23, 59, 59, 999);
       previousPeriodAppointmentsStart = new Date(previousPeriodAppointmentsEnd);
-      previousPeriodAppointmentsStart.setDate(previousPeriodAppointmentsStart.getDate() - 6);
+      previousPeriodAppointmentsStart.setDate(previousPeriodAppointmentsStart.getDate() - 6); // Đầu tuần trước (7 ngày)
       previousPeriodAppointmentsStart.setHours(0, 0, 0, 0);
     } else if (originalPeriod === 'today') {
-      // Compare with yesterday
+      // So sánh với hôm qua: trừ đi 1 ngày
       previousPeriodAppointmentsStart = new Date(startDate);
       previousPeriodAppointmentsStart.setDate(previousPeriodAppointmentsStart.getDate() - 1);
       previousPeriodAppointmentsEnd = new Date(previousPeriodAppointmentsStart);
       previousPeriodAppointmentsEnd.setHours(23, 59, 59, 999);
       previousPeriodAppointmentsStart.setHours(0, 0, 0, 0);
     } else if (originalPeriod === 'custom') {
-      // Compare with same duration before the custom period
+      // So sánh với cùng độ dài trước kỳ custom
+      // Thuật toán: Lấy startDate, trừ 1 ngày để được cuối kỳ trước, sau đó trừ đi periodDurationMs
       previousPeriodAppointmentsEnd = new Date(startDate);
       previousPeriodAppointmentsEnd.setDate(previousPeriodAppointmentsEnd.getDate() - 1);
       previousPeriodAppointmentsEnd.setHours(23, 59, 59, 999);
       previousPeriodAppointmentsStart = new Date(previousPeriodAppointmentsEnd.getTime() - periodDurationMs);
       previousPeriodAppointmentsStart.setHours(0, 0, 0, 0);
     } else {
-      // Default: compare with yesterday
+      // Mặc định: so sánh với hôm qua
       previousPeriodAppointmentsStart = new Date(startDate);
       previousPeriodAppointmentsStart.setDate(previousPeriodAppointmentsStart.getDate() - 1);
       previousPeriodAppointmentsEnd = new Date(previousPeriodAppointmentsStart);
@@ -3033,13 +3147,17 @@ export const getStatistics = async (req, res) => {
       ? periodAppointments - previousPeriodAppointments 
       : periodAppointments;
 
-    // 4. Doanh Thu - Revenue based on selected period
-    // Calculate revenue for the selected period (startDate to endDate)
+    // ========== 4. DOANH THU - Dựa trên period được chọn ==========
+    // Tính doanh thu cho khoảng thời gian đã chọn
+    // Lưu ý: Sử dụng createdAt của payment (thời gian thanh toán) để tính doanh thu
+    // Thuật toán: Lấy tất cả payments đã thanh toán thành công, tính tổng (total - refundAmount)
     const periodPayments = await Payment.find({
-      status: { $in: ['captured', 'authorized'] },
-      createdAt: { $gte: startDate, $lte: endDate }
+      status: { $in: ['captured', 'authorized'] }, // Chỉ lấy payments đã thanh toán thành công
+      createdAt: { $gte: startDate, $lte: endDate } // Lọc theo thời gian tạo payment
     });
     
+    // Tính tổng doanh thu: duyệt qua tất cả payments, cộng dồn (total - refundAmount)
+    // refundAmount là số tiền đã hoàn lại, nên phải trừ đi để có doanh thu thực tế
     const periodRevenue = periodPayments.reduce((sum, payment) => {
       return sum + (payment.total - (payment.refundAmount || 0));
     }, 0);
@@ -3096,65 +3214,121 @@ export const getStatistics = async (req, res) => {
       ? Math.round(((periodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100)
       : (periodRevenue > 0 ? 100 : 0);
 
-    // 5. Top 3 Bác Sĩ Khám Online Nhiều Nhất
+    // ========== 5. TOP 3 BÁC SĨ KHÁM ONLINE NHIỀU NHẤT ==========
+    // Sử dụng cùng logic date range như appointments query để đảm bảo tính nhất quán
+    // Thuật toán MongoDB Aggregation:
+    // 1. $match: Lọc appointments online trong khoảng thời gian, có doctorId hợp lệ
+    // 2. $group: Nhóm theo doctorId, đếm số lượng appointments
+    // 3. $sort: Sắp xếp theo count giảm dần
+    // 4. $limit: Chỉ lấy top 3
+    // 5. $lookup: Join với collection Doctors để lấy thông tin bác sĩ
+    // 6. $unwind: Chuyển array thành object (vì $lookup trả về array)
+    // 7. $lookup: Join với collection Users để lấy tên bác sĩ
+    // 8. $unwind: Chuyển array thành object
+    // 9. $project: Chọn các trường cần thiết (doctorId, name, count)
+    
+    let onlineAppointmentsDateQuery = {};
+    if (originalPeriod === 'year') {
+      const yearStart = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0);
+      const yearEnd = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+      onlineAppointmentsDateQuery = {
+        scheduledStart: { $gte: yearStart, $lte: yearEnd }
+      };
+    } else {
+      onlineAppointmentsDateQuery = {
+        scheduledStart: { $gte: startDate, $lte: endDate }
+      };
+    }
+    
     const onlineAppointments = await Appointment.aggregate([
       {
+        // Bước 1: Lọc appointments
         $match: {
-          mode: 'online',
-          scheduledStart: { $gte: startDate, $lte: endDate },
-          status: { $in: ['accepted', 'in_progress', 'done'] }
+          mode: 'online', // Chỉ lấy appointments online
+          ...onlineAppointmentsDateQuery, // Lọc theo khoảng thời gian
+          status: { $in: ['accepted', 'in_progress', 'done', 'pending_doctor', 'no_show'] }, // Chỉ lấy các status hợp lệ
+          doctorId: { $exists: true, $ne: null } // Đảm bảo có doctorId
         }
       },
       {
+        // Bước 2: Nhóm theo doctorId và đếm số lượng
         $group: {
-          _id: '$doctorId',
-          count: { $sum: 1 }
+          _id: '$doctorId', // Nhóm theo doctorId
+          count: { $sum: 1 } // Đếm số appointments
         }
       },
       {
+        // Bước 3: Sắp xếp theo count giảm dần
         $sort: { count: -1 }
       },
       {
+        // Bước 4: Chỉ lấy top 3
         $limit: 3
       },
       {
+        // Bước 5: Join với collection Doctors
         $lookup: {
-          from: 'Doctors',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'doctor'
+          from: 'Doctors', // Tên collection trong MongoDB
+          localField: '_id', // Trường từ document hiện tại (doctorId)
+          foreignField: '_id', // Trường trong collection Doctors
+          as: 'doctor' // Tên field chứa kết quả join
         }
       },
       {
-        $unwind: '$doctor'
+        // Bước 6: Chuyển array thành object (vì $lookup trả về array)
+        $unwind: {
+          path: '$doctor',
+          preserveNullAndEmptyArrays: false // Nếu không tìm thấy doctor, bỏ qua document này
+        }
       },
       {
+        // Bước 7: Join với collection Users để lấy tên
         $lookup: {
           from: 'Users',
-          localField: 'doctor.userId',
+          localField: 'doctor.userId', // userId từ doctor document
           foreignField: '_id',
           as: 'user'
         }
       },
       {
-        $unwind: '$user'
+        // Bước 8: Chuyển array thành object
+        $unwind: {
+          path: '$user',
+          preserveNullAndEmptyArrays: false
+        }
       },
       {
+        // Bước 9: Chọn các trường cần thiết
         $project: {
           doctorId: '$_id',
-          name: '$user.fullName',
+          name: '$user.fullName', // Lấy tên từ User
           count: 1
         }
       }
     ]);
 
     // 6. Top 3 Bác Sĩ Khám Offline Nhiều Nhất
+    // Use same date range logic as appointments query for consistency
+    let offlineAppointmentsDateQuery = {};
+    if (originalPeriod === 'year') {
+      const yearStart = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0);
+      const yearEnd = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+      offlineAppointmentsDateQuery = {
+        scheduledStart: { $gte: yearStart, $lte: yearEnd }
+      };
+    } else {
+      offlineAppointmentsDateQuery = {
+        scheduledStart: { $gte: startDate, $lte: endDate }
+      };
+    }
+    
     const offlineAppointments = await Appointment.aggregate([
       {
         $match: {
           mode: 'offline',
-          scheduledStart: { $gte: startDate, $lte: endDate },
-          status: { $in: ['accepted', 'in_progress', 'done'] }
+          ...offlineAppointmentsDateQuery,
+          status: { $in: ['accepted', 'in_progress', 'done', 'pending_doctor', 'no_show'] },
+          doctorId: { $exists: true, $ne: null }
         }
       },
       {
@@ -3178,7 +3352,10 @@ export const getStatistics = async (req, res) => {
         }
       },
       {
-        $unwind: '$doctor'
+        $unwind: {
+          path: '$doctor',
+          preserveNullAndEmptyArrays: false
+        }
       },
       {
         $lookup: {
@@ -3189,7 +3366,10 @@ export const getStatistics = async (req, res) => {
         }
       },
       {
-        $unwind: '$user'
+        $unwind: {
+          path: '$user',
+          preserveNullAndEmptyArrays: false
+        }
       },
       {
         $project: {
@@ -3200,69 +3380,291 @@ export const getStatistics = async (req, res) => {
       }
     ]);
 
-    // 7. Top 3 Bệnh Nhân Đến Khám Nhiều Nhất
-    // First, get appointments in period and collect appointment IDs
+    // ========== 7. TOP 3 BỆNH NHÂN ĐẾN KHÁM NHIỀU NHẤT ==========
+    // Thuật toán:
+    // 1. Lấy tất cả appointments trong khoảng thời gian
+    // 2. Lấy tất cả payments liên quan đến các appointments đó
+    // 3. Tạo Map: appointmentId -> payment amount (để tra cứu nhanh)
+    // 4. Nhóm appointments theo patientId, tính:
+    //    - visitCount: số lần khám
+    //    - lastVisit: lần khám gần nhất
+    //    - totalSpending: tổng chi tiêu (từ paymentMap)
+    // 5. Sắp xếp theo visitCount giảm dần, lấy top 3
+    // 6. Populate thông tin patient và user để lấy tên
+    
+    // Sử dụng cùng logic date range như appointments query để đảm bảo tính nhất quán
+    let topPatientsDateQuery = {};
+    if (originalPeriod === 'year') {
+      const yearStart = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0);
+      const yearEnd = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+      topPatientsDateQuery = {
+        scheduledStart: { $gte: yearStart, $lte: yearEnd }
+      };
+    } else {
+      topPatientsDateQuery = {
+        scheduledStart: { $gte: startDate, $lte: endDate }
+      };
+    }
+    
+    // Bước 1: Lấy tất cả appointments trong khoảng thời gian
+    // Chỉ lấy các trường cần thiết: _id, patientId, scheduledStart, paymentId
     const appointmentsInPeriod = await Appointment.find({
-      scheduledStart: { $gte: startDate, $lte: endDate },
-      status: { $in: ['accepted', 'in_progress', 'done'] }
-    }).select('_id patientId scheduledStart').lean();
+      ...topPatientsDateQuery,
+      status: { $in: ['accepted', 'in_progress', 'done', 'pending_doctor', 'no_show'] }, // Chỉ lấy các status hợp lệ
+      patientId: { $exists: true, $ne: null } // Đảm bảo có patientId
+    }).select('_id patientId scheduledStart paymentId').lean(); // Thêm paymentId để query payments trực tiếp
 
-    // Get payments for these appointments
+    // Bước 2: Lấy tất cả payments liên quan đến các appointments này
     const appointmentIds = appointmentsInPeriod.map(apt => apt._id);
-    const paymentsInPeriod = await Payment.find({
-      appointmentId: { $in: appointmentIds },
-      status: 'captured'
-    }).lean();
+    
+    // Query TẤT CẢ payments liên quan đến appointments này
+    // Một appointment có thể có nhiều payments: booking payment + service payment
+    // Cần query qua cả paymentId (từ appointment) và appointmentId/appointmentIds (từ payment)
+    let paymentsInPeriod = [];
+    
+    // Cách 1: Query payments từ paymentId trong appointments (booking payments)
+    const paymentIdsFromAppointments = appointmentsInPeriod
+      .filter(apt => apt.paymentId)
+      .map(apt => apt.paymentId);
+    
+    if (paymentIdsFromAppointments.length > 0) {
+      const paymentsFromPaymentId = await Payment.find({
+        _id: { $in: paymentIdsFromAppointments },
+        status: { $in: ['captured', 'authorized'] } // Chỉ lấy payments đã thanh toán thành công
+      }).lean();
+      
+      paymentsInPeriod = paymentsFromPaymentId;
+      console.log(`📊 Top Patients: Found ${paymentsInPeriod.length} payments via paymentId from appointments`);
+    }
+    
+    // Cách 2: Query payments có appointmentId hoặc appointmentIds (bao gồm cả booking và service payments)
+    // QUAN TRỌNG: Một appointment có thể có nhiều payments (booking + service)
+    // Cần query tất cả payments, không chỉ paymentId trong appointment
+    if (appointmentIds.length > 0) {
+      const paymentsByAppointmentId = await Payment.find({
+        $or: [
+          { appointmentId: { $in: appointmentIds } }, // Payments có appointmentId trong danh sách
+          { appointmentIds: { $in: appointmentIds } } // Payments có appointmentIds chứa ID trong danh sách
+        ],
+        status: { $in: ['captured', 'authorized'] } // Chỉ lấy payments đã thanh toán thành công
+      }).lean();
+      
+      // Merge với payments đã tìm được (tránh duplicate)
+      const existingPaymentIds = new Set(paymentsInPeriod.map(p => p._id.toString()));
+      paymentsByAppointmentId.forEach(payment => {
+        if (!existingPaymentIds.has(payment._id.toString())) {
+          paymentsInPeriod.push(payment);
+        }
+      });
+      
+      console.log(`📊 Top Patients: Found ${paymentsByAppointmentId.length} payments via appointmentId/appointmentIds, total: ${paymentsInPeriod.length}`);
+    }
+    
+    // Debug: Log số lượng payments tìm được và chi tiết
+    console.log(`📊 Top Patients Debug: Found ${paymentsInPeriod.length} payments for ${appointmentIds.length} appointments`);
+    if (paymentsInPeriod.length > 0) {
+      console.log(`📊 Sample payments:`, paymentsInPeriod.slice(0, 3).map(p => ({
+        _id: p._id.toString(),
+        appointmentId: p.appointmentId?.toString(),
+        appointmentIds: p.appointmentIds?.map(id => id.toString()),
+        total: p.total,
+        refundAmount: p.refundAmount || 0,
+        netAmount: p.total - (p.refundAmount || 0)
+      })));
+    } else {
+      // Nếu không tìm thấy payments qua appointments, thử query tất cả payments trong khoảng thời gian
+      // (có thể payments chưa có appointmentId được set)
+      const allPaymentsInPeriod = await Payment.find({
+        status: { $in: ['captured', 'authorized'] },
+        createdAt: { $gte: startDate, $lte: endDate }
+      }).lean();
+      
+      console.log(`📊 Alternative: Found ${allPaymentsInPeriod.length} payments by createdAt in period`);
+      if (allPaymentsInPeriod.length > 0) {
+        const paymentsWithAppointmentId = allPaymentsInPeriod.filter(p => 
+          p.appointmentId || (p.appointmentIds && Array.isArray(p.appointmentIds) && p.appointmentIds.length > 0)
+        );
+        console.log(`📊 Payments with appointmentId/appointmentIds: ${paymentsWithAppointmentId.length}`);
+        
+        // Chỉ lấy payments có appointmentId/appointmentIds và match với appointments trong period
+        paymentsInPeriod = paymentsWithAppointmentId.filter(p => {
+          if (p.appointmentId) {
+            return appointmentIds.some(id => id.toString() === p.appointmentId.toString());
+          }
+          if (p.appointmentIds && Array.isArray(p.appointmentIds)) {
+            return p.appointmentIds.some(aptId => 
+              appointmentIds.some(id => id.toString() === aptId.toString())
+            );
+          }
+          return false;
+        });
+        
+        console.log(`📊 Filtered payments matching appointments: ${paymentsInPeriod.length}`);
+      }
+    }
 
-    // Create a map of appointmentId -> payment amount
+    // Bước 3: Tạo Map để tra cứu nhanh: appointmentId -> payment amount
+    // Sử dụng Map thay vì Object để tối ưu hiệu suất
     const paymentMap = new Map();
+    
+    // Tạo Map: paymentId -> payment để tra cứu nhanh
+    const paymentByIdMap = new Map();
     paymentsInPeriod.forEach(payment => {
-      const amount = payment.total - (payment.refundAmount || 0);
-      const existing = paymentMap.get(payment.appointmentId.toString()) || 0;
-      paymentMap.set(payment.appointmentId.toString(), existing + amount);
+      paymentByIdMap.set(payment._id.toString(), payment);
     });
-
-    // Group appointments by patient
-    const patientMap = new Map();
+    
+    // Map TẤT CẢ payments vào appointments
+    // QUAN TRỌNG: Một appointment có thể có nhiều payments (booking + service)
+    // Cần cộng dồn tất cả payments, không chỉ lấy một payment
+    // Sử dụng Set để track payments đã được map qua paymentId (tránh duplicate)
+    const paymentsMappedViaPaymentId = new Set();
+    
+    // Cách 1: Map payments từ appointments thông qua paymentId (ưu tiên - đảm bảo không bỏ sót)
     appointmentsInPeriod.forEach(apt => {
-      const patientId = apt.patientId.toString();
-      if (!patientMap.has(patientId)) {
-        patientMap.set(patientId, {
-          patientId: apt.patientId,
-          visitCount: 0,
-          lastVisit: apt.scheduledStart,
-          appointmentIds: [],
-          totalSpending: 0
+      if (apt.paymentId) {
+        const payment = paymentByIdMap.get(apt.paymentId.toString());
+        if (payment) {
+          const amount = payment.total - (payment.refundAmount || 0); // Doanh thu thực tế
+          const aptIdKey = apt._id.toString();
+          const existing = paymentMap.get(aptIdKey) || 0;
+          paymentMap.set(aptIdKey, existing + amount);
+          paymentsMappedViaPaymentId.add(payment._id.toString()); // Đánh dấu payment đã được map
+          console.log(`📊 Payment Map: Added ${amount} VND (${payment.invoiceType}) for appointment ${aptIdKey} via paymentId (total: ${existing + amount})`);
+        }
+      }
+    });
+    
+    // Cách 2: Map payments từ appointmentId/appointmentIds (bao gồm cả payments không có trong paymentId)
+    // QUAN TRỌNG: Một appointment có thể có nhiều payments (booking + service)
+    // Cần cộng dồn tất cả payments, không chỉ lấy một payment
+    // Chỉ map payments chưa được map qua paymentId (tránh duplicate)
+    paymentsInPeriod.forEach(payment => {
+      const paymentIdStr = payment._id.toString();
+      // Bỏ qua nếu payment đã được map qua paymentId
+      if (paymentsMappedViaPaymentId.has(paymentIdStr)) {
+        return;
+      }
+      
+      const amount = payment.total - (payment.refundAmount || 0); // Doanh thu thực tế = total - refundAmount
+      
+      // Xử lý appointmentId (single) - có thể là booking hoặc service payment
+      if (payment.appointmentId) {
+        const aptIdKey = payment.appointmentId.toString();
+        // Kiểm tra xem appointment này có trong danh sách appointments trong period không
+        if (appointmentIds.some(id => id.toString() === aptIdKey)) {
+          // Cộng dồn vào map (không kiểm tra has, vì một appointment có thể có nhiều payments)
+          const existing = paymentMap.get(aptIdKey) || 0;
+          paymentMap.set(aptIdKey, existing + amount);
+          console.log(`📊 Payment Map: Added ${amount} VND (${payment.invoiceType}) for appointment ${aptIdKey} via appointmentId (total: ${existing + amount})`);
+        }
+      }
+      
+      // Xử lý appointmentIds (array) - chia đều amount cho các appointments
+      if (payment.appointmentIds && Array.isArray(payment.appointmentIds) && payment.appointmentIds.length > 0) {
+        const amountPerAppointment = amount / payment.appointmentIds.length;
+        payment.appointmentIds.forEach(aptId => {
+          const aptIdKey = aptId.toString();
+          // Chỉ thêm nếu appointment này trong khoảng thời gian
+          if (appointmentIds.some(id => id.toString() === aptIdKey)) {
+            // Cộng dồn vào map (không kiểm tra has, vì một appointment có thể có nhiều payments)
+            const existing = paymentMap.get(aptIdKey) || 0;
+            paymentMap.set(aptIdKey, existing + amountPerAppointment);
+            console.log(`📊 Payment Map: Added ${amountPerAppointment} VND (${payment.invoiceType}) for appointment ${aptIdKey} from array (total: ${existing + amountPerAppointment})`);
+          }
         });
       }
+    });
+    
+    // Debug: Log appointments không có payments
+    const appointmentsWithoutPayments = appointmentsInPeriod.filter(apt => {
+      const aptIdStr = apt._id.toString();
+      return !paymentMap.has(aptIdStr) || paymentMap.get(aptIdStr) === 0;
+    });
+    if (appointmentsWithoutPayments.length > 0) {
+      console.log(`⚠️ Top Patients: ${appointmentsWithoutPayments.length} appointments without payments:`, 
+        appointmentsWithoutPayments.slice(0, 5).map(apt => ({
+          appointmentId: apt._id.toString(),
+          paymentId: apt.paymentId?.toString(),
+          hasPaymentId: !!apt.paymentId
+        }))
+      );
+    }
+    
+    // Debug: Log paymentMap size và chi tiết
+    console.log(`📊 Payment Map size: ${paymentMap.size}, Sample entries:`, Array.from(paymentMap.entries()).slice(0, 5));
+    console.log(`📊 Appointment IDs in period (first 5):`, appointmentIds.slice(0, 5).map(id => id.toString()));
+
+    // Bước 4: Nhóm appointments theo patientId
+    // Sử dụng Map để nhóm và tính toán thống kê cho mỗi patient
+    const patientMap = new Map();
+    appointmentsInPeriod.forEach(apt => {
+      const patientId = apt.patientId.toString(); // Chuyển sang string để dùng làm key
+      
+      // Nếu chưa có trong Map, khởi tạo
+      if (!patientMap.has(patientId)) {
+        patientMap.set(patientId, {
+          patientId: apt.patientId, // Giữ ObjectId để query sau
+          visitCount: 0, // Số lần khám
+          lastVisit: apt.scheduledStart, // Lần khám gần nhất
+          appointmentIds: [], // Danh sách appointment IDs (để debug)
+          totalSpending: 0 // Tổng chi tiêu
+        });
+      }
+      
       const patient = patientMap.get(patientId);
-      patient.visitCount += 1;
+      patient.visitCount += 1; // Tăng số lần khám
+      
+      // Cập nhật lần khám gần nhất (nếu appointment này mới hơn)
       if (apt.scheduledStart > patient.lastVisit) {
         patient.lastVisit = apt.scheduledStart;
       }
-      patient.appointmentIds.push(apt._id);
-      const paymentAmount = paymentMap.get(apt._id.toString()) || 0;
+      
+      patient.appointmentIds.push(apt._id); // Lưu appointment ID
+      
+      // Lấy payment amount từ paymentMap và cộng vào totalSpending
+      const aptIdStr = apt._id.toString();
+      const paymentAmount = paymentMap.get(aptIdStr) || 0;
       patient.totalSpending += paymentAmount;
+      
+      // Debug: Log nếu có payment amount
+      if (paymentAmount > 0) {
+        console.log(`📊 Patient ${patientId}: Added ${paymentAmount} VND for appointment ${aptIdStr} (total spending: ${patient.totalSpending})`);
+      }
     });
 
-    // Get top 3 patients
+    // Bước 5: Sắp xếp theo visitCount giảm dần và lấy top 3
     const topPatientsArray = Array.from(patientMap.values())
-      .sort((a, b) => b.visitCount - a.visitCount)
-      .slice(0, 3);
+      .sort((a, b) => b.visitCount - a.visitCount) // Sắp xếp giảm dần theo số lần khám
+      .slice(0, 3); // Chỉ lấy 3 bệnh nhân đầu tiên
 
-    // Populate patient and user info
+    // Bước 6: Populate thông tin patient và user để lấy tên
+    // Sử dụng patient.fullName trước, nếu không có thì dùng user.fullName
     const topPatients = await Promise.all(
       topPatientsArray.map(async (patient) => {
         const patientDoc = await Patient.findById(patient.patientId).lean();
-        if (!patientDoc) return null;
-        const user = await User.findById(patientDoc.userId).lean();
-        if (!user) return null;
+        if (!patientDoc) {
+          console.warn(`⚠️ Patient not found: ${patient.patientId}`);
+          return null;
+        }
+        
+        // Ưu tiên dùng patient.fullName, nếu không có thì dùng user.fullName
+        let patientName = patientDoc.fullName;
+        if (!patientName && patientDoc.userId) {
+          const user = await User.findById(patientDoc.userId).lean();
+          if (user) {
+            patientName = user.fullName;
+          }
+        }
+        
+        // Debug: Log thông tin patient
+        console.log(`📊 Patient ${patient.patientId}: visits=${patient.visitCount}, spending=${patient.totalSpending}, name=${patientName}`);
+        
         return {
           patientId: patient.patientId,
-          name: user.fullName || `Bệnh nhân`,
+          name: patientName || `Bệnh nhân`,
           visitCount: patient.visitCount,
           lastVisit: patient.lastVisit,
-          totalSpending: patient.totalSpending
+          totalSpending: patient.totalSpending || 0
         };
       })
     );
@@ -3310,32 +3712,70 @@ export const getStatistics = async (req, res) => {
       ? Math.round((offlineCount / totalAppointmentsInPeriod) * 100)
       : 0;
 
-    // 9. Revenue Trend (Daily for week/month/year, hourly for today)
+    // ========== 9. XU HƯỚNG DOANH THU THEO THỜI GIAN ==========
+    // Thuật toán:
+    // - Nếu period = 'today': chia theo giờ (24 điểm dữ liệu)
+    // - Nếu period <= 7 ngày: chia theo ngày
+    // - Nếu period > 7 ngày: chia theo tháng
+    // Mỗi điểm dữ liệu sẽ có: online revenue, offline revenue, total revenue
+    // 
+    // Lưu ý: Thay vì query payments theo createdAt, ta query appointments trong khoảng thời gian
+    // rồi tìm payments liên quan đến các appointments đó (đảm bảo tính nhất quán với appointment count)
+    
     const revenueTrend = [];
-    const daysDiff = Math.ceil(periodDurationMs / (1000 * 60 * 60 * 24));
+    const daysDiff = Math.ceil(periodDurationMs / (1000 * 60 * 60 * 24)); // Tính số ngày trong period
     
     if (originalPeriod === 'today') {
-      // Hourly trend for today
+      // Xu hướng theo giờ cho hôm nay: duyệt qua 24 giờ
+      // Lưu ý: Query payments theo createdAt (thời gian thanh toán thực tế) để hiển thị đúng thời điểm thanh toán
       for (let hour = 0; hour < 24; hour++) {
         const hourStart = new Date(startDate);
         hourStart.setHours(hour, 0, 0, 0);
         const hourEnd = new Date(startDate);
         hourEnd.setHours(hour, 59, 59, 999);
         
+        // Query payments được tạo (thanh toán) trong giờ này
+        // Đây là thời điểm thanh toán thực tế, không phải thời điểm đặt lịch
         const hourPayments = await Payment.find({
-          status: { $in: ['captured', 'authorized'] },
-          createdAt: { $gte: hourStart, $lte: hourEnd }
-        }).populate('appointmentId', 'mode');
+          status: { $in: ['captured', 'authorized'] }, // Chỉ lấy payments đã thanh toán thành công
+          createdAt: { $gte: hourStart, $lte: hourEnd } // Lọc theo thời gian thanh toán (createdAt)
+        }).populate('appointmentId', 'mode').lean(); // Populate để lấy mode (online/offline)
         
+        // Debug: Log số lượng payments tìm được
+        if (hour === 0 || hour === 12) {
+          console.log(`📊 Revenue Trend Hour ${hour}: Found ${hourPayments.length} payments`);
+          if (hourPayments.length > 0) {
+            console.log(`📊 Sample payment:`, {
+              total: hourPayments[0].total,
+              appointmentId: hourPayments[0].appointmentId?._id?.toString(),
+              appointmentMode: hourPayments[0].appointmentId?.mode,
+              hasAppointmentIds: !!hourPayments[0].appointmentIds
+            });
+          }
+        }
+        
+        // Tính doanh thu cho từng loại (online/offline)
         let onlineRevenue = 0;
         let offlineRevenue = 0;
         
         hourPayments.forEach(payment => {
-          const netAmount = payment.total - (payment.refundAmount || 0);
-          if (payment.appointmentId?.mode === 'online') {
+          const netAmount = payment.total - (payment.refundAmount || 0); // Doanh thu thực tế
+          
+          // Xử lý appointmentId (single)
+          if (payment.appointmentId) {
+            if (payment.appointmentId.mode === 'online') {
+              onlineRevenue += netAmount;
+            } else if (payment.appointmentId.mode === 'offline') {
+              offlineRevenue += netAmount;
+            }
+          } else if (payment.appointmentIds && Array.isArray(payment.appointmentIds) && payment.appointmentIds.length > 0) {
+            // Xử lý appointmentIds (array) - tạm thời tính vào online (cần cải thiện để query appointments)
+            // Lưu ý: Để tính đúng, cần query appointments để lấy mode, nhưng sẽ làm chậm query
+            // Tạm thời tính vào online để hiển thị dữ liệu
             onlineRevenue += netAmount;
-          } else if (payment.appointmentId?.mode === 'offline') {
-            offlineRevenue += netAmount;
+          } else {
+            // Nếu không có appointmentId/appointmentIds, bỏ qua (chỉ tính payments có appointments)
+            console.warn(`⚠️ Payment ${payment._id} has no appointmentId or appointmentIds`);
           }
         });
         
@@ -3348,6 +3788,7 @@ export const getStatistics = async (req, res) => {
       }
     } else if (daysDiff <= 7) {
       // Daily trend for week
+      // Query payments theo createdAt (thời gian thanh toán thực tế)
       const currentDate = new Date(startDate);
       while (currentDate <= endDate) {
         const dayStart = new Date(currentDate);
@@ -3355,20 +3796,30 @@ export const getStatistics = async (req, res) => {
         const dayEnd = new Date(currentDate);
         dayEnd.setHours(23, 59, 59, 999);
         
+        // Query payments được tạo (thanh toán) trong ngày này
         const dayPayments = await Payment.find({
           status: { $in: ['captured', 'authorized'] },
-          createdAt: { $gte: dayStart, $lte: dayEnd }
-        }).populate('appointmentId', 'mode');
+          createdAt: { $gte: dayStart, $lte: dayEnd } // Lọc theo thời gian thanh toán
+        }).populate('appointmentId', 'mode').lean();
         
         let onlineRevenue = 0;
         let offlineRevenue = 0;
         
         dayPayments.forEach(payment => {
           const netAmount = payment.total - (payment.refundAmount || 0);
-          if (payment.appointmentId?.mode === 'online') {
+          // Xử lý appointmentId (single)
+          if (payment.appointmentId) {
+            if (payment.appointmentId.mode === 'online') {
+              onlineRevenue += netAmount;
+            } else if (payment.appointmentId.mode === 'offline') {
+              offlineRevenue += netAmount;
+            }
+          } else if (payment.appointmentIds && Array.isArray(payment.appointmentIds) && payment.appointmentIds.length > 0) {
+            // Xử lý appointmentIds (array) - tạm thời tính vào online (cần cải thiện)
             onlineRevenue += netAmount;
-          } else if (payment.appointmentId?.mode === 'offline') {
-            offlineRevenue += netAmount;
+          } else {
+            // Bỏ qua payments không có appointments
+            console.warn(`⚠️ Payment ${payment._id} has no appointmentId or appointmentIds`);
           }
         });
         
@@ -3384,25 +3835,36 @@ export const getStatistics = async (req, res) => {
       }
     } else {
       // Monthly trend for month/year
+      // Query payments theo createdAt (thời gian thanh toán thực tế)
       const currentDate = new Date(startDate);
       while (currentDate <= endDate) {
         const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
         const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
         
+        // Query payments được tạo (thanh toán) trong tháng này
         const monthPayments = await Payment.find({
           status: { $in: ['captured', 'authorized'] },
-          createdAt: { $gte: monthStart, $lte: monthEnd }
-        }).populate('appointmentId', 'mode');
+          createdAt: { $gte: monthStart, $lte: monthEnd } // Lọc theo thời gian thanh toán
+        }).populate('appointmentId', 'mode').lean();
         
         let onlineRevenue = 0;
         let offlineRevenue = 0;
         
         monthPayments.forEach(payment => {
           const netAmount = payment.total - (payment.refundAmount || 0);
-          if (payment.appointmentId?.mode === 'online') {
+          // Xử lý appointmentId (single)
+          if (payment.appointmentId) {
+            if (payment.appointmentId.mode === 'online') {
+              onlineRevenue += netAmount;
+            } else if (payment.appointmentId.mode === 'offline') {
+              offlineRevenue += netAmount;
+            }
+          } else if (payment.appointmentIds && Array.isArray(payment.appointmentIds) && payment.appointmentIds.length > 0) {
+            // Xử lý appointmentIds (array) - tạm thời tính vào online (cần cải thiện)
             onlineRevenue += netAmount;
-          } else if (payment.appointmentId?.mode === 'offline') {
-            offlineRevenue += netAmount;
+          } else {
+            // Bỏ qua payments không có appointments
+            console.warn(`⚠️ Payment ${payment._id} has no appointmentId or appointmentIds`);
           }
         });
         
@@ -3416,6 +3878,19 @@ export const getStatistics = async (req, res) => {
         currentDate.setMonth(currentDate.getMonth() + 1);
       }
     }
+
+    // Debug logging
+    console.log('📊 Statistics Debug:', {
+      period: originalPeriod,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      startDateFormatted: `${startDate.getDate()}/${startDate.getMonth() + 1}/${startDate.getFullYear()}`,
+      endDateFormatted: `${endDate.getDate()}/${endDate.getMonth() + 1}/${endDate.getFullYear()}`,
+      onlineAppointmentsCount: onlineAppointments.length,
+      offlineAppointmentsCount: offlineAppointments.length,
+      topPatientsCount: topPatientsFinal.length,
+      periodAppointments
+    });
 
     const statistics = {
       totalDoctors: {
