@@ -581,8 +581,7 @@ export default function QuanLyHoaDon() {
             >
               <option value="all">Tất cả trạng thái</option>
               <option value="captured">Đã thanh toán</option>
-              <option value="initiated">Đang xử lý</option>
-              
+              <option value="pending_manager">Yêu cầu thanh toán</option>
             </select>
           </div>
         </div>

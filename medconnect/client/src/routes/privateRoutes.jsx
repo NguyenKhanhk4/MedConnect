@@ -55,6 +55,7 @@ import AdminLayout from "../layouts/AdminLayout/AdminLayout";
 // Manager Components
 import TrangChuManager from "../pages/Manager/trang-chu/TrangChu";
 import QuanLyLichBacSi from "../pages/Manager/quan-ly-lich-bac-si/QuanLyLichBacSi";
+import DanhSachBacSi from "../pages/Manager/danh-sach-bac-si/DanhSachBacSi";
 import QuanLyYeuCauNghiPhep from "../pages/Manager/quan-ly-yeu-cau-nghi-phep/QuanLyYeuCauNghiPhep";
 import QuanLyGiaDichVu from "../pages/Manager/quan-ly-gia-dich-vu/QuanLyGiaDichVu";
 import QuanLyHoaDon from "../pages/Manager/quan-ly-hoa-don/QuanLyHoaDon";
@@ -226,6 +227,7 @@ export const privateRoutes = (
         <Route path="/manager/trang-chu" element={<TrangChuManager />} />
         <Route path="/manager" element={<TrangChuManager />} />
         <Route path="/manager/quan-ly-lich" element={<QuanLyLichBacSi />} />
+        <Route path="/manager/danh-sach-bac-si" element={<DanhSachBacSi />} />
         <Route path="/manager/quan-ly-gia" element={<QuanLyGiaTheoTrinhDo />} />
         <Route
           path="/manager/yeu-cau-nghi-phep"

@@ -70,9 +70,6 @@ export default function QuanLyLichBacSi() {
 
   // Leave request states
 
-  // Status filter state
-  const [selectedStatus, setSelectedStatus] = useState("pending");
-
   // Block detail dialog state (chỉ để xem lý do nghỉ, không thể đăng ký nghỉ)
   const [showBlockDetailDialog, setShowBlockDetailDialog] = useState(false);
 
@@ -482,18 +479,19 @@ export default function QuanLyLichBacSi() {
         slotsMap[slotDate] = {};
       }
 
+      // Nếu slot đã hủy, xử lý như slot trống (available) - không hiển thị thông tin appointment
       const mappedSlot = {
         id: slot._id,
         startAt: slot.startAt,
         endAt: slot.endAt,
-        status: slot.status,
-        patientName: slot.patientName || null,
-        reason: slot.reason || null,
-        mode: slot.mode || null,
-        appointmentId: slot.appointmentId || null,
-        rescheduledFromId: slot.rescheduledFromId || null, // Flag to identify rescheduled appointments
-        leaveReason: slot.leaveReason || null, // Lý do nghỉ
-        hasPendingLeaveRequest: slot.hasPendingLeaveRequest || false, // Flag leave request đang pending
+        status: slot.status === "cancelled" ? "available" : slot.status,
+        patientName: slot.status === "cancelled" ? null : (slot.patientName || null),
+        reason: slot.status === "cancelled" ? null : (slot.reason || null),
+        mode: slot.status === "cancelled" ? null : (slot.mode || null),
+        appointmentId: slot.status === "cancelled" ? null : (slot.appointmentId || null),
+        rescheduledFromId: slot.status === "cancelled" ? null : (slot.rescheduledFromId || null), // Flag to identify rescheduled appointments
+        leaveReason: slot.status === "cancelled" ? null : (slot.leaveReason || null), // Lý do nghỉ
+        hasPendingLeaveRequest: slot.status === "cancelled" ? false : (slot.hasPendingLeaveRequest || false), // Flag leave request đang pending
         isEmpty: false,
       };
 
@@ -535,31 +533,6 @@ export default function QuanLyLichBacSi() {
   const timesWithSlots = React.useMemo(() => {
     return timeSlotsList;
   }, [timeSlotsList]);
-
-  const stats = React.useMemo(() => {
-    const counts = {
-      pending: 0,
-      completed: 0,
-      booked: 0,
-      cancelled: 0,
-    };
-
-    timeSlots.forEach((slot) => {
-      if (slot.status === "pending" || slot.status === "pending_doctor")
-        counts.pending++;
-      else if (slot.status === "completed" || slot.status === "done")
-        counts.completed++;
-      else if (
-        slot.status === "booked" ||
-        slot.status === "confirmed" ||
-        slot.status === "accepted"
-      )
-        counts.booked++;
-      else if (slot.status === "cancelled") counts.cancelled++;
-    });
-
-    return counts;
-  }, [timeSlots]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -1316,82 +1289,22 @@ export default function QuanLyLichBacSi() {
         </div>
       ) : (
         <>
-          {/* Summary Cards */}
-          <div className="summary-cards">
-            <div className="summary-card pending">
-              <div className="summary-label">Chờ duyệt</div>
-              <div className="summary-value">{stats.pending}</div>
-            </div>
-            <div className="summary-card completed">
-              <div className="summary-label">Hoàn thành</div>
-              <div className="summary-value">{stats.completed}</div>
-            </div>
-            <div className="summary-card booked">
-              <div className="summary-label">Đã đặt</div>
-              <div className="summary-value">{stats.booked}</div>
-            </div>
-            <div className="summary-card cancelled">
-              <div className="summary-label">Đã hủy</div>
-              <div className="summary-value">{stats.cancelled}</div>
-            </div>
-          </div>
-
-          {/* Navigation and Controls */}
-          <div className="schedule-controls">
-            <div className="week-navigation">
-              <span>Tuần:</span>
-              <button className="nav-arrow" onClick={() => navigateWeek(-1)}>
-                &lt;
-              </button>
-              <span className="date-range">{formatDateRange()}</span>
-              <button className="nav-arrow" onClick={() => navigateWeek(1)}>
-                &gt;
-              </button>
-            </div>
-
-            <div className="status-filters">
-              <span>Trạng thái:</span>
-              <button
-                className={`status-filter pending ${
-                  selectedStatus === "pending" ? "active" : ""
-                }`}
-                onClick={() => setSelectedStatus("pending")}
-              >
-                Chờ duyệt
-              </button>
-              <button
-                className={`status-filter completed ${
-                  selectedStatus === "completed" ? "active" : ""
-                }`}
-                onClick={() => setSelectedStatus("completed")}
-              >
-                Hoàn thành
-              </button>
-              <button
-                className={`status-filter booked ${
-                  selectedStatus === "booked" ? "active" : ""
-                }`}
-                onClick={() => setSelectedStatus("booked")}
-              >
-                Đã đặt
-              </button>
-              <button
-                className={`status-filter cancelled ${
-                  selectedStatus === "cancelled" ? "active" : ""
-                }`}
-                onClick={() => setSelectedStatus("cancelled")}
-              >
-                Đã hủy
-              </button>
-            </div>
-          </div>
-
           <div className="schedule-header">
             <div className="header-left">
               <h1>
                 <Calendar className="icon" />
                 Lịch làm việc - {selectedDoctor?.fullName}
               </h1>
+              <div className="week-navigation">
+                <span>Tuần:</span>
+                <button className="nav-arrow" onClick={() => navigateWeek(-1)}>
+                  &lt;
+                </button>
+                <span className="date-range">{formatDateRange()}</span>
+                <button className="nav-arrow" onClick={() => navigateWeek(1)}>
+                  &gt;
+                </button>
+              </div>
             </div>
 
             <div className="header-right">

@@ -85,19 +85,19 @@ const ChonThoiGian = () => {
   const [pendingAppointmentId, setPendingAppointmentId] = useState(null); // Track appointment chưa thanh toán
   const [pendingOrderCode, setPendingOrderCode] = useState(null); // Track orderCode để cleanup
   const [doctorPricing, setDoctorPricing] = useState(null); // Doctor pricing from API
-  
+
   // Payment summary state (NEW FLOW)
   const [paymentSummary, setPaymentSummary] = useState(null);
   const [showPaymentSummary, setShowPaymentSummary] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [patientIdForBooking, setPatientIdForBooking] = useState(null); // Store patientId for family member booking
-  
+
   // Modal state for viewing reviews
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [doctorReviews, setDoctorReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsPagination, setReviewsPagination] = useState(null);
-  
+
   // Ref for reason textarea
   const reasonTextareaRef = useRef(null);
 
@@ -111,11 +111,11 @@ const ChonThoiGian = () => {
       const response = await api.get(
         `/api/doctors/${doctorId}/reviews?limit=10&page=1`
       );
-      
+
       // Handle different response structures
       let reviews = [];
       let pagination = null;
-      
+
       if (response?.success || response?.data?.success) {
         // Response structure: { success: true, data: { reviews: [...], pagination: {...} } }
         if (response?.data?.reviews) {
@@ -133,7 +133,7 @@ const ChonThoiGian = () => {
         reviews = response.reviews;
         pagination = response.pagination;
       }
-      
+
       setDoctorReviews(reviews);
       setReviewsPagination(pagination);
     } catch (error) {
@@ -534,6 +534,8 @@ const ChonThoiGian = () => {
     try {
       setLoading(true);
 
+      let patientIdForBooking = null;
+
       // Validate profile if booking for "me"
       if (bookingFor === "me") {
         const validation = validateProfileComplete();
@@ -548,9 +550,12 @@ const ChonThoiGian = () => {
           setLoading(false);
           return;
         }
-      }
 
-      let patientIdForBooking = null;
+        // IMPORTANT: Đảm bảo reset patientIdForBooking ngay khi booking for "me"
+        setPatientIdForBooking(null);
+        // IMPORTANT: patientIdForBooking local variable = null (đặt cho chính mình)
+        patientIdForBooking = null;
+      }
 
       // If booking for family, create family member first
       if (bookingFor === "family") {
@@ -576,7 +581,8 @@ const ChonThoiGian = () => {
           if (familyResponse.success) {
             message.success("Thêm người thân thành công!");
             const newPatientId = familyResponse.data.patient._id;
-            setPatientIdForBooking(newPatientId);
+            patientIdForBooking = newPatientId;
+            setPatientIdForBooking(newPatientId); // Store in state
             await fetchFamilyMembers();
           } else {
             message.error(familyResponse.message || "Thêm người thân thất bại");
@@ -613,32 +619,78 @@ const ChonThoiGian = () => {
         appointmentData.clinicId = defaultClinic._id;
       }
 
-      // Add patientId for family member booking
+      // ONLY add patientId for family member booking
+      // IMPORTANT: Check bookingFor instead of just patientIdForBooking to be absolutely sure
       if (bookingFor === "family" && patientIdForBooking) {
         appointmentData.patientId = patientIdForBooking;
+      } else {
+        // IMPORTANT: Explicitly delete patientId if booking for "me" to prevent backend from adding it
+        delete appointmentData.patientId;
       }
 
-      // Also store in state for later use in handleConfirmPayment
-      if (bookingFor === "family") {
-        appointmentData.patientId = patientIdForBooking;
-      }
+      // Debug log để kiểm tra
+      console.log("🔍 handleBookingSubmit - Debug Info:");
+      console.log("bookingFor:", bookingFor);
+      console.log("patientIdForBooking (local):", patientIdForBooking);
+      console.log(
+        "appointmentData BEFORE sending to API:",
+        JSON.parse(JSON.stringify(appointmentData))
+      );
+      console.log("appointmentData.patientId:", appointmentData.patientId);
+      console.log("Has patientId key:", "patientId" in appointmentData);
 
       // NEW FLOW: Calculate payment summary (don't create appointment yet)
       try {
         const summaryResponse = await api.post(
           "/api/patients/appointments/calculate-payment-summary",
-        appointmentData
-      );
+          appointmentData
+        );
 
         if (summaryResponse.success || summaryResponse?.data?.success) {
           const summary = summaryResponse?.data || summaryResponse;
+
+          // Debug log để xem response từ backend
+          console.log("📥 Summary Response from backend:", summary);
+
+          // IMPORTANT: Lưu bookingFor vào paymentSummary để dùng trong handleConfirmPayment
+          summary.bookingFor = bookingFor;
+          summary.familyMemberPatientId =
+            bookingFor === "family" ? patientIdForBooking : null;
+
+          // IMPORTANT: Nếu booking for "me", xóa patientId khỏi appointmentSummary (nếu backend trả về)
+          if (
+            bookingFor === "me" &&
+            summary.appointmentSummary &&
+            summary.appointmentSummary.patientId
+          ) {
+            console.warn(
+              '⚠️ Backend returned patientId for "me" booking, removing it...'
+            );
+            delete summary.appointmentSummary.patientId;
+          }
+
+          // Debug log
+          console.log("💾 Payment Summary AFTER cleanup:");
+          console.log("summary.bookingFor:", summary.bookingFor);
+          console.log(
+            "summary.familyMemberPatientId:",
+            summary.familyMemberPatientId
+          );
+          console.log(
+            "summary.appointmentSummary.patientId:",
+            summary.appointmentSummary?.patientId
+          );
+
           setPaymentSummary(summary);
           setShowPaymentSummary(true);
           message.success("Vui lòng xem lại hóa đơn và xác nhận thanh toán");
         } else {
-          message.error(summaryResponse?.message || "Không thể tính toán hóa đơn");
+          message.error(
+            summaryResponse?.message || "Không thể tính toán hóa đơn"
+          );
         }
       } catch (summaryError) {
+        console.error("❌ Summary Error:", summaryError);
         message.error(
           summaryError?.response?.data?.message ||
             summaryError?.message ||
@@ -646,6 +698,7 @@ const ChonThoiGian = () => {
         );
       }
     } catch (error) {
+      console.error("❌ Booking Submit Error:", error);
       message.error("Có lỗi xảy ra khi đặt lịch. Vui lòng thử lại!");
     } finally {
       setLoading(false);
@@ -664,6 +717,14 @@ const ChonThoiGian = () => {
       return;
     }
 
+    // Debug log
+    console.log("💳 handleConfirmPayment - Debug Info:");
+    console.log("paymentSummary.bookingFor:", paymentSummary.bookingFor);
+    console.log(
+      "paymentSummary.familyMemberPatientId:",
+      paymentSummary.familyMemberPatientId
+    );
+
     try {
       setProcessingPayment(true);
 
@@ -675,11 +736,17 @@ const ChonThoiGian = () => {
         // Sử dụng data từ paymentSummary (đã được validate và tính toán)
         appointmentData = {
           doctorId: paymentSummary.appointmentSummary.doctorId || doctor._id,
-          slotId: paymentSummary.appointmentSummary.slotId || selectedTimeSlot._id,
+          slotId:
+            paymentSummary.appointmentSummary.slotId || selectedTimeSlot._id,
           mode: paymentSummary.appointmentSummary.mode || selectedMode,
-          reason: paymentSummary.appointmentSummary.reason || form.getFieldValue("reason") || "",
-          scheduledStart: paymentSummary.appointmentSummary.scheduledStart 
-            ? new Date(paymentSummary.appointmentSummary.scheduledStart).toISOString()
+          reason:
+            paymentSummary.appointmentSummary.reason ||
+            form.getFieldValue("reason") ||
+            "",
+          scheduledStart: paymentSummary.appointmentSummary.scheduledStart
+            ? new Date(
+                paymentSummary.appointmentSummary.scheduledStart
+              ).toISOString()
             : selectedDate
                 .clone()
                 .hour(parseInt(selectedTimeSlot.startTime.split(":")[0]))
@@ -688,7 +755,9 @@ const ChonThoiGian = () => {
                 .millisecond(0)
                 .toISOString(),
           scheduledEnd: paymentSummary.appointmentSummary.scheduledEnd
-            ? new Date(paymentSummary.appointmentSummary.scheduledEnd).toISOString()
+            ? new Date(
+                paymentSummary.appointmentSummary.scheduledEnd
+              ).toISOString()
             : selectedDate
                 .clone()
                 .hour(parseInt(selectedTimeSlot.endTime.split(":")[0]))
@@ -700,9 +769,10 @@ const ChonThoiGian = () => {
 
         // Add clinicId for offline appointments
         if (appointmentData.mode === "offline") {
-          appointmentData.clinicId = paymentSummary.appointmentSummary.clinicId || defaultClinic?._id;
+          appointmentData.clinicId =
+            paymentSummary.appointmentSummary.clinicId || defaultClinic?._id;
         }
-          } else {
+      } else {
         // Fallback - extract từ form và selected data (tương tự logic nhiều lịch)
         appointmentData = {
           doctorId: doctor._id,
@@ -732,23 +802,85 @@ const ChonThoiGian = () => {
       }
 
       // Validate appointment data (tương tự logic nhiều lịch)
-      if (!appointmentData || !appointmentData.doctorId || !appointmentData.slotId || !appointmentData.mode) {
+      if (
+        !appointmentData ||
+        !appointmentData.doctorId ||
+        !appointmentData.slotId ||
+        !appointmentData.mode
+      ) {
         message.error("Không có lịch hẹn hợp lệ để thanh toán");
         setProcessingPayment(false);
         return;
       }
 
-      // Add patientId for family member booking
-      if (bookingFor === "family" && patientIdForBooking) {
-        appointmentData.patientId = patientIdForBooking;
+      // IMPORTANT: Sử dụng bookingFor và familyMemberPatientId từ paymentSummary (đã lưu khi submit)
+      // Thay vì dùng state patientIdForBooking (có thể đã bị thay đổi)
+      const isBookingForFamily = paymentSummary.bookingFor === "family";
+      const familyPatientId = paymentSummary.familyMemberPatientId;
+
+      // Debug log
+      console.log("isBookingForFamily:", isBookingForFamily);
+      console.log("familyPatientId:", familyPatientId);
+
+      // ONLY add patientId for family member booking
+      if (isBookingForFamily && familyPatientId) {
+        appointmentData.patientId = familyPatientId;
+        console.log("✅ Added patientId to appointmentData:", familyPatientId);
+      } else {
+        // IMPORTANT: Explicitly delete patientId if booking for "me"
+        delete appointmentData.patientId;
+        console.log(
+          "✅ No patientId added (booking for me) - deleted patientId key"
+        );
       }
 
-      // Create payment and get PayOS link (tương tự logic nhiều lịch)
-      const response = await api.post("/api/patients/appointments/create-payment", {
-        ...appointmentData,
+      // IMPORTANT: Tạo clean request body - force remove patientId if booking for "me"
+      const requestBody = {
+        doctorId: appointmentData.doctorId,
+        slotId: appointmentData.slotId,
+        mode: appointmentData.mode,
+        reason: appointmentData.reason,
+        scheduledStart: appointmentData.scheduledStart,
+        scheduledEnd: appointmentData.scheduledEnd,
         gateway: "payos",
-        method: "qr", // QR code payment
-      });
+        method: "qr",
+        // IMPORTANT: Add explicit flag to tell backend this is for current user
+        bookForSelf: !isBookingForFamily, // true if booking for me, false if family
+      };
+
+      // Add clinicId if exists
+      if (appointmentData.clinicId) {
+        requestBody.clinicId = appointmentData.clinicId;
+      }
+
+      // ONLY add patientId if booking for family
+      if (isBookingForFamily && familyPatientId) {
+        requestBody.patientId = familyPatientId;
+        console.log("✅ Added patientId to request body:", familyPatientId);
+      } else {
+        // Explicitly ensure no patientId for "me" booking
+        // Add explicit null to override any backend default
+        requestBody.patientId = null;
+        console.log("✅ Explicitly set patientId = null (booking for me)");
+      }
+
+      console.log(
+        "📮 Clean request body SENT to create-payment API:",
+        JSON.parse(JSON.stringify(requestBody))
+      );
+      console.log(
+        "📮 Request body has patientId key:",
+        "patientId" in requestBody
+      );
+      console.log("📮 Request body.patientId:", requestBody.patientId);
+
+      // Create payment and get PayOS link (tương tự logic nhiều lịch)
+      const response = await api.post(
+        "/api/patients/appointments/create-payment",
+        requestBody
+      );
+
+      console.log("📥 Response from create-payment API:", response);
 
       if (response?.success || response?.data?.success) {
         // Response structure: ok(res, { paymentId, payUrl, orderCode, ... })
@@ -760,12 +892,13 @@ const ChonThoiGian = () => {
           // Sau khi thanh toán thành công, webhook sẽ tạo appointment với status "pending_doctor"
           window.location.href = payUrl;
         } else {
-          message.error("Không thể tạo liên kết thanh toán");
+          message.error("Không thể tạo liên kết thanh toán ");
         }
       } else {
         message.error(response?.message || "Không thể tạo thanh toán");
       }
     } catch (error) {
+      console.error("❌ Payment Error:", error);
       message.error(
         error?.response?.data?.message ||
           error?.message ||
@@ -883,8 +1016,17 @@ const ChonThoiGian = () => {
                           : `BS. ${fullName}`;
                       })()}
                     </Title>
-                    <div className="doctor-specializations" style={{ marginBottom: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {doctor.specializationIds && doctor.specializationIds.length > 0 && (
+                    <div
+                      className="doctor-specializations"
+                      style={{
+                        marginBottom: 8,
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                      }}
+                    >
+                      {doctor.specializationIds &&
+                        doctor.specializationIds.length > 0 &&
                         doctor.specializationIds.map((spec, index) => (
                           <Tag
                             key={index}
@@ -901,8 +1043,7 @@ const ChonThoiGian = () => {
                           >
                             {spec.name || spec}
                           </Tag>
-                        ))
-                      )}
+                        ))}
                       {doctor.educationLevel && (
                         <Tag
                           style={{
@@ -946,7 +1087,11 @@ const ChonThoiGian = () => {
                               setShowReviewModal(true);
                               fetchDoctorReviews(doctor._id);
                             }}
-                            style={{ padding: 0, height: 'auto', fontSize: "14px" }}
+                            style={{
+                              padding: 0,
+                              height: "auto",
+                              fontSize: "14px",
+                            }}
                           >
                             Xem đánh giá
                           </Button>
@@ -1059,9 +1204,12 @@ const ChonThoiGian = () => {
               {/* Payment Summary (NEW FLOW) */}
               {showPaymentSummary && paymentSummary && (
                 <Card className="payment-summary-card">
-                  <Title level={3}>Tổng hợp lịch hẹn và hóa đơn thanh toán</Title>
+                  <Title level={3}>
+                    Tổng hợp lịch hẹn và hóa đơn thanh toán
+                  </Title>
                   <Paragraph>
-                    Vui lòng xem lại thông tin lịch hẹn và hóa đơn thanh toán trước khi xác nhận.
+                    Vui lòng xem lại thông tin lịch hẹn và hóa đơn thanh toán
+                    trước khi xác nhận.
                   </Paragraph>
 
                   <Alert
@@ -1078,7 +1226,11 @@ const ChonThoiGian = () => {
                   {paymentSummary.appointmentSummary && (
                     <Table
                       dataSource={[paymentSummary.appointmentSummary]}
-                      rowKey={(record) => record.slotId?.toString() || record.doctorId?.toString() || "appointment"}
+                      rowKey={(record) =>
+                        record.slotId?.toString() ||
+                        record.doctorId?.toString() ||
+                        "appointment"
+                      }
                       pagination={false}
                       columns={[
                         {
@@ -1098,7 +1250,10 @@ const ChonThoiGian = () => {
                           dataIndex: "reason",
                           key: "reason",
                           render: (text) => (
-                            <Text ellipsis={{ tooltip: text }} style={{ maxWidth: 200 }}>
+                            <Text
+                              ellipsis={{ tooltip: text }}
+                              style={{ maxWidth: 200 }}
+                            >
                               {text || "Không có"}
                             </Text>
                           ),
@@ -1111,7 +1266,11 @@ const ChonThoiGian = () => {
                               return record.timeText;
                             }
                             if (record.scheduledStart && record.scheduledEnd) {
-                              return `${dayjs(record.scheduledStart).format("HH:mm")} - ${dayjs(record.scheduledEnd).format("HH:mm")}`;
+                              return `${dayjs(record.scheduledStart).format(
+                                "HH:mm"
+                              )} - ${dayjs(record.scheduledEnd).format(
+                                "HH:mm"
+                              )}`;
                             }
                             if (selectedTimeSlot?.timeRange) {
                               return selectedTimeSlot.timeRange;
@@ -1125,7 +1284,9 @@ const ChonThoiGian = () => {
                           key: "mode",
                           render: (mode) => (
                             <Tag color={mode === "online" ? "blue" : "green"}>
-                              {mode === "online" ? "Trực tuyến" : "Tại phòng khám"}
+                              {mode === "online"
+                                ? "Trực tuyến"
+                                : "Tại phòng khám"}
                             </Tag>
                           ),
                         },
@@ -1163,10 +1324,7 @@ const ChonThoiGian = () => {
                     <Title level={4} style={{ margin: 0 }}>
                       Tổng thanh toán:
                     </Title>
-                    <Title
-                      level={3}
-                      style={{ margin: 0, color: "#52c41a" }}
-                    >
+                    <Title level={3} style={{ margin: 0, color: "#52c41a" }}>
                       {paymentSummary.totalAmount
                         ? paymentSummary.totalAmount.toLocaleString("vi-VN")
                         : "0"}{" "}
@@ -1189,18 +1347,24 @@ const ChonThoiGian = () => {
                           fontSize: "16px",
                         }}
                       >
-                        {processingPayment ? "Đang xử lý..." : "Xác nhận thanh toán"}
+                        {processingPayment
+                          ? "Đang xử lý..."
+                          : "Xác nhận thanh toán"}
                       </Button>
                       <Paragraph
                         type="secondary"
                         style={{ marginTop: 12, marginBottom: 0 }}
                       >
-                        Bạn sẽ được chuyển đến trang thanh toán PayOS. Sau khi thanh toán thành công, lịch hẹn sẽ được tạo và chờ bác sĩ duyệt.
+                        Bạn sẽ được chuyển đến trang thanh toán PayOS. Sau khi
+                        thanh toán thành công, lịch hẹn sẽ được tạo và chờ bác
+                        sĩ duyệt.
                       </Paragraph>
                       <Button
                         onClick={() => {
                           setShowPaymentSummary(false);
                           setPaymentSummary(null);
+                          // IMPORTANT: Reset patientIdForBooking khi quay lại để tránh lỗi
+                          setPatientIdForBooking(null);
                         }}
                         style={{ marginTop: 16 }}
                       >
@@ -1238,6 +1402,8 @@ const ChonThoiGian = () => {
                           onClick={() => {
                             setBookingFor("me");
                             setSelectedFamilyMember(null);
+                            setPatientIdForBooking(null); // Reset patientId khi chuyển về "me"
+                            form.resetFields(); // Reset toàn bộ form
                           }}
                           className="booking-button"
                         >
@@ -1247,7 +1413,9 @@ const ChonThoiGian = () => {
                           type={bookingFor === "family" ? "primary" : "default"}
                           onClick={() => {
                             setBookingFor("family");
-                            setSelectedFamilyMember(null); // Clear any previous selection
+                            setSelectedFamilyMember(null);
+                            setPatientIdForBooking(null); // Reset patientId khi chuyển sang family
+                            form.resetFields(); // Reset toàn bộ form
                           }}
                           className="booking-button"
                         >
@@ -1685,8 +1853,8 @@ const ChonThoiGian = () => {
                     )}
 
                     {/* Reason */}
-                    <Form.Item 
-                      name="reason" 
+                    <Form.Item
+                      name="reason"
                       label="Lý do khám"
                       rules={[
                         {
@@ -1695,71 +1863,87 @@ const ChonThoiGian = () => {
                         },
                       ]}
                     >
-                      <Form.Item shouldUpdate={(prevValues, curValues) => prevValues.reason !== curValues.reason} noStyle>
+                      <Form.Item
+                        shouldUpdate={(prevValues, curValues) =>
+                          prevValues.reason !== curValues.reason
+                        }
+                        noStyle
+                      >
                         {({ getFieldValue }) => {
                           const reasonValue = getFieldValue("reason") || "";
                           const isMaxLength = reasonValue.length >= 100;
                           return (
                             <>
-                      <TextArea
+                              <TextArea
                                 ref={reasonTextareaRef}
                                 rows={4}
-                        placeholder="Mô tả triệu chứng hoặc lý do khám (không bắt buộc)"
+                                placeholder="Mô tả triệu chứng hoặc lý do khám (không bắt buộc)"
                                 maxLength={100}
                                 showCount
                                 onChange={(e) => {
                                   const newValue = e.target.value;
                                   const newLength = newValue.length;
-                                  
+
                                   // Cắt bớt nếu vượt quá 100 ký tự
                                   if (newLength > 100) {
-                                    const truncatedValue = newValue.slice(0, 100);
+                                    const truncatedValue = newValue.slice(
+                                      0,
+                                      100
+                                    );
                                     e.target.value = truncatedValue;
-                                    form.setFieldsValue({ reason: truncatedValue });
+                                    form.setFieldsValue({
+                                      reason: truncatedValue,
+                                    });
                                   }
                                 }}
                                 onKeyDown={(e) => {
-                                  const currentValue = getFieldValue("reason") || "";
+                                  const currentValue =
+                                    getFieldValue("reason") || "";
                                   const currentLength = currentValue.length;
-                                  
+
                                   // Nếu đã có 100 ký tự
                                   if (currentLength >= 100) {
                                     // Cho phép xóa (Backspace, Delete)
-                                    if (e.key === 'Backspace' || e.key === 'Delete') {
+                                    if (
+                                      e.key === "Backspace" ||
+                                      e.key === "Delete"
+                                    ) {
                                       return;
                                     }
-                                    
+
                                     // Cho phép điều hướng
                                     const navigationKeys = [
-                                      'ArrowLeft',
-                                      'ArrowRight',
-                                      'ArrowUp',
-                                      'ArrowDown',
-                                      'Home',
-                                      'End',
-                                      'Tab',
+                                      "ArrowLeft",
+                                      "ArrowRight",
+                                      "ArrowUp",
+                                      "ArrowDown",
+                                      "Home",
+                                      "End",
+                                      "Tab",
                                     ];
                                     if (navigationKeys.includes(e.key)) {
                                       return;
                                     }
-                                    
+
                                     // Cho phép Ctrl/Cmd + A, C, X, Z (nhưng chặn Ctrl+V)
                                     if (e.ctrlKey || e.metaKey) {
-                                      if (e.key === 'v' || e.key === 'V') {
+                                      if (e.key === "v" || e.key === "V") {
                                         e.preventDefault();
                                         return false;
                                       }
                                       return;
                                     }
-                                    
+
                                     // Chặn Enter
-                                    if (e.key === 'Enter') {
+                                    if (e.key === "Enter") {
                                       e.preventDefault();
                                       return false;
                                     }
-                                    
+
                                     // Chặn các phím nhập khác
-                                    const isCharacterKey = e.key.length === 1 && !navigationKeys.includes(e.key);
+                                    const isCharacterKey =
+                                      e.key.length === 1 &&
+                                      !navigationKeys.includes(e.key);
                                     if (isCharacterKey) {
                                       e.preventDefault();
                                       return false;
@@ -1768,17 +1952,18 @@ const ChonThoiGian = () => {
                                 }}
                                 onBeforeInput={(e) => {
                                   // Chặn input event nếu đã có 100 ký tự
-                                  const currentValue = getFieldValue("reason") || "";
+                                  const currentValue =
+                                    getFieldValue("reason") || "";
                                   if (currentValue.length >= 100) {
                                     // Kiểm tra xem có phải đang xóa không
                                     const inputType = e.inputType;
-                                    const isDeleteOperation = 
-                                      inputType === 'deleteContentBackward' || 
-                                      inputType === 'deleteContentForward' || 
-                                      inputType === 'deleteByDrag' || 
-                                      inputType === 'deleteCompositionText' ||
-                                      inputType === 'deleteWordBackward' ||
-                                      inputType === 'deleteWordForward';
+                                    const isDeleteOperation =
+                                      inputType === "deleteContentBackward" ||
+                                      inputType === "deleteContentForward" ||
+                                      inputType === "deleteByDrag" ||
+                                      inputType === "deleteCompositionText" ||
+                                      inputType === "deleteWordBackward" ||
+                                      inputType === "deleteWordForward";
                                     if (isDeleteOperation) {
                                       // Đang xóa, cho phép
                                       return;
@@ -1793,13 +1978,19 @@ const ChonThoiGian = () => {
                                   // Cắt bớt nếu vượt quá 100 ký tự
                                   const newValue = e.target.value;
                                   if (newValue.length > 100) {
-                                    const truncatedValue = newValue.slice(0, 100);
+                                    const truncatedValue = newValue.slice(
+                                      0,
+                                      100
+                                    );
                                     e.target.value = truncatedValue;
-                                    form.setFieldsValue({ reason: truncatedValue });
+                                    form.setFieldsValue({
+                                      reason: truncatedValue,
+                                    });
                                   }
                                 }}
                                 onPaste={(e) => {
-                                  const currentValue = getFieldValue("reason") || "";
+                                  const currentValue =
+                                    getFieldValue("reason") || "";
                                   const currentLength = currentValue.length;
                                   // Nếu đã có 100 ký tự, chặn paste hoàn toàn
                                   if (currentLength >= 100) {
@@ -1808,46 +1999,88 @@ const ChonThoiGian = () => {
                                     return;
                                   }
                                   // Nếu chưa đạt 100, xử lý paste
-                                  const pastedText = e.clipboardData.getData('text/plain');
+                                  const pastedText =
+                                    e.clipboardData.getData("text/plain");
                                   const textarea = e.target;
-                                  const selectionStart = textarea.selectionStart || 0;
-                                  const selectionEnd = textarea.selectionEnd || 0;
-                                  const textBefore = currentValue.substring(0, selectionStart);
-                                  const textAfter = currentValue.substring(selectionEnd);
-                                  const newText = textBefore + pastedText + textAfter;
-                                  
+                                  const selectionStart =
+                                    textarea.selectionStart || 0;
+                                  const selectionEnd =
+                                    textarea.selectionEnd || 0;
+                                  const textBefore = currentValue.substring(
+                                    0,
+                                    selectionStart
+                                  );
+                                  const textAfter =
+                                    currentValue.substring(selectionEnd);
+                                  const newText =
+                                    textBefore + pastedText + textAfter;
+
                                   if (newText.length > 100) {
                                     e.preventDefault();
                                     // Chỉ paste phần vừa đủ
                                     const maxAllowedLength = 100;
-                                    const availableLength = maxAllowedLength - (textBefore.length + textAfter.length);
+                                    const availableLength =
+                                      maxAllowedLength -
+                                      (textBefore.length + textAfter.length);
                                     if (availableLength > 0) {
-                                      const truncatedPaste = pastedText.substring(0, availableLength);
-                                      const finalText = textBefore + truncatedPaste + textAfter;
-                                      form.setFieldsValue({ reason: finalText });
+                                      const truncatedPaste =
+                                        pastedText.substring(
+                                          0,
+                                          availableLength
+                                        );
+                                      const finalText =
+                                        textBefore + truncatedPaste + textAfter;
+                                      form.setFieldsValue({
+                                        reason: finalText,
+                                      });
                                       // Set cursor position sau text vừa paste
                                       setTimeout(() => {
-                                        const newCursorPos = textBefore.length + truncatedPaste.length;
-                                        textarea.setSelectionRange(newCursorPos, newCursorPos);
+                                        const newCursorPos =
+                                          textBefore.length +
+                                          truncatedPaste.length;
+                                        textarea.setSelectionRange(
+                                          newCursorPos,
+                                          newCursorPos
+                                        );
                                       }, 0);
                                     }
                                   }
                                 }}
-                                style={isMaxLength ? { 
-                                  borderColor: '#faad14',
-                                  backgroundColor: '#fffbe6'
-                                } : {}}
+                                style={
+                                  isMaxLength
+                                    ? {
+                                        borderColor: "#faad14",
+                                        backgroundColor: "#fffbe6",
+                                      }
+                                    : {}
+                                }
                               />
                               {isMaxLength && (
                                 <div style={{ marginTop: 4 }}>
-                                  <Text type="warning" style={{ fontSize: '12px', fontWeight: 500 }}>
-                                    ⚠️ Bạn đã nhập đủ 100 ký tự (giới hạn tối đa)
+                                  <Text
+                                    type="warning"
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    ⚠️ Bạn đã nhập đủ 100 ký tự (giới hạn tối
+                                    đa)
                                   </Text>
                                 </div>
                               )}
                               {!isMaxLength && (
-                                <Text type="secondary" style={{ fontSize: '12px', marginTop: 4, display: 'block' }}>
-                                  Bạn có thể nhập tối đa 100 ký tự để mô tả lý do khám ({100 - reasonValue.length} ký tự còn lại)
+                                <Text
+                                  type="secondary"
+                                  style={{
+                                    fontSize: "12px",
+                                    marginTop: 4,
+                                    display: "block",
+                                  }}
+                                >
+                                  Bạn có thể nhập tối đa 100 ký tự để mô tả lý
+                                  do khám ({100 - reasonValue.length} ký tự còn
+                                  lại)
                                 </Text>
                               )}
                             </>
@@ -1891,104 +2124,110 @@ const ChonThoiGian = () => {
 
           {/* Right Column - Booking Summary (Hidden when showing payment summary) */}
           {!showPaymentSummary && (
-          <Col xs={24} lg={8}>
-            <div className="booking-summary-section">
-              {/* Booking Summary */}
-              <Card className="booking-summary-card">
-                <Title level={4}>Tóm tắt đặt lịch</Title>
+            <Col xs={24} lg={8}>
+              <div className="booking-summary-section">
+                {/* Booking Summary */}
+                <Card className="booking-summary-card">
+                  <Title level={4}>Tóm tắt đặt lịch</Title>
 
-                <div className="summary-item">
-                  <Text strong>Bác sĩ:</Text>
-                  <Text>
-                    {(() => {
-                      const fullName =
-                        doctor.userId?.fullName || doctor.fullName;
-                      return fullName?.startsWith("BS.")
-                        ? fullName
-                        : `BS. ${fullName}`;
-                    })()}
-                  </Text>
-                </div>
-
-                <div className="summary-item">
-                  <Text strong>Chuyên khoa:</Text>
-                  <Text>
-                    {getSpecializationNames(doctor.specializationIds)}
-                  </Text>
-                </div>
-
-                {selectedDate && (
                   <div className="summary-item">
-                    <Text strong>Ngày khám:</Text>
-                    <Text>{selectedDate.format("DD/MM/YYYY")}</Text>
-                  </div>
-                )}
-
-                {selectedTimeSlot && (
-                  <div className="summary-item">
-                    <Text strong>Giờ khám:</Text>
-                    <Text>{selectedTimeSlot.timeRange}</Text>
-                  </div>
-                )}
-
-                {selectedMode && (
-                  <div className="summary-item">
-                    <Text strong>Hình thức:</Text>
+                    <Text strong>Bác sĩ:</Text>
                     <Text>
-                      {selectedMode === "online"
-                        ? "Khám online"
-                        : "Khám tại phòng khám"}
+                      {(() => {
+                        const fullName =
+                          doctor.userId?.fullName || doctor.fullName;
+                        return fullName?.startsWith("BS.")
+                          ? fullName
+                          : `BS. ${fullName}`;
+                      })()}
                     </Text>
                   </div>
-                )}
 
-                {selectedMode === "offline" && defaultClinic && (
                   <div className="summary-item">
-                    <Text strong>Phòng khám:</Text>
-                    <div>
-                      <div>{defaultClinic.name}</div>
-                      <Text type="secondary" style={{ fontSize: "12px" }}>
-                        {defaultClinic.address}
+                    <Text strong>Chuyên khoa:</Text>
+                    <Text>
+                      {getSpecializationNames(doctor.specializationIds)}
+                    </Text>
+                  </div>
+
+                  {selectedDate && (
+                    <div className="summary-item">
+                      <Text strong>Ngày khám:</Text>
+                      <Text>{selectedDate.format("DD/MM/YYYY")}</Text>
+                    </div>
+                  )}
+
+                  {selectedTimeSlot && (
+                    <div className="summary-item">
+                      <Text strong>Giờ khám:</Text>
+                      <Text>{selectedTimeSlot.timeRange}</Text>
+                    </div>
+                  )}
+
+                  {selectedMode && (
+                    <div className="summary-item">
+                      <Text strong>Hình thức:</Text>
+                      <Text>
+                        {selectedMode === "online"
+                          ? "Khám online"
+                          : "Khám tại phòng khám"}
                       </Text>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Payment info */}
-                {selectedMode && selectedDate && (
-                  <>
-                    <Divider />
-                    <div className="payment-info">
-                      <div className="summary-item">
-                        <Text strong>Phí khám:</Text>
-                        <Text
-                          strong
-                          style={{ fontSize: "16px", color: "#1890ff" }}
-                        >
-                          {calculatePrice(
-                            selectedMode,
-                            selectedDate
-                          ).toLocaleString("vi-VN")}
-                          đ
+                  {selectedMode === "offline" && defaultClinic && (
+                    <div className="summary-item">
+                      <Text strong>Phòng khám:</Text>
+                      <div>
+                        <div>{defaultClinic.name}</div>
+                        <Text type="secondary" style={{ fontSize: "12px" }}>
+                          {defaultClinic.address}
                         </Text>
                       </div>
                     </div>
-                  </>
-                )}
-              </Card>
+                  )}
 
-              {/* Help Text */}
-              <Card className="help-card">
-                <Title level={4}>Lưu ý</Title>
-                <ul>
-                    <li>Sau khi thanh toán thành công, lịch hẹn sẽ được tạo với trạng thái "Chờ bác sĩ duyệt"</li>
-                    <li>Bác sĩ sẽ xem xét và chấp nhận hoặc từ chối lịch hẹn của bạn</li>
-                  <li>Bạn sẽ nhận được thông báo khi bác sĩ xác nhận</li>
-                  <li>Có thể hủy lịch hẹn trước khi bác sĩ xác nhận</li>
-                </ul>
-              </Card>
-            </div>
-          </Col>
+                  {/* Payment info */}
+                  {selectedMode && selectedDate && (
+                    <>
+                      <Divider />
+                      <div className="payment-info">
+                        <div className="summary-item">
+                          <Text strong>Phí khám:</Text>
+                          <Text
+                            strong
+                            style={{ fontSize: "16px", color: "#1890ff" }}
+                          >
+                            {calculatePrice(
+                              selectedMode,
+                              selectedDate
+                            ).toLocaleString("vi-VN")}
+                            đ
+                          </Text>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </Card>
+
+                {/* Help Text */}
+                <Card className="help-card">
+                  <Title level={4}>Lưu ý</Title>
+                  <ul>
+                    <li>
+                      Sau khi thanh toán thành công, lịch hẹn sẽ được tạo với
+                      trạng thái "Chờ bác sĩ duyệt"
+                    </li>
+                    <li>
+                      Bác sĩ sẽ xem xét và chấp nhận hoặc từ chối lịch hẹn của
+                      bạn
+                    </li>
+                    <li>Bạn sẽ nhận được thông báo khi bác sĩ xác nhận</li>
+                    <li>Có thể hủy lịch hẹn trước khi bác sĩ xác nhận</li>
+                  </ul>
+                </Card>
+              </div>
+            </Col>
           )}
         </Row>
       </div>
@@ -2030,12 +2269,12 @@ const ChonThoiGian = () => {
         ) : doctorReviews && doctorReviews.length > 0 ? (
           <div style={{ maxHeight: "600px", overflowY: "auto" }}>
             {doctorReviews.map((review) => (
-              <Card
-                key={review._id}
-                style={{ marginBottom: 16 }}
-                size="small"
-              >
-                <Space direction="vertical" style={{ width: "100%" }} size="small">
+              <Card key={review._id} style={{ marginBottom: 16 }} size="small">
+                <Space
+                  direction="vertical"
+                  style={{ width: "100%" }}
+                  size="small"
+                >
                   <Space>
                     <Avatar
                       size="small"
@@ -2087,7 +2326,9 @@ const ChonThoiGian = () => {
                       </Paragraph>
                       {review.doctorResponseAt && (
                         <Text type="secondary" style={{ fontSize: "12px" }}>
-                          {dayjs(review.doctorResponseAt).format("DD/MM/YYYY HH:mm")}
+                          {dayjs(review.doctorResponseAt).format(
+                            "DD/MM/YYYY HH:mm"
+                          )}
                         </Text>
                       )}
                     </div>
@@ -2095,13 +2336,15 @@ const ChonThoiGian = () => {
                 </Space>
               </Card>
             ))}
-            {reviewsPagination && reviewsPagination.total > reviewsPagination.limit && (
-              <div style={{ textAlign: "center", marginTop: 16 }}>
-                <Text type="secondary">
-                  Hiển thị {doctorReviews.length} / {reviewsPagination.total} đánh giá
-                </Text>
-              </div>
-            )}
+            {reviewsPagination &&
+              reviewsPagination.total > reviewsPagination.limit && (
+                <div style={{ textAlign: "center", marginTop: 16 }}>
+                  <Text type="secondary">
+                    Hiển thị {doctorReviews.length} / {reviewsPagination.total}{" "}
+                    đánh giá
+                  </Text>
+                </div>
+              )}
           </div>
         ) : (
           <Empty description="Chưa có đánh giá nào" />

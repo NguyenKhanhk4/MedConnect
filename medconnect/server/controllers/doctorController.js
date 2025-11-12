@@ -3351,17 +3351,42 @@ export async function getDoctorTimeSlots(req, res) {
       // Get slot IDs to fetch appointments
       const slotIds = timeSlots.map((slot) => slot._id);
 
-      // Fetch leave requests for these slots
+      // Fetch leave requests that overlap with the date range of these slots
+      // Get date range from slots
+      const slotDates = timeSlots.map(slot => new Date(slot.startAt));
+      const minDate = new Date(Math.min(...slotDates));
+      const maxDate = new Date(Math.max(...slotDates));
+      minDate.setHours(0, 0, 0, 0);
+      maxDate.setHours(23, 59, 59, 999);
+
+      // Find leave requests that overlap with this date range
+      // Overlap occurs when: startDate <= maxDate AND endDate >= minDate
       const leaveRequests = await LeaveRequest.find({
-        slotId: { $in: slotIds },
+        doctorId: doctor._id,
         status: "pending",
+        startDate: { $lte: maxDate },
+        endDate: { $gte: minDate },
       }).lean();
 
-      // Create a map of slotId -> leave request
+      // Create a map of slotId -> leave request (check if slot date is within leave request range)
       const leaveRequestMap = {};
-      leaveRequests.forEach((leaveRequest) => {
-        const slotIdKey = leaveRequest.slotId.toString();
-        leaveRequestMap[slotIdKey] = leaveRequest;
+      timeSlots.forEach((slot) => {
+        const slotDate = new Date(slot.startAt);
+        slotDate.setHours(0, 0, 0, 0);
+        
+        // Check if this slot date falls within any pending leave request
+        const matchingRequest = leaveRequests.find((lr) => {
+          const lrStart = new Date(lr.startDate);
+          lrStart.setHours(0, 0, 0, 0);
+          const lrEnd = new Date(lr.endDate);
+          lrEnd.setHours(23, 59, 59, 999);
+          return slotDate >= lrStart && slotDate <= lrEnd;
+        });
+        
+        if (matchingRequest) {
+          const slotIdKey = slot._id.toString();
+          leaveRequestMap[slotIdKey] = matchingRequest;
+        }
       });
 
       // Fetch appointments for these slots
