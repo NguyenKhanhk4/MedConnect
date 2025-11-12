@@ -1,5 +1,5 @@
 .manager-schedule-management {
-  padding: 24px;
+  padding: 0 24px 24px 24px;
   background-color: #f8fafc;
   min-height: 100vh;
 
@@ -171,16 +171,16 @@
 
   .schedule-header {
     margin: 0 !important;
-    margin-top: -24px !important;
+    margin-top: 0 !important;
     margin-bottom: 1.5rem !important;
     margin-left: -24px !important;
     margin-right: -24px !important;
-    padding: 1rem 24px !important;
+    padding: 1.5rem 24px !important;
     width: calc(100% + 48px) !important;
     display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    gap: 32px;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
     background: linear-gradient(135deg, #e0f7f9 0%, #fff4e6 100%) !important;
     border-radius: 12px !important;
     border: none !important;
@@ -191,12 +191,16 @@
     box-shadow: none !important;
 
     .header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+
       h1 {
         font-size: 1.875rem !important;
         font-weight: 800 !important;
         color: #111827 !important;
         margin: 0 !important;
-        margin-bottom: 0.25rem !important;
         letter-spacing: -0.03em !important;
         background: linear-gradient(
           135deg,
@@ -215,6 +219,58 @@
           display: inline-block;
           margin-right: 0.5rem;
           vertical-align: middle;
+        }
+      }
+
+      .week-navigation {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-left: 0;
+
+        span:first-child {
+          font-weight: 500;
+          color: #6b7280;
+          font-size: 14px;
+        }
+
+        .nav-arrow {
+          background: white;
+          border: 1px solid #e5e7eb;
+          color: #6b7280;
+          font-size: 16px;
+          cursor: pointer;
+          padding: 6px 10px;
+          border-radius: 6px;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+
+          &:hover {
+            background-color: #f3f4f6;
+            border-color: #d1d5db;
+            color: #374151;
+          }
+
+          &:active {
+            transform: scale(0.95);
+          }
+        }
+
+        .date-range {
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          padding: 6px 16px;
+          font-weight: 500;
+          color: #1f2937;
+          min-width: 220px;
+          text-align: center;
+          font-size: 14px;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
       }
     }
@@ -1337,7 +1393,7 @@
 // Responsive design
 @media (max-width: 768px) {
   .manager-schedule-management {
-    padding: 16px;
+    padding: 0 16px 16px 16px;
 
     .schedule-header {
       margin-left: -16px !important;
@@ -1348,12 +1404,20 @@
       gap: 16px;
       align-items: stretch;
 
+      .header-left {
+        .week-navigation {
+          .date-range {
+            min-width: 180px;
+            font-size: 13px;
+          }
+        }
+      }
+
       .header-right {
         flex-direction: column;
         gap: 16px;
         align-items: stretch;
 
-        .week-navigation,
         .status-indicators,
         .action-buttons {
           justify-content: center;
