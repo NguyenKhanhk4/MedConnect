@@ -1,0 +1,335 @@
+// Notification Center Styles
+.notification-center {
+  position: relative;
+  display: inline-block;
+
+  .notification-bell {
+    position: relative;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    .bell-icon {
+      width: 24px;
+      height: 24px;
+      color: #666;
+    }
+
+    .unread-badge {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      background-color: #ff4d4f;
+      color: white;
+      border-radius: 50%;
+      min-width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 0 4px;
+      animation: pulse 2s infinite;
+    }
+  }
+
+  .notification-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 400px;
+    max-width: 90vw;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    border: 1px solid #e5e7eb;
+    z-index: 1000;
+    margin-top: 8px;
+
+    .notification-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f9fafb;
+      border-radius: 12px 12px 0 0;
+
+      h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #111827;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .mark-all-read-btn {
+          background: none;
+          border: none;
+          color: #3b82f6;
+          font-size: 14px;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 6px;
+          transition: background-color 0.2s;
+
+          &:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+          }
+        }
+
+        .close-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 6px;
+          color: #6b7280;
+          transition: all 0.2s;
+
+          &:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+            color: #374151;
+          }
+        }
+      }
+    }
+
+    .notification-list {
+      max-height: 240px; // Reduced height
+      overflow-y: auto;
+
+      .loading-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        color: #6b7280;
+
+        .loading-spinner {
+          width: 24px;
+          height: 24px;
+          border: 2px solid #e5e7eb;
+          border-top: 2px solid #3b82f6;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin-bottom: 12px;
+        }
+      }
+
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        color: #6b7280;
+
+        .empty-icon {
+          width: 48px;
+          height: 48px;
+          margin-bottom: 12px;
+          opacity: 0.5;
+        }
+      }
+
+      .notification-item {
+        display: flex;
+        align-items: flex-start;
+        padding: 16px 20px;
+        border-bottom: 1px solid #f3f4f6;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        position: relative;
+
+        &:hover {
+          background-color: #f9fafb;
+        }
+
+        &.unread {
+          background-color: #eff6ff;
+          border-left: 3px solid #3b82f6;
+        }
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        .notification-content {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          flex: 1;
+
+          .notification-icon-wrapper {
+            flex-shrink: 0;
+            margin-top: 2px;
+
+            .notification-icon {
+              width: 20px;
+              height: 20px;
+
+              &.priority-high {
+                color: #ef4444;
+              }
+
+              &.priority-medium {
+                color: #f59e0b;
+              }
+
+              &.priority-low {
+                color: #6b7280;
+              }
+            }
+          }
+
+          .notification-text {
+            flex: 1;
+            min-width: 0;
+
+            .notification-title {
+              margin: 0 0 4px 0;
+              font-size: 14px;
+              font-weight: 600;
+              color: #111827;
+              line-height: 1.4;
+            }
+
+            .notification-message {
+              margin: 0 0 8px 0;
+              font-size: 13px;
+              color: #6b7280;
+              line-height: 1.4;
+              display: -webkit-box;
+              -webkit-line-clamp: 2;
+              -webkit-box-orient: vertical;
+              overflow: hidden;
+            }
+
+            .notification-time {
+              font-size: 12px;
+              color: #9ca3af;
+            }
+          }
+        }
+
+        .unread-indicator {
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          width: 8px;
+          height: 8px;
+          background-color: #3b82f6;
+          border-radius: 50%;
+        }
+      }
+    }
+
+    .notification-footer {
+      padding: 10px 20px;
+      border-top: 1px solid #e5e7eb;
+      background: #f9fafb;
+      border-radius: 0 0 12px 12px;
+
+      .view-all-btn {
+        width: 100%;
+        background: none;
+        border: 1px solid #d1d5db;
+        color: #374151;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+
+        &:hover {
+          background-color: #f3f4f6;
+          border-color: #9ca3af;
+        }
+      }
+    }
+  }
+}
+
+// Animations
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+// Responsive
+@media (max-width: 480px) {
+  .notification-center {
+    .notification-dropdown {
+      width: 320px;
+      right: -50px;
+
+      .notification-header {
+        padding: 12px 16px;
+
+        h3 {
+          font-size: 16px;
+        }
+      }
+
+      .notification-list {
+        .notification-item {
+          padding: 12px 16px;
+
+          .notification-content {
+            gap: 10px;
+
+            .notification-text {
+              .notification-title {
+                font-size: 13px;
+              }
+
+              .notification-message {
+                font-size: 12px;
+              }
+            }
+          }
+        }
+      }
+
+      .notification-footer {
+        padding: 8px 16px;
+
+        .view-all-btn {
+          padding: 5px 10px;
+          font-size: 11px;
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,300 @@
+.doctor-dashboard-container {
+  display: flex;
+  height: 100vh;
+  background: #f8fafc;
+  position: relative;
+}
+
+.doctor-dashboard-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: radial-gradient(circle at 20% 50%, rgba(8, 145, 178, 0.05) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 20%, rgba(8, 145, 178, 0.05) 0%, transparent 50%),
+                    radial-gradient(circle at 40% 80%, rgba(8, 145, 178, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.doctor-main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.doctor-content-area {
+  flex: 1;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 0.5rem;
+  margin: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  
+  // Ẩn thanh trượt
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  
+  &::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+  
+  // Ẩn scrollbar cho tất cả phần tử con
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+
+// Removed old header styles as we're not using them anymore
+
+.dashboard-content-padding {
+  padding: 2rem;
+}
+
+.dashboard-main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.doctor-dashboard-container .stat-card,
+.doctor-content-area .stat-card,
+.dashboard-stats .stat-card,
+div.stat-card {
+  background: #17B0D0 !important;
+  background-color: #17B0D0 !important;
+  padding: 1.5rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(23, 176, 208, 0.3);
+  border: none !important;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  
+  * {
+    color: #ffffff !important;
+    opacity: 1 !important;
+  }
+}
+
+.doctor-dashboard-container .stat-card::before,
+.doctor-content-area .stat-card::before,
+.dashboard-stats .stat-card::before,
+div.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
+  pointer-events: none;
+  opacity: 1 !important;
+}
+
+.doctor-dashboard-container .stat-card:hover,
+.doctor-content-area .stat-card:hover,
+.dashboard-stats .stat-card:hover,
+div.stat-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 8px 30px rgba(23, 176, 208, 0.4);
+  background: #17B0D0 !important;
+  background-color: #17B0D0 !important;
+}
+
+.stat-card-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  z-index: 1;
+}
+
+.doctor-dashboard-container .stat-icon,
+.doctor-content-area .stat-icon,
+.dashboard-stats .stat-icon,
+.stat-card .stat-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #ffffff !important;
+  opacity: 1 !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.doctor-dashboard-container .stat-label,
+.doctor-content-area .stat-label,
+.dashboard-stats .stat-label,
+.stat-card .stat-label {
+  font-size: 0.875rem;
+  color: #ffffff !important;
+  opacity: 1 !important;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.doctor-dashboard-container .stat-value,
+.doctor-content-area .stat-value,
+.dashboard-stats .stat-value,
+.stat-card .stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #ffffff !important;
+  opacity: 1 !important;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.appointment-search {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.appointment-search input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease;
+}
+
+.appointment-search input:focus {
+  outline: none;
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: 1rem;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .dashboard-header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dashboard-stats {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .stat-card {
+    padding: 1rem;
+    background: #17B0D0 !important;
+    background-color: #17B0D0 !important;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-content {
+    padding: 1rem;
+  }
+
+  .stat-card {
+    padding: 0.75rem;
+    background: #17B0D0 !important;
+    background-color: #17B0D0 !important;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+  }
+
+  .stat-value {
+    font-size: 1.25rem;
+  }
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.dashboard-shortcuts-card {
+  padding: 1.5rem;
+  border: none;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
+  background: white;
+}
+
+.dashboard-shortcuts-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 1rem 0;
+}
+
+.dashboard-shortcuts-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dashboard-shortcut-btn {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.dashboard-info-card {
+  padding: 1.5rem;
+  border: none;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
+  background: white;
+}
+
+.dashboard-info-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 1rem 0;
+}
+
+.dashboard-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.dashboard-info-label {
+  color: #64748b;
+  margin: 0;
+}
+
+.dashboard-info-value {
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+}

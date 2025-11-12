@@ -1,0 +1,348 @@
+.online-consultation-page {
+  min-height: 100vh;
+  background-color: #ffffff;
+  padding: 0;
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+  }
+
+  .loading-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+  }
+
+  .error-state {
+    text-align: center;
+    padding: 3rem;
+    color: #64748b;
+
+    h2 {
+      color: #ef4444;
+      margin-bottom: 1rem;
+    }
+
+    p {
+      margin-bottom: 1.5rem;
+    }
+
+    .retry-button {
+      background-color: #3b82f6;
+      color: #ffffff;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background-color: #2563eb;
+      }
+    }
+  }
+
+  .page-header {
+    margin-bottom: 2rem;
+
+    .page-title {
+      font-size: 1.875rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin: 0 0 0.5rem 0;
+    }
+
+    .page-description {
+      font-size: 1rem;
+      color: #64748b;
+      margin: 0;
+    }
+  }
+
+  .consultation-section {
+    margin-bottom: 3rem;
+
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #1e293b;
+      margin: 0 0 1.5rem 0;
+    }
+
+    .consultations-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+      gap: 1.5rem;
+
+      .empty-state {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 3rem;
+        color: #64748b;
+        font-size: 1rem;
+        background-color: #f8fafc;
+        border-radius: 0.75rem;
+        border: 1px solid #e2e8f0;
+      }
+    }
+  }
+
+  .consultation-card {
+    background-color: #ffffff;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+    display: flex;
+    gap: 1rem;
+    transition: all 0.3s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .doctor-avatar {
+      flex-shrink: 0;
+
+      .avatar-image {
+        width: 4rem;
+        height: 4rem;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #e5e7eb;
+      }
+
+      .default-avatar {
+        width: 4rem;
+        height: 4rem;
+        color: #9ca3af;
+        background-color: #f3f4f6;
+        border-radius: 50%;
+        padding: 1rem;
+        border: 2px solid #e5e7eb;
+      }
+    }
+
+    .consultation-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-left: 1rem;
+
+      .doctor-info-section {
+        .doctor-name-row {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin-bottom: 0.25rem;
+
+          .doctor-name {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0;
+          }
+
+          .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+
+            &.scheduled {
+              background-color: #3b82f6;
+              color: #ffffff;
+            }
+
+            &.completed {
+              background-color: #f3f4f6;
+              color: #6b7280;
+            }
+          }
+        }
+
+        .doctor-specialty {
+          font-size: 0.875rem;
+          color: #64748b;
+          margin: 0;
+        }
+      }
+
+      .consultation-details {
+        display: flex;
+        flex-direction: row;
+        gap: 1.5rem;
+        align-items: center;
+
+        .detail-item {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.875rem;
+          color: #374151;
+
+          .detail-icon {
+            width: 1rem;
+            height: 1rem;
+            color: #64748b;
+          }
+        }
+      }
+
+      .consultation-actions {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: auto;
+
+        .action-button {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          padding: 0.75rem 1.5rem;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border: none;
+          min-width: fit-content;
+          white-space: nowrap;
+
+          .button-icon {
+            width: 1rem;
+            height: 1rem;
+          }
+
+          &.join-button {
+            background-color: #3b82f6;
+            color: #ffffff;
+            flex: 1;
+
+            &:hover {
+              background-color: #2563eb;
+            }
+          }
+
+          &.message-button {
+            background-color: #ffffff;
+            color: #64748b;
+            border: 1px solid #e5e7eb;
+
+            &:hover {
+              background-color: #f8fafc;
+              border-color: #d1d5db;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .online-consultation-page {
+    padding: 1rem 0;
+
+    .container {
+      padding: 0 0.5rem;
+    }
+
+    .page-header {
+      margin-bottom: 1.5rem;
+
+      .page-title {
+        font-size: 1.5rem;
+      }
+
+      .page-description {
+        font-size: 0.875rem;
+      }
+    }
+
+    .consultation-section {
+      margin-bottom: 2rem;
+
+      .section-title {
+        font-size: 1.125rem;
+      }
+
+      .consultations-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+
+        .consultation-card {
+          padding: 1rem;
+          flex-direction: column;
+          gap: 0.75rem;
+
+          .doctor-avatar {
+            align-self: flex-start;
+
+            .avatar-image,
+            .default-avatar {
+              width: 3rem;
+              height: 3rem;
+            }
+
+            .default-avatar {
+              padding: 0.75rem;
+            }
+          }
+
+          .consultation-content {
+            gap: 0.75rem;
+
+            .doctor-info-section {
+              .doctor-name-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+
+                .doctor-name {
+                  font-size: 1rem;
+                }
+              }
+            }
+
+            .consultation-actions {
+              flex-direction: column;
+              gap: 0.5rem;
+
+              .action-button {
+                width: 100%;
+                justify-content: center;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .online-consultation-page {
+    .consultation-section {
+      .consultations-grid {
+        .consultation-card {
+          .consultation-actions {
+            .action-button {
+              padding: 0.625rem 1rem;
+              font-size: 0.8125rem;
+            }
+          }
+        }
+      }
+    }
+  }
+}

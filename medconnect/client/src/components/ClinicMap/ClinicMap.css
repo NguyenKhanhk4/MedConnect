@@ -1,0 +1,100 @@
+.clinic-map-container {
+  margin-top: 16px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.clinic-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.clinic-map-header .anticon {
+  color: #1890ff;
+  margin-right: 4px;
+}
+
+.clinic-map-wrapper {
+  height: 300px;
+  width: 100%;
+  position: relative;
+}
+
+.clinic-map {
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+}
+
+.clinic-map-placeholder {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: #f8f9fa;
+  padding: 20px;
+  text-align: center;
+}
+
+.clinic-map-placeholder p {
+  margin: 12px 0;
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+.clinic-map-footer {
+  padding: 8px 16px;
+  background: #fafafa;
+  border-top: 1px solid #e9ecef;
+  font-size: 12px;
+  color: #666;
+}
+
+/* Hide Leaflet attribution, keep only OpenStreetMap attribution (legal requirement) */
+.clinic-map :global(.leaflet-control-attribution) {
+  font-size: 10px !important;
+  padding: 2px 4px !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.clinic-map :global(.leaflet-control-attribution:hover) {
+  opacity: 1;
+}
+
+/* Hide Leaflet logo/icon if present */
+.clinic-map :global(.leaflet-control-attribution a[href*="leafletjs.com"]) {
+  display: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .clinic-map-wrapper {
+    height: 250px;
+  }
+  
+  .clinic-map-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .clinic-map-header .ant-btn {
+    width: 100%;
+  }
+  
+  /* Make attribution even smaller on mobile */
+  .clinic-map :global(.leaflet-control-attribution) {
+    font-size: 8px !important;
+    padding: 1px 3px !important;
+  }
+}
+

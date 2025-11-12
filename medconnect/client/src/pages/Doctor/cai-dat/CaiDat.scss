@@ -1,0 +1,622 @@
+/* Doctor Profile Settings Styles */
+/* Professional medical app design system */
+
+/* Color variables for professional medical app */
+:root {
+  /* Light theme colors */
+  --background: oklch(0.98 0 0);
+  --foreground: oklch(0.2 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0 0);
+  --primary: oklch(0.45 0.15 200);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.92 0.02 200);
+  --secondary-foreground: oklch(0.2 0 0);
+  --muted: oklch(0.92 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+  --accent: oklch(0.5 0.18 200);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.93 0 0);
+  --input: oklch(0.97 0 0);
+  --ring: oklch(0.5 0.15 200);
+  --chart-1: oklch(0.5 0.18 200);
+  --chart-2: oklch(0.6 0.15 180);
+  --chart-3: oklch(0.55 0.16 210);
+  --chart-4: oklch(0.65 0.14 190);
+  --chart-5: oklch(0.7 0.12 200);
+  --radius: 0.5rem;
+  --sidebar: oklch(0.98 0 0);
+  --sidebar-foreground: oklch(0.2 0 0);
+  --sidebar-primary: oklch(0.45 0.15 200);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.92 0.02 200);
+  --sidebar-accent-foreground: oklch(0.2 0 0);
+  --sidebar-border: oklch(0.93 0 0);
+  --sidebar-ring: oklch(0.5 0.15 200);
+
+  /* Shadow variables */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
+}
+
+/* Dark theme colors */
+.dark {
+  --background: oklch(0.12 0 0);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.18 0 0);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.18 0 0);
+  --popover-foreground: oklch(0.95 0 0);
+  --primary: oklch(0.6 0.18 200);
+  --primary-foreground: oklch(0.12 0 0);
+  --secondary: oklch(0.25 0.02 200);
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.25 0 0);
+  --muted-foreground: oklch(0.65 0 0);
+  --accent: oklch(0.65 0.2 200);
+  --accent-foreground: oklch(0.12 0 0);
+  --destructive: oklch(0.6 0.2 25);
+  --destructive-foreground: oklch(0.95 0 0);
+  --border: oklch(0.25 0 0);
+  --input: oklch(0.22 0 0);
+  --ring: oklch(0.6 0.18 200);
+  --chart-1: oklch(0.6 0.18 200);
+  --chart-2: oklch(0.65 0.16 180);
+  --chart-3: oklch(0.7 0.15 210);
+  --chart-4: oklch(0.75 0.14 190);
+  --chart-5: oklch(0.8 0.12 200);
+  --sidebar: oklch(0.15 0 0);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.6 0.18 200);
+  --sidebar-primary-foreground: oklch(0.12 0 0);
+  --sidebar-accent: oklch(0.25 0.02 200);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.25 0 0);
+  --sidebar-ring: oklch(0.6 0.18 200);
+}
+
+/* Base styles */
+* {
+  border-color: var(--border);
+  outline-color: var(--ring);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.profileSettings {
+  min-height: 100vh;
+  background: var(--background);
+  padding: 2rem;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.twoColumnGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.twoColumnGrid .card {
+  padding: 1.5rem;
+}
+
+.twoColumnGrid .cardHeader {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+}
+
+.twoColumnGrid .infoCards {
+  gap: 0.75rem;
+}
+
+.twoColumnGrid .infoCard {
+  padding: 0.75rem;
+}
+
+.twoColumnGrid .securitySection .passwordField {
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .twoColumnGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  padding: 2rem;
+  transition: all 0.3s ease;
+  color: var(--card-foreground);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.cardHeader .icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: calc(var(--radius) - 2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cardHeader .icon.cyan {
+  background: #e0f7fa;
+  color: #06b6d4;
+}
+
+.cardHeader .icon.blue {
+  background: #e0f7fa;
+  color: #06b6d4;
+}
+
+.cardHeader .icon.red {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.cardHeader h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--card-foreground);
+  margin: 0;
+}
+
+/* Avatar Section */
+.avatar-section {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f0fdfa 0%, #e6fffa 100%);
+  border-radius: var(--radius);
+  border: 1px solid #27d5e1;
+}
+
+.avatar-container {
+  position: relative;
+}
+
+.avatar-image {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #14b8a6;
+  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.2);
+}
+
+.avatar-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.avatar-upload-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  background: #14b8a6;
+  color: white;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  
+  &:hover {
+    background: #0d9488;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(20, 184, 166, 0.3);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.avatar-hint {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
+}
+
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.formGroup.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.formGroup label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 0.5rem;
+}
+
+.inputWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--input);
+  transition: all 0.2s ease;
+}
+
+.inputWrapper:focus-within {
+  border-color: #06b6d4;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+}
+
+.inputWrapper .icon {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+.inputWrapper input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 0.875rem;
+}
+
+.inputWrapper input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 0.875rem;
+  resize: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  background: var(--input);
+  color: var(--foreground);
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: #06b6d4;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+}
+
+.textarea::placeholder {
+  color: var(--muted-foreground);
+}
+
+.formActions {
+  margin-top: 1.5rem;
+}
+
+.formActions button {
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  background: #06b6d4;
+  color: white;
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.formActions button:hover {
+  background: #0891b2;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+}
+
+.infoCards {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.infoCard {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--muted);
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.infoCard:hover {
+  border-color: #06b6d4;
+}
+
+.infoCard .icon {
+  color: #06b6d4;
+  flex-shrink: 0;
+}
+
+.infoCard .content {
+  flex: 1;
+}
+
+.infoCard .title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  margin-bottom: 0.25rem;
+}
+
+.infoCard .value {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.securitySection .passwordField {
+  margin-bottom: 1.5rem;
+}
+
+.securitySection .passwordField label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 0.5rem;
+}
+
+.securityButton {
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  background: #06b6d4;
+  color: white;
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.securityButton:hover {
+  background: #0891b2;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+}
+
+// Password toggle style giống login form
+.password-toggle {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 18px;
+  transition: color 0.2s ease;
+  pointer-events: auto;
+  padding: 8px;
+
+  &:hover {
+    color: #2d3748;
+  }
+}
+
+// Cập nhật inputWrapper để có position relative cho password toggle
+.securitySection .inputWrapper {
+  position: relative;
+  border: 2px solid #f7f8f9;
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: #fafafa;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #d1d5db;
+    background: #ffffff;
+  }
+
+  &:focus-within {
+    border-color: #06b6d4;
+    background: #ffffff;
+    box-shadow: 0 0 0 4px rgba(8, 145, 178, 0.1);
+  }
+
+  &.error {
+    border-color: #dc2626;
+    background: #fef2f2;
+
+    &:focus-within {
+      border-color: #dc2626;
+      box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.1);
+    }
+  }
+
+  input {
+    padding-right: 50px; // Tạo chỗ cho icon
+  }
+}
+
+.error-text {
+  color: #dc2626;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  font-weight: 500;
+}
+
+// Avatar Management Styles
+.avatarManagement {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.currentAvatar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--muted);
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid var(--border);
+}
+
+.avatar {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  color: var(--primary-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  flex-shrink: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+}
+
+.avatarInfo {
+  flex: 1;
+}
+
+.avatarInfo h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0 0 0.25rem 0;
+}
+
+.avatarInfo p {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+.avatarActions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.uploadButton {
+  padding: 0.5rem 1rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-block;
+  text-align: center;
+
+  &:hover {
+    background: var(--accent);
+    transform: translateY(-1px);
+  }
+}
+
+.saveButton {
+  padding: 0.5rem 1rem;
+  background: var(--chart-1);
+  color: white;
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--chart-2);
+    transform: translateY(-1px);
+  }
+}
+
+.removeButton {
+  padding: 0.5rem 1rem;
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--destructive);
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+}

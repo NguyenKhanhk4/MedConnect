@@ -1,0 +1,416 @@
+.about-page {
+  min-height: 100vh;
+  background: #ffffff;
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  // Hero Section
+  .about-hero {
+    background: linear-gradient(135deg, #40cccc 0%, #45c3d2 100%);
+    padding: 80px 0 100px;
+    margin-top: 16px;
+    color: #ffffff;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50 50L0 0M100 100L50 50' stroke='rgba(255,255,255,0.05)' stroke-width='1'/%3E%3C/svg%3E")
+        repeat;
+      opacity: 0.3;
+    }
+
+    .hero-content {
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+      font-size: 32px;
+      font-weight: 600;
+
+      .logo-icon {
+        width: 56px;
+        height: 56px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36px;
+        font-weight: 700;
+        color: #ffffff;
+      }
+
+      .logo-text {
+        color: #ffffff;
+      }
+    }
+
+    .hero-title {
+      color: #ffffff !important;
+      font-size: 48px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      line-height: 1.2;
+
+      @media (max-width: 768px) {
+        font-size: 32px;
+      }
+    }
+
+    .hero-description {
+      font-size: 18px;
+      line-height: 1.8;
+      color: rgba(255, 255, 255, 0.95);
+      max-width: 800px;
+      margin: 0 auto 40px;
+    }
+  }
+
+  // Mission Section
+  .about-mission {
+    padding: 80px 0;
+    background: #ffffff;
+
+    .mission-text {
+      font-size: 16px;
+      line-height: 1.8;
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    .mission-image {
+      .mission-card {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        border-radius: 16px;
+        padding: 40px;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      }
+
+      .mission-icon-wrapper {
+        width: 100px;
+        height: 100px;
+        background: #45c3d2;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 24px;
+
+        .mission-icon {
+          font-size: 48px;
+          color: #ffffff;
+        }
+      }
+    }
+  }
+
+  // Features Section
+  .about-features {
+    padding: 80px 0;
+    background: #f8f9fa;
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 48px;
+
+      .section-title {
+        font-size: 40px;
+        font-weight: 700;
+        margin-bottom: 16px;
+        color: #1a1a1a;
+      }
+
+      .section-description {
+        font-size: 18px;
+        color: #666;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+    }
+
+    .feature-card {
+      border-radius: 12px;
+      padding: 32px;
+      transition: all 0.3s ease;
+      border: 1px solid #e8e8e8;
+
+      &:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+      }
+
+      .feature-icon-wrapper {
+        font-size: 48px;
+        margin-bottom: 20px;
+        display: block;
+      }
+
+      .feature-title {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #1a1a1a;
+      }
+
+      .feature-description {
+        color: #666;
+        line-height: 1.6;
+        margin: 0;
+      }
+    }
+  }
+
+  // Statistics Section
+  .about-statistics {
+    padding: 60px 0;
+    background: #ffffff;
+
+    .stat-card {
+      text-align: center;
+      border-radius: 12px;
+      padding: 32px 24px;
+      background: linear-gradient(135deg, #40cccc 0%, #45c3d2 100%);
+      transition: all 0.3s ease;
+
+      &:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(64, 204, 204, 0.3);
+      }
+
+      :global(.ant-statistic-title) {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 16px;
+        font-weight: 500;
+        margin-bottom: 8px;
+      }
+
+      :global(.ant-statistic-content) {
+        color: #ffffff;
+      }
+    }
+  }
+
+  // Benefits Section
+  .about-benefits {
+    padding: 80px 0;
+    background: #ffffff;
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 48px;
+
+      .section-title {
+        font-size: 40px;
+        font-weight: 700;
+        margin-bottom: 16px;
+        color: #1a1a1a;
+      }
+
+      .section-description {
+        font-size: 18px;
+        color: #666;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+    }
+
+    .benefit-card {
+      background: #f8f9fa;
+      border-radius: 16px;
+      padding: 40px;
+      height: 100%;
+      transition: all 0.3s ease;
+
+      &:hover {
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+      }
+
+      .benefit-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+
+        .benefit-icon {
+          width: 64px;
+          height: 64px;
+          background: #45c3d2;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 32px;
+          color: #ffffff;
+        }
+
+        h3 {
+          margin: 0 !important;
+          font-size: 24px;
+          font-weight: 600;
+          color: #1a1a1a;
+        }
+      }
+
+      .benefit-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+
+        li {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 12px 0;
+          font-size: 16px;
+          color: #333;
+          line-height: 1.6;
+
+          .check-icon {
+            color: #52c41a;
+            font-size: 18px;
+            margin-top: 4px;
+            flex-shrink: 0;
+          }
+        }
+      }
+    }
+  }
+
+  // Values Section
+  .about-values {
+    padding: 80px 0;
+    background: #f8f9fa;
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 48px;
+
+      .section-title {
+        font-size: 40px;
+        font-weight: 700;
+        margin-bottom: 16px;
+        color: #1a1a1a;
+      }
+
+      .section-description {
+        font-size: 18px;
+        color: #666;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+    }
+
+    .value-card {
+      text-align: center;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 32px 24px;
+      transition: all 0.3s ease;
+      border: 1px solid #e8e8e8;
+
+      &:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+      }
+
+      .value-icon {
+        font-size: 56px;
+        color: #45c3d2;
+        margin-bottom: 20px;
+      }
+
+      .value-title {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #1a1a1a;
+      }
+
+      .value-description {
+        color: #666;
+        line-height: 1.6;
+        margin: 0;
+      }
+    }
+  }
+
+  // CTA Section
+  .about-cta {
+    padding: 80px 0;
+    background: linear-gradient(135deg, #40cccc 0%, #45c3d2 100%);
+    color: #ffffff;
+
+    .cta-card {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+
+      .cta-content {
+        text-align: center;
+        color: #ffffff;
+
+        .cta-icon {
+          font-size: 64px;
+          color: #ffffff;
+          margin-bottom: 24px;
+          display: block;
+        }
+
+        .cta-title {
+          color: #ffffff !important;
+          font-size: 40px;
+          font-weight: 700;
+          margin-bottom: 16px;
+        }
+
+        .cta-description {
+          font-size: 18px;
+          color: rgba(255, 255, 255, 0.95);
+          max-width: 700px;
+          margin: 0 auto 32px;
+          line-height: 1.8;
+        }
+      }
+    }
+  }
+
+  // Responsive
+  @media (max-width: 768px) {
+    .about-hero {
+      padding: 60px 0 80px;
+    }
+
+    .about-mission,
+    .about-features,
+    .about-benefits,
+    .about-values,
+    .about-cta {
+      padding: 60px 0;
+    }
+
+    .section-header .section-title {
+      font-size: 32px;
+    }
+
+    .benefit-card {
+      padding: 24px;
+    }
+  }
+}

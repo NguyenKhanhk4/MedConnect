@@ -1,0 +1,168 @@
+/* Patient Dashboard - Main SCSS File */
+
+// Import all component styles
+@import "../AppSidebar/AppSidebar.scss";
+@import "../dau-trang-benh-nhan/DauTrangBenhNhan.scss";
+@import "../phan-chao-mung/PhanChaoMung.scss";
+@import "../the-thong-ke/TheThongKe.scss";
+@import "../lich-kham/LichKham.scss";
+@import "../lich-hen-sap-toi/LichHenSapToi.scss";
+@import "../hanh-dong-nhanh/HanhDongNhanh.scss";
+
+/* All styles are now imported from separate component files */
+
+/* Common border style override for all cards */
+.card,
+.stat-card,
+.appointment-card,
+.welcome-section,
+.quick-action-card {
+  border: 2px solid #cbd5e1 !important;
+}
+
+/* Stat cards should have white background and black text for patient dashboard */
+/* Only apply teal background to doctor dashboard, not patient dashboard */
+.patient-content .stat-card,
+.patient-content .stat-card.stat-card-white,
+.patient-content .stat-card[class*="stat-card"],
+.patient-content div.stat-card {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border: 2px solid #cbd5e1 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1) !important;
+  transition: none !important;
+  position: relative;
+  overflow: visible;
+
+  /* Remove gradient overlay */
+  &::before {
+    display: none !important;
+  }
+
+  /* Force black text */
+  * {
+    color: inherit !important;
+    opacity: 1 !important;
+  }
+
+  .stat-card-title {
+    color: #374151 !important;
+  }
+
+  .stat-card-value {
+    color: #111827 !important;
+  }
+
+  .stat-card-description {
+    color: #6b7280 !important;
+  }
+
+  /* Default state - cards already float a bit */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06) !important;
+  transform: translateY(0) !important;
+
+  /* Hover effects - allow transform and shadow */
+  &:hover {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    transform: translateY(-6px) !important;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15), 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* Active state */
+  &:active {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  /* Icon colors based on stat type - always visible */
+  &[data-stat-type="confirmed"] {
+    .stat-icon {
+      color: #3b82f6 !important;
+    }
+
+    &:hover {
+      border-color: #3b82f6 !important;
+
+      .stat-icon {
+        color: #3b82f6 !important;
+        transform: scale(1.2);
+      }
+    }
+  }
+
+  &[data-stat-type="in_progress"] {
+    .stat-icon {
+      color: #06b6d4 !important;
+    }
+
+    &:hover {
+      border-color: #06b6d4 !important;
+
+      .stat-icon {
+        color: #0891b2 !important;
+        transform: scale(1.2);
+      }
+    }
+  }
+
+  &[data-stat-type="completed"] {
+    .stat-icon {
+      color: #22c55e !important;
+    }
+
+    &:hover {
+      border-color: #22c55e !important;
+
+      .stat-icon {
+        color: #22c55e !important;
+        transform: scale(1.2);
+      }
+    }
+  }
+
+  &[data-stat-type="cancelled"] {
+    .stat-icon {
+      color: #ef4444 !important;
+    }
+
+    &:hover {
+      border-color: #ef4444 !important;
+
+      .stat-icon {
+        color: #ef4444 !important;
+        transform: scale(1.2);
+      }
+    }
+  }
+}
+
+/* Main content responsive */
+.main-content {
+  /* No margin needed - flex layout handles spacing */
+  display: block;
+}
+
+/* Main grid layout: Calendar + Upcoming Appointments on left, Quick Actions on right */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-main-grid {
+    grid-template-columns: 2fr 1fr !important;
+  }
+}
+
+.dashboard-left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.dashboard-right-column {
+  width: 100%;
+}

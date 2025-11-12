@@ -1,0 +1,23 @@
+/* =========================================== */
+/*                MAIN CONTENT                 */
+/* =========================================== */
+
+/* ==== MAIN CONTENT ==== */
+main {
+  padding-top: var(
+    --page-padding-top,
+    var(--header-height, 72px)
+  ); /* Khoảng cách mặc định bằng chiều cao header, có thể override theo trang */
+  min-height: calc(100vh - 80px);
+}
+
+/* =========================================== */
+/*           MAIN CONTENT RESPONSIVE           */
+/* =========================================== */
+
+/* Print styles */
+@media print {
+  main {
+    padding-top: 0 !important;
+  }
+}

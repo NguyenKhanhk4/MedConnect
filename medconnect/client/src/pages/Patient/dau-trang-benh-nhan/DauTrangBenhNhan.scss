@@ -1,0 +1,200 @@
+/* Patient Header Styles */
+.patient-header {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  gap: 2rem;
+}
+
+/* Left Section - Brand/Logo */
+.header-left {
+  flex: 0 0 auto;
+  min-width: 200px;
+}
+
+.brand-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-circle {
+  width: 2.5rem;
+  height: 2.5rem;
+  background: linear-gradient(135deg, #40cccc, #45c3d2);
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-icon-symbol {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #ffffff;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.brand-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #000000;
+  line-height: 1.2;
+}
+
+.brand-tagline {
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+/* Center Section - Search */
+.header-center {
+  flex: 1;
+  max-width: 600px;
+  min-width: 300px;
+}
+
+/* Right Section - Notifications */
+.header-right {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 60px;
+}
+
+/* Search Form */
+.search-form {
+  width: 100%;
+}
+
+.search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #6b7280;
+  z-index: 1;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 3rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-input::placeholder {
+  color: #9ca3af;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .header-content {
+    gap: 1.5rem;
+  }
+
+  .header-left {
+    min-width: 180px;
+  }
+
+  .header-center {
+    min-width: 250px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-content {
+    padding: 0 1rem;
+    gap: 1rem;
+  }
+
+  .header-left {
+    min-width: 160px;
+  }
+
+  .brand-name {
+    font-size: 1rem;
+  }
+
+  .brand-tagline {
+    font-size: 0.7rem;
+  }
+
+  .header-center {
+    min-width: 200px;
+  }
+
+  .search-input {
+    font-size: 1rem; /* Prevent zoom on iOS */
+  }
+}
+
+@media (max-width: 640px) {
+  .patient-header {
+    padding: 0.75rem 0;
+  }
+
+  .header-content {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+
+  .header-left,
+  .header-center,
+  .header-right {
+    flex: none;
+    min-width: auto;
+  }
+
+  .header-left {
+    align-self: center;
+  }
+
+  .header-right {
+    align-self: flex-end;
+  }
+
+  .search-form {
+    width: 100%;
+  }
+}

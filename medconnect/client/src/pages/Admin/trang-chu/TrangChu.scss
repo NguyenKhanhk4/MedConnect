@@ -1,0 +1,272 @@
+.admin-dashboard {
+  .dashboard-header {
+    margin-bottom: 32px;
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: #262626;
+      margin: 0 0 8px 0;
+      line-height: 1.2;
+    }
+
+    p {
+      font-size: 16px;
+      color: #8c8c8c;
+      margin: 0;
+      line-height: 1.5;
+    }
+  }
+
+  .stats-row {
+    margin-bottom: 32px;
+
+    .ant-col {
+      display: flex;
+    }
+
+    .stat-card {
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      border: none;
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      min-width: 200px; // Đảm bảo card không bị thu nhỏ quá khi zoom
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+
+      // Override Ant Design default white background
+      background: var(--card-bg, transparent) !important;
+      
+      &.clickable {
+        cursor: pointer;
+        
+        &:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        &:active {
+          transform: translateY(-2px);
+        }
+      }
+
+      .ant-card-body {
+        // Use CSS variable for background
+        background: var(--card-bg, transparent) !important;
+        padding: 20px;
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        flex: 1;
+        min-height: 140px;
+      }
+
+      .stat-icon {
+        width: 56px;
+        height: 56px;
+        min-width: 56px; // Đảm bảo icon không bị thu nhỏ
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        flex-shrink: 0;
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+
+      .stat-content {
+        flex: 1;
+        min-width: 0; // Cho phép text wrap đúng cách
+        display: flex;
+        flex-direction: column;
+
+        .stat-title {
+          font-size: 13px;
+          color: rgba(255, 255, 255, 0.9);
+          margin-bottom: 6px;
+          line-height: 1.3;
+          font-weight: 500;
+          white-space: nowrap; // Không cho title wrap
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .stat-value {
+          font-size: 26px;
+          font-weight: 700;
+          color: #ffffff;
+          margin-bottom: 6px;
+          line-height: 1.2;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+          white-space: nowrap; // Không cho số wrap
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .stat-change {
+          font-size: 11px;
+          color: rgba(255, 255, 255, 0.75);
+          line-height: 1.4;
+          word-break: break-word; // Cho phép wrap nhưng có kiểm soát
+          display: -webkit-box;
+          -webkit-line-clamp: 2; // Giới hạn tối đa 2 dòng
+          line-clamp: 2; // Standard property
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+      }
+
+      .stat-change-value {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+    }
+  }
+
+  .content-row {
+    .activity-card,
+    .status-card {
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      border: none;
+
+      .ant-card-head {
+        border-bottom: 1px solid #f0f0f0;
+        padding: 16px 24px;
+
+        .ant-card-head-title {
+          font-size: 18px;
+          font-weight: 600;
+          color: #262626;
+        }
+      }
+
+      .ant-card-body {
+        padding: 24px;
+      }
+    }
+
+    .activity-card {
+      .activities-scroll-container {
+        max-height: 500px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 8px;
+        margin-right: -8px;
+
+        // Custom scrollbar styling
+        &::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        &::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 4px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+          background: #c1c1c1;
+          border-radius: 4px;
+          
+          &:hover {
+            background: #a8a8a8;
+          }
+        }
+
+        // Firefox scrollbar
+        scrollbar-width: thin;
+        scrollbar-color: #c1c1c1 #f1f1f1;
+      }
+
+      .ant-list-item {
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f0f0;
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        .ant-list-item-meta {
+          .ant-list-item-meta-avatar {
+            margin-right: 12px;
+          }
+
+          .ant-list-item-meta-title {
+            font-size: 14px;
+            color: #262626;
+            margin-bottom: 4px;
+          }
+
+          .ant-list-item-meta-description {
+            font-size: 12px;
+            color: #8c8c8c;
+          }
+        }
+      }
+    }
+
+    .status-card {
+      .status-list {
+        .status-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 0;
+          border-bottom: 1px solid #f0f0f0;
+
+          &:last-child {
+            border-bottom: none;
+          }
+
+          .status-label {
+            font-size: 14px;
+            color: #262626;
+            font-weight: 500;
+          }
+
+          .status-value {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #262626;
+            font-weight: 600;
+
+            .status-dot {
+              width: 8px;
+              height: 8px;
+              border-radius: 50%;
+
+              &.success {
+                background: #52c41a;
+              }
+
+              &.warning {
+                background: #faad14;
+              }
+
+              &.error {
+                background: #ff4d4f;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

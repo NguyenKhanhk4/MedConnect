@@ -1,0 +1,403 @@
+/* Doctor Reviews Page Styles */
+.doctor-reviews-page {
+  min-height: 100vh;
+  background: #f8f9fa;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* Doctor Header Section */
+.doctor-header-section {
+  background: #ffffff;
+  padding: 30px 0;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.doctor-header-card {
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: none;
+}
+
+.doctor-header-card .ant-card-body {
+  padding: 30px;
+}
+
+.doctor-avatar-section {
+  text-align: center;
+}
+
+.doctor-avatar {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.doctor-info {
+  padding: 0 20px;
+}
+
+.doctor-name {
+  color: #262626;
+  margin-bottom: 8px;
+}
+
+.doctor-specialization {
+  color: #666;
+  font-size: 16px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.doctor-rating {
+  margin-bottom: 12px;
+}
+
+.rating-text {
+  margin-left: 8px;
+  color: #666;
+}
+
+.doctor-location {
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doctor-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.book-appointment-btn {
+  background: #45c3d2;
+  border-color: #45c3d2;
+  font-weight: 500;
+  height: 48px;
+}
+
+.book-appointment-btn:hover {
+  background: #3ba8b8;
+  border-color: #3ba8b8;
+  transform: translateY(-1px);
+}
+
+.back-btn {
+  height: 48px;
+  font-weight: 500;
+}
+
+.back-btn:hover {
+  color: #45c3d2;
+  border-color: #45c3d2;
+}
+
+/* Reviews Section */
+.reviews-section {
+  padding: 30px 0;
+}
+
+.rating-summary-card,
+.reviews-list-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #f0f0f0;
+}
+
+.rating-summary-card .ant-card-body,
+.reviews-list-card .ant-card-body {
+  padding: 24px;
+}
+
+.rating-overview {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.overall-rating {
+  margin-bottom: 16px;
+}
+
+.rating-number {
+  font-size: 48px;
+  font-weight: 700;
+  color: #45c3d2;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.rating-stars {
+  margin-bottom: 8px;
+}
+
+.rating-stars .ant-rate {
+  font-size: 20px;
+}
+
+.rating-count {
+  color: #666;
+  font-size: 14px;
+}
+
+.rating-distribution {
+  margin-top: 20px;
+}
+
+.rating-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.rating-bar .ant-typography {
+  min-width: 60px;
+  margin: 0;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #45c3d2;
+  transition: width 0.3s ease;
+}
+
+/* Reviews List */
+.reviews-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.reviews-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.review-item {
+  padding: 20px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.reviewer-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reviewer-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.review-date {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.review-comment {
+  line-height: 1.5;
+  margin: 0;
+}
+
+.review-comment .ant-typography-paragraph {
+  font-size: 16px;
+  margin-bottom: 0 !important;
+}
+
+.reviewer-name {
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.review-rating .ant-rate {
+  font-size: 16px;
+}
+
+.review-comment {
+  margin-bottom: 12px;
+}
+
+.review-comment .ant-typography {
+  margin: 0;
+  color: #262626;
+  line-height: 1.6;
+}
+
+.review-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Doctor Response */
+.doctor-response {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f0f9ff;
+  border-radius: 8px;
+  border-left: 4px solid #45c3d2;
+}
+
+.response-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.response-date {
+  font-size: 12px;
+}
+
+.response-content {
+  margin: 0;
+  color: #262626;
+  line-height: 1.6;
+}
+
+/* Review Meta */
+.review-meta {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.helpful-count {
+  font-size: 12px;
+}
+
+.reviews-pagination {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.reviews-pagination .ant-pagination-item-active {
+  background: #45c3d2;
+  border-color: #45c3d2;
+}
+
+.reviews-pagination .ant-pagination-item-active a {
+  color: white;
+}
+
+.reviews-pagination .ant-pagination-item:hover {
+  border-color: #45c3d2;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  .doctor-header-card .ant-card-body {
+    padding: 20px;
+  }
+
+  .doctor-info {
+    padding: 0;
+    text-align: center;
+    margin-top: 16px;
+  }
+
+  .doctor-actions {
+    margin-top: 20px;
+  }
+
+  .reviews-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reviews-filters {
+    justify-content: center;
+  }
+
+  .review-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .rating-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .rating-bar .ant-typography {
+    min-width: auto;
+  }
+
+  .progress-bar {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .doctor-header-section {
+    padding: 20px 0;
+  }
+
+  .reviews-section {
+    padding: 20px 0;
+  }
+
+  .rating-summary-card .ant-card-body,
+  .reviews-list-card .ant-card-body {
+    padding: 16px;
+  }
+
+  .reviews-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reviews-filters .ant-input-search,
+  .reviews-filters .ant-select {
+    width: 100% !important;
+  }
+
+  .comment-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .comment-preview-item {
+    padding: 12px;
+  }
+}

@@ -1,0 +1,48 @@
+/* =========================================== */
+/*                CSS VARIABLES                */
+/* =========================================== */
+
+:root {
+  /* Brand Colors */
+  --color-brand: #45c3d2;
+  --color-brand-dark: #1095a8;
+  --color-highlight: #ffbf00;
+  --color-bg-soft: #f3fffe; /* xanh nhạt */
+  --color-text: #111;
+
+  /* Layout */
+  --radius-pill: 40px;
+  --header-height: 72px;
+
+  /* Primary Color (for compatibility) */
+  --primary-color: #12c2e9;
+}
+
+/* =========================================== */
+/*           RESPONSIVE HEADER HEIGHTS         */
+/* =========================================== */
+
+/* Update header height variable for responsive */
+@media (max-width: 480px) {
+  :root {
+    --header-height: 60px;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 767px) {
+  :root {
+    --header-height: 64px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 980px) {
+  :root {
+    --header-height: 68px;
+  }
+}
+
+@media (min-width: 981px) {
+  :root {
+    --header-height: 72px;
+  }
+}

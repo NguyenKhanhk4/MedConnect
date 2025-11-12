@@ -1,0 +1,519 @@
+/* Time Slot Selection Page Styles */
+.time-slot-selection-page {
+  padding: 24px 0;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.booking-section {
+  margin-bottom: 24px;
+}
+
+.doctor-profile-card {
+  margin-bottom: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e8e8e8;
+}
+
+.doctor-profile-content {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.doctor-avatar {
+  flex-shrink: 0;
+}
+
+.avatar-image {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #f0f0f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.doctor-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  text-align: left !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+}
+
+.doctor-info h3 {
+  color: #262626;
+  margin-bottom: 4px !important;
+  font-weight: 600;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  line-height: 1.2 !important;
+  word-break: normal !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left !important;
+  align-self: flex-start !important;
+  width: 100% !important;
+}
+
+.doctor-info .ant-typography {
+  text-align: left !important;
+  align-self: flex-start !important;
+  width: 100% !important;
+}
+
+.doctor-info .ant-typography h3 {
+  text-align: left !important;
+  align-self: flex-start !important;
+  width: 100% !important;
+}
+
+.doctor-info h3 * {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  line-height: 1.4 !important;
+  word-break: normal !important;
+}
+
+.doctor-specializations {
+  margin: 4px 0 !important;
+  text-align: left !important;
+  align-self: flex-start !important;
+  width: 100% !important;
+}
+
+.doctor-specializations .ant-tag {
+  text-align: left !important;
+  align-self: flex-start !important;
+}
+
+.doctor-experience {
+  margin: 6px 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  align-self: flex-start !important;
+  width: 100% !important;
+}
+
+.doctor-experience .anticon {
+  color: #1890ff;
+}
+
+.doctor-bio {
+  margin: 6px 0 !important;
+  color: #8c8c8c;
+  line-height: 1.4 !important;
+  text-align: left !important;
+  align-self: flex-start !important;
+  width: 100% !important;
+}
+
+.doctor-bio .ant-typography {
+  text-align: left !important;
+  align-self: flex-start !important;
+  width: 100% !important;
+}
+
+.doctor-rating {
+  margin: 6px 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  align-self: flex-start !important;
+  width: 100% !important;
+}
+
+.doctor-rating .ant-rate {
+  font-size: 14px;
+}
+
+.doctor-rating {
+  margin: 6px 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  align-self: flex-start !important;
+  width: 100% !important;
+  flex-wrap: nowrap !important;
+}
+
+.doctor-rating .ant-rate {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.doctor-rating .ant-typography {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.share-btn {
+  margin-top: 6px !important;
+  background: #45c3d2;
+  border-color: #45c3d2;
+  border-radius: 8px;
+  font-weight: 500;
+  align-self: flex-start;
+}
+
+.share-btn:hover {
+  background: #3ba8b8;
+  border-color: #3ba8b8;
+  transform: translateY(-1px);
+}
+
+.date-selection-card,
+.time-slots-card,
+.booking-form-card {
+  margin-bottom: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e8e8e8;
+}
+
+.date-selection-card h4,
+.time-slots-card h4 {
+  color: #262626;
+  margin-bottom: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-selection-card .anticon,
+.time-slots-card .anticon {
+  color: #45c3d2;
+  font-size: 18px;
+}
+
+.time-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.time-slot-button {
+  height: 50px;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border: 2px solid #e8e8e8;
+  font-size: 14px;
+}
+
+.time-slot-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-color: #45c3d2;
+}
+
+.time-slot-button.ant-btn-primary {
+  background: #45c3d2;
+  border-color: #45c3d2;
+}
+
+.time-slot-button.ant-btn-primary:hover {
+  background: #3ba8b8;
+  border-color: #3ba8b8;
+}
+
+.time-slot-button:disabled {
+  background: #f5f5f5 !important;
+  border-color: #d9d9d9 !important;
+  color: #bfbfbf !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+  position: relative;
+}
+
+.time-slot-button:disabled:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: #d9d9d9 !important;
+  background: #f5f5f5 !important;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.form-header h4 {
+  color: #262626;
+  margin: 0;
+  font-weight: 600;
+}
+
+.booking-form {
+  max-width: 600px;
+}
+
+.booking-form .ant-form-item-label > label {
+  font-weight: 500;
+  color: #262626;
+}
+
+.booking-form .ant-input,
+.booking-form .ant-select-selector,
+.booking-form .ant-picker {
+  border-radius: 8px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s ease;
+}
+
+.booking-form .ant-input:focus,
+.booking-form .ant-select-focused .ant-select-selector,
+.booking-form .ant-picker-focused {
+  border-color: #45c3d2;
+  box-shadow: 0 0 0 2px rgba(69, 195, 210, 0.2);
+}
+
+.booking-form .ant-radio-group {
+  display: flex;
+  gap: 16px;
+}
+
+.booking-form .ant-radio-wrapper {
+  font-weight: 500;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.form-actions .ant-btn {
+  min-width: 120px;
+  height: 40px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.form-actions .ant-btn-primary {
+  background: #45c3d2;
+  border-color: #45c3d2;
+}
+
+.form-actions .ant-btn-primary:hover {
+  background: #3ba8b8;
+  border-color: #3ba8b8;
+  transform: translateY(-1px);
+}
+
+.booking-summary-section {
+  position: sticky;
+  top: 24px;
+}
+
+.booking-summary-card,
+.help-card {
+  margin-bottom: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e8e8e8;
+}
+
+.booking-summary-card h4,
+.help-card h4 {
+  color: #262626;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 4px 0;
+}
+
+.summary-item .ant-typography {
+  margin: 0;
+}
+
+.help-card ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.help-card li {
+  margin-bottom: 8px;
+  color: #595959;
+  line-height: 1.5;
+}
+
+/* Loading States */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+}
+
+/* Form Validation */
+.booking-form .ant-form-item-has-error .ant-input,
+.booking-form .ant-form-item-has-error .ant-select-selector {
+  border-color: #ff4d4f;
+}
+
+.booking-form .ant-form-item-explain-error {
+  color: #ff4d4f;
+  font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  .doctor-profile-content {
+    flex-direction: column;
+    text-align: left;
+    gap: 16px;
+  }
+
+  .time-slots-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .time-slot-button {
+    height: 40px;
+    font-size: 12px;
+  }
+
+  .booking-form .ant-row {
+    flex-direction: column;
+  }
+
+  .booking-form .ant-col {
+    width: 100%;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .form-actions .ant-btn {
+    width: 100%;
+  }
+
+  .booking-summary-section {
+    position: static;
+    margin-top: 24px;
+  }
+}
+
+/* Clinic Info Display */
+.clinic-info-display {
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.clinic-name {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #1890ff;
+}
+
+.clinic-address {
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.clinic-phone {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: #666;
+}
+
+@media (max-width: 576px) {
+  .time-slots-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-form .ant-radio-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* Booking For Buttons */
+.booking-for-buttons {
+  display: flex;
+  gap: 12px;
+  max-width: 500px;
+}
+
+.booking-button {
+  flex: 1 !important;
+  height: 40px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border-radius: 0.75rem !important;
+  transition: all 0.3s ease;
+}
+
+.booking-button.ant-btn-default {
+  background: #ffffff !important;
+  border-color: #e8e8e8 !important;
+  color: #595959 !important;
+}
+
+.booking-button.ant-btn-default:hover {
+  border-color: #45c3d2 !important;
+  color: #45c3d2 !important;
+}
+
+.booking-button.ant-btn-primary {
+  background: #1890ff !important;
+  border-color: #1890ff !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3) !important;
+}
+
+.booking-button.ant-btn-primary:hover {
+  background: #40a9ff !important;
+  border-color: #40a9ff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4) !important;
+}

@@ -1,0 +1,70 @@
+.select-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.select-trigger {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  background: white;
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: border-color 0.2s ease;
+}
+
+.select-trigger:hover {
+  border-color: #0891b2;
+}
+
+.select-trigger-open {
+  border-color: #0891b2;
+  box-shadow: 0 0 0 1px #0891b2;
+}
+
+.select-value {
+  color: #0f172a;
+}
+
+.select-content {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 10001; /* Higher than dialog z-index (1000) to ensure it appears above */
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 0.25rem;
+}
+
+.select-item {
+  padding: 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #0f172a;
+  transition: background-color 0.2s ease;
+}
+
+.select-item:hover {
+  background-color: #f1f5f9;
+}
+
+.select-item:first-child {
+  border-top-left-radius: 0.375rem;
+  border-top-right-radius: 0.375rem;
+}
+
+.select-item:last-child {
+  border-bottom-left-radius: 0.375rem;
+  border-bottom-right-radius: 0.375rem;
+}
