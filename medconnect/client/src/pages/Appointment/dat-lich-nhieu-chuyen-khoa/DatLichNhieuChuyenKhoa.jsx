@@ -650,6 +650,9 @@ const DatLichNhieuChuyenKhoa = () => {
         : null);
 
     // Create local appointment object
+    const trimmedReason =
+      typeof appointmentReason === "string" ? appointmentReason.trim() : "";
+
     const newAppointment = {
       _id: appointmentToReplace ? appointmentToReplace._id : `temp-${Date.now()}`, // Keep same ID if replacing
       doctor: {
@@ -664,14 +667,25 @@ const DatLichNhieuChuyenKhoa = () => {
       scheduledEnd: slotEndAt,
       status: "draft", // Not saved yet
       mode: selectedMode,
-      reason: appointmentReason || (appointmentToReplace ? appointmentToReplace.reason : `Khám ${currentSpecialization.name}`),
+      reason:
+        trimmedReason ||
+        (appointmentToReplace && appointmentToReplace.reason
+          ? appointmentToReplace.reason
+          : ""),
       // Store original data for saving later
       _tempData: {
         doctorId: selectedDoctor._id,
         slotId: selectedSlot._id,
         mode: selectedMode,
-        clinicId: selectedMode === "offline" && defaultClinic ? defaultClinic._id : undefined, // Required for offline
-        reason: appointmentReason || (appointmentToReplace ? appointmentToReplace.reason : `Khám ${currentSpecialization.name}`),
+        clinicId:
+          selectedMode === "offline" && defaultClinic
+            ? defaultClinic._id
+            : undefined, // Required for offline
+        reason:
+          trimmedReason ||
+          (appointmentToReplace && appointmentToReplace.reason
+            ? appointmentToReplace.reason
+            : ""),
       },
       // Store slot reference for display
       slotId: selectedSlot._id,
@@ -713,25 +727,10 @@ const DatLichNhieuChuyenKhoa = () => {
         // Create or get family member
         if (selectedFamilyMember && selectedFamilyMember._id) {
           // Use existing family member - allergyNotes sẽ lấy từ form (có thể đã được sửa)
-          console.log("Using existing family member:", selectedFamilyMember._id);
           currentPatientIdForBooking = selectedFamilyMember._id;
           setPatientIdForBooking(selectedFamilyMember._id);
           // Note: allergyNotes từ form sẽ được dùng khi tạo appointment, không cần update vào DB
         } else {
-          console.log("Creating new family member, validating form...");
-          
-          // First, try to get form values directly
-          let formValuesBeforeValidation = {};
-          try {
-            formValuesBeforeValidation = familyForm.getFieldsValue();
-            console.log("📋 Form values BEFORE validation (getFieldsValue):", formValuesBeforeValidation);
-          } catch (e) {
-            console.warn("⚠️ Could not get form values (form may be unmounted):", e);
-          }
-          
-          console.log("📋 Saved form values from state:", savedFamilyFormValues);
-          console.log("📋 Form instance exists:", !!familyForm);
-          
           // Validate family form for new member
           let familyValues;
           try {
@@ -739,39 +738,32 @@ const DatLichNhieuChuyenKhoa = () => {
             if (familyForm && typeof familyForm.validateFields === 'function') {
               try {
                 familyValues = await familyForm.validateFields();
-                console.log("✅ Form values validated (validateFields):", familyValues);
               } catch (validationError) {
-                console.warn("⚠️ validateFields threw error (form may be unmounted):", validationError);
                 // Continue to try getFieldsValue
               }
             }
             
             // If validateFields returns empty or form is unmounted, try getFieldsValue
             if (!familyValues || Object.keys(familyValues).length === 0) {
-              console.warn("⚠️ validateFields returned empty, trying getFieldsValue...");
               try {
                 if (familyForm && typeof familyForm.getFieldsValue === 'function') {
                   familyValues = familyForm.getFieldsValue(true); // true = include disabled fields
-                  console.log("📋 Form values from getFieldsValue:", familyValues);
                   
                   // If still empty, try without disabled fields
                   if (!familyValues || Object.keys(familyValues).length === 0) {
                     familyValues = familyForm.getFieldsValue(false);
-                    console.log("📋 Form values from getFieldsValue (no disabled):", familyValues);
                   }
                 }
               } catch (e) {
-                console.warn("⚠️ Could not get form values from form instance:", e);
+                // Ignore
               }
             }
             
             // If still empty, use saved form values from state
             if (!familyValues || Object.keys(familyValues).length === 0) {
               if (savedFamilyFormValues && Object.keys(savedFamilyFormValues).length > 0) {
-                console.log("✅ Using saved form values from state:", savedFamilyFormValues);
                 familyValues = savedFamilyFormValues;
               } else {
-                console.error("❌ No form values available from form or state!");
                 message.error("Vui lòng điền đầy đủ thông tin người thân");
                 setLoading(false);
                 return;
@@ -779,21 +771,17 @@ const DatLichNhieuChuyenKhoa = () => {
             }
           } catch (validationError) {
             // Form validation failed
-            console.error("❌ Form validation error:", validationError);
-            
             // Try to get values anyway
             try {
               if (familyForm && typeof familyForm.getFieldsValue === 'function') {
                 familyValues = familyForm.getFieldsValue(true);
-                console.log("📋 Got form values despite validation error:", familyValues);
               }
             } catch (e) {
-              console.error("❌ Could not get form values:", e);
+              // Ignore
             }
             
             // If still empty, use saved form values
             if ((!familyValues || Object.keys(familyValues).length === 0) && savedFamilyFormValues) {
-              console.log("✅ Using saved form values after validation error:", savedFamilyFormValues);
               familyValues = savedFamilyFormValues;
             }
             
@@ -811,36 +799,6 @@ const DatLichNhieuChuyenKhoa = () => {
             }
           }
 
-          // Log ALL form values for debugging
-          console.log("=== FULL FORM VALUES (raw) ===", familyValues);
-          // Try to stringify, but handle dayjs objects
-          try {
-            const serializableValues = { ...familyValues };
-            if (serializableValues.dob && typeof serializableValues.dob.format === 'function') {
-              serializableValues.dob = `[dayjs: ${serializableValues.dob.format("YYYY-MM-DD")}]`;
-            }
-            console.log("=== FULL FORM VALUES (serialized) ===", JSON.stringify(serializableValues, null, 2));
-          } catch (e) {
-            console.log("Could not serialize form values:", e);
-          }
-          console.log("=== FORM VALUES DETAILED ===", {
-            fullName: familyValues.fullName,
-            fullNameType: typeof familyValues.fullName,
-            fullNameLength: familyValues.fullName?.length,
-            dob: familyValues.dob,
-            dobType: typeof familyValues.dob,
-            dobIsDayjs: familyValues.dob && typeof familyValues.dob.format === 'function',
-            dobIsValid: familyValues.dob && dayjs(familyValues.dob).isValid(),
-            gender: familyValues.gender,
-            genderType: typeof familyValues.gender,
-            relationshipToOwner: familyValues.relationshipToOwner,
-            relationshipType: typeof familyValues.relationshipToOwner,
-            phone: familyValues.phone,
-            citizenId: familyValues.citizenId,
-            address: familyValues.address,
-            allKeys: Object.keys(familyValues)
-          });
-
           // Format dob properly first to check if it's valid
           let dobFormatted = null;
           if (familyValues.dob) {
@@ -849,74 +807,30 @@ const DatLichNhieuChuyenKhoa = () => {
                 // dayjs object - try to format it
                 try {
                   dobFormatted = familyValues.dob.format("YYYY-MM-DD");
-                  console.log("✅ DOB formatted from dayjs:", dobFormatted);
                 } catch (formatError) {
-                  console.error("❌ Error formatting dayjs dob:", formatError);
                   // Try to convert to dayjs and format
                   const dayjsObj = dayjs(familyValues.dob);
                   if (dayjsObj.isValid()) {
                     dobFormatted = dayjsObj.format("YYYY-MM-DD");
-                    console.log("✅ DOB formatted after conversion:", dobFormatted);
-                  } else {
-                    console.error("❌ Invalid dayjs object after conversion");
                   }
                 }
               } else if (typeof familyValues.dob === 'string' && familyValues.dob.trim()) {
                 // Already a string
                 dobFormatted = familyValues.dob.trim();
-                console.log("✅ DOB is string:", dobFormatted);
               } else if (familyValues.dob instanceof Date) {
                 // Date object
                 dobFormatted = dayjs(familyValues.dob).format("YYYY-MM-DD");
-                console.log("✅ DOB formatted from Date:", dobFormatted);
-              } else {
-                console.error("❌ Unknown dob type:", typeof familyValues.dob, familyValues.dob);
               }
             } catch (e) {
-              console.error("❌ Error formatting dob:", e, e.stack);
+              // Ignore
             }
-          } else {
-            console.error("❌ DOB is null/undefined");
           }
-          
-          console.log("Final dobFormatted:", dobFormatted);
 
           // Validate required fields with proper checks
           const fullNameValid = familyValues.fullName && typeof familyValues.fullName === 'string' && familyValues.fullName.trim().length > 0;
           const dobValid = dobFormatted && typeof dobFormatted === 'string' && dobFormatted.length > 0;
           const genderValid = familyValues.gender && typeof familyValues.gender === 'string' && ['male', 'female', 'other'].includes(familyValues.gender);
           const relationshipValid = familyValues.relationshipToOwner && typeof familyValues.relationshipToOwner === 'string' && ['father', 'mother', 'spouse', 'child', 'grandparent', 'other'].includes(familyValues.relationshipToOwner);
-
-          console.log("=== VALIDATION CHECK ===", {
-            fullNameValid: {
-              value: familyValues.fullName,
-              exists: !!familyValues.fullName,
-              isString: typeof familyValues.fullName === 'string',
-              trimmedLength: familyValues.fullName?.trim()?.length,
-              valid: fullNameValid
-            },
-            dobValid: {
-              value: dobFormatted,
-              exists: !!dobFormatted,
-              isString: typeof dobFormatted === 'string',
-              length: dobFormatted?.length,
-              valid: dobValid
-            },
-            genderValid: {
-              value: familyValues.gender,
-              exists: !!familyValues.gender,
-              isString: typeof familyValues.gender === 'string',
-              inArray: familyValues.gender ? ['male', 'female', 'other'].includes(familyValues.gender) : false,
-              valid: genderValid
-            },
-            relationshipValid: {
-              value: familyValues.relationshipToOwner,
-              exists: !!familyValues.relationshipToOwner,
-              isString: typeof familyValues.relationshipToOwner === 'string',
-              inArray: familyValues.relationshipToOwner ? ['father', 'mother', 'spouse', 'child', 'grandparent', 'other'].includes(familyValues.relationshipToOwner) : false,
-              valid: relationshipValid
-            }
-          });
 
           if (!fullNameValid || !dobValid || !genderValid || !relationshipValid) {
             const missingFields = [];
@@ -925,25 +839,10 @@ const DatLichNhieuChuyenKhoa = () => {
             if (!genderValid) missingFields.push("Giới tính");
             if (!relationshipValid) missingFields.push("Mối quan hệ");
             
-            console.error("❌ Missing or invalid required fields:", {
-              missingFields,
-              fullNameValid,
-              dobValid,
-              genderValid,
-              relationshipValid,
-              actualValues: {
-                fullName: familyValues.fullName,
-                dob: dobFormatted,
-                gender: familyValues.gender,
-                relationshipToOwner: familyValues.relationshipToOwner
-              }
-            });
             message.error(`Vui lòng điền đầy đủ các thông tin bắt buộc: ${missingFields.join(", ")}`);
             setLoading(false);
             return;
           }
-
-          console.log("✅ All required fields are valid!");
 
           // Create new family member
           const familyResponse = await api.post(
@@ -972,14 +871,12 @@ const DatLichNhieuChuyenKhoa = () => {
             await fetchFamilyMembers();
           } else {
             const errorMsg = familyResponse.message || familyResponse.data?.message || "Thêm người thân thất bại";
-            console.error("Error creating family member:", familyResponse);
             message.error(errorMsg);
             setLoading(false);
             return;
           }
         }
       } catch (error) {
-        console.error("Error in handleCompletePlanning - family member:", error);
         if (error.errorFields) {
           // Form validation error
           message.error("Vui lòng điền đầy đủ thông tin người thân");
@@ -1571,7 +1468,6 @@ const DatLichNhieuChuyenKhoa = () => {
                     }}
                     onValuesChange={(changedValues, allValues) => {
                       // Save form values to state whenever form changes
-                      console.log("📝 Form values changed:", changedValues, "All values:", allValues);
                       setSavedFamilyFormValues(allValues);
                     }}
                   >
@@ -1588,6 +1484,8 @@ const DatLichNhieuChuyenKhoa = () => {
                                 (m) => m._id === value
                               );
                               setSelectedFamilyMember(member);
+                              // Persist patientId immediately to avoid losing selection across steps
+                              setPatientIdForBooking(member?._id || null);
                               // Fill form with existing member data
                               familyForm.setFieldsValue({
                                 fullName: member.fullName,
@@ -1605,6 +1503,7 @@ const DatLichNhieuChuyenKhoa = () => {
                               });
                             } else {
                               setSelectedFamilyMember(null);
+                              setPatientIdForBooking(null);
                               familyForm.resetFields();
                             }
                           }}
@@ -1899,6 +1798,8 @@ const DatLichNhieuChuyenKhoa = () => {
                         onClick={async () => {
                           // If family member is already selected, no need to validate
                           if (selectedFamilyMember) {
+                            // Persist selected patient id to ensure downstream steps use correct patient
+                            setPatientIdForBooking(selectedFamilyMember._id);
                             setCurrentStep(1);
                             return;
                           }
@@ -1908,7 +1809,6 @@ const DatLichNhieuChuyenKhoa = () => {
                             await familyForm.validateFields();
                             // Save form values before moving to next step
                             const formValues = familyForm.getFieldsValue(true);
-                            console.log("💾 Saving form values before step change:", formValues);
                             setSavedFamilyFormValues(formValues);
                             setCurrentStep(1);
                           } catch (error) {
@@ -2226,9 +2126,22 @@ const DatLichNhieuChuyenKhoa = () => {
                       );
                     });
 
+                    const reasonFromAppointment =
+                      matchingAppointment?.reason ||
+                      matchingAppointment?._tempData?.reason ||
+                      "";
+
+                    const finalReason =
+                      typeof reasonFromAppointment === "string" &&
+                      reasonFromAppointment.trim().length > 0
+                        ? reasonFromAppointment.trim()
+                        : (typeof summary.reason === "string" && summary.reason.trim().length > 0
+                            ? summary.reason.trim()
+                            : "Không có");
+
                     return {
                       ...summary,
-                      reason: matchingAppointment?.reason || matchingAppointment?._tempData?.reason || summary.reason || "Không có",
+                      reason: finalReason,
                     };
                   });
 
@@ -2255,11 +2168,17 @@ const DatLichNhieuChuyenKhoa = () => {
                             title: "Lý do",
                             dataIndex: "reason",
                             key: "reason",
-                            render: (text) => (
-                              <Text ellipsis={{ tooltip: text }} style={{ maxWidth: 200 }}>
-                                {text || "Không có"}
+                            render: (text) => {
+                              const displayText =
+                                typeof text === "string" && text.trim().length > 0
+                                  ? text
+                                  : "Không có";
+                              return (
+                                <Text ellipsis={{ tooltip: displayText }} style={{ maxWidth: 200 }}>
+                                  {displayText}
                               </Text>
-                            ),
+                              );
+                            },
                           },
                           {
                             title: "Thời gian",
