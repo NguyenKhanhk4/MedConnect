@@ -757,7 +757,7 @@ export async function createAppointmentByManager(req, res) {
       scheduledStart: scheduledStartDate,
       scheduledEnd: scheduledEndDate,
       reason,
-      status: "pending_doctor",
+      status: "accepted",
     };
 
     // Add clinicId if mode is offline
@@ -2447,7 +2447,7 @@ export async function createBookingPaymentByManager(req, res) {
         scheduledStart: scheduledStartDate,
         scheduledEnd: scheduledEndDate,
         reason,
-        status: "pending_doctor",
+        status: "accepted",
         // Mark as pending payment - will be activated after payment
         paymentStatus: "unpaid",
       });
