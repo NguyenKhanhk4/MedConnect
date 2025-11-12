@@ -90,21 +90,32 @@ export async function createLeaveRequest(req, res) {
       );
     }
 
-    // Kiểm tra có slot nào có appointment active không
+    // Kiểm tra có slot nào có appointment active không (chỉ để thông báo, không reject)
     const slotIds = slotsInRange.map((slot) => slot._id);
     const activeAppointments = await Appointment.find({
       slotId: { $in: slotIds },
       status: {
         $in: ["pending_doctor", "accepted", "in_progress"],
       },
-    });
+    }).select("slotId").lean();
 
-    if (activeAppointments.length > 0) {
+    // Tạo set các slotId có appointment
+    const slotsWithAppointments = new Set(
+      activeAppointments.map((apt) => apt.slotId.toString())
+    );
+
+    // Đếm số slot available (không có appointment)
+    const availableSlots = slotsInRange.filter(
+      (slot) => !slotsWithAppointments.has(slot._id.toString())
+    );
+
+    // Chỉ báo lỗi nếu TẤT CẢ slot đều có appointment
+    if (availableSlots.length === 0) {
       return fail(
         res,
         400,
         ERROR_CODES.INVALID_INPUT,
-        `Cannot request leave: ${activeAppointments.length} slot(s) have active appointments`
+        `Cannot request leave: All slots in the date range have active appointments`
       );
     }
 
@@ -190,9 +201,63 @@ export async function getLeaveRequests(req, res) {
       .sort({ createdAt: -1 })
       .lean();
 
+    // Lấy thông tin appointments trong date range cho mỗi leave request
+    const leaveRequestsWithAppointments = await Promise.all(
+      leaveRequests.map(async (request) => {
+        const start = new Date(request.startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(request.endDate);
+        end.setHours(23, 59, 59, 999);
+
+        // Tìm tất cả slot trong khoảng thời gian
+        const slotsInRange = await DoctorTimeSlot.find({
+          doctorId: request.doctorId._id || request.doctorId,
+          startAt: { $gte: start, $lte: end },
+        }).select("_id").lean();
+
+        if (slotsInRange.length === 0) {
+          return {
+            ...request,
+            appointments: [],
+            appointmentsCount: 0,
+          };
+        }
+
+        const slotIds = slotsInRange.map((slot) => slot._id);
+
+        // Tìm tất cả appointments trong các slot này
+        const appointments = await Appointment.find({
+          slotId: { $in: slotIds },
+          status: {
+            $in: ["pending_doctor", "accepted", "in_progress"],
+          },
+        })
+          .populate({
+            path: "patientId",
+            select: "fullName phone dob gender email",
+            populate: {
+              path: "userId",
+              select: "fullName email phone",
+            },
+          })
+          .populate({
+            path: "slotId",
+            select: "startAt endAt",
+          })
+          .select("patientId slotId scheduledStart scheduledEnd status mode reason")
+          .lean();
+
+        return {
+          ...request,
+          appointments: appointments || [],
+          appointmentsCount: appointments?.length || 0,
+        };
+      })
+    );
+
     return ok(res, {
-      leaveRequests,
-      total: leaveRequests.length,
+      leaveRequests: leaveRequestsWithAppointments,
+      total: leaveRequestsWithAppointments.length,
     });
   } catch (error) {
     console.error("❌ getLeaveRequests error:", error);
