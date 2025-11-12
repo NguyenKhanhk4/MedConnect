@@ -1,0 +1,167 @@
+.favorite-doctors-page {
+  padding: 0;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+
+  .page-header {
+    margin-bottom: 24px;
+    padding: 40px 24px;
+    background: linear-gradient(to right, #e0f7fa, #fffde7, #ffe0b2);
+    border-radius: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-text {
+      flex: 1;
+    }
+
+    .main-title {
+      margin-bottom: 12px !important;
+      color: #45c3d2 !important;
+      font-size: 32px !important;
+      font-weight: 700 !important;
+      line-height: 1.2 !important;
+    }
+
+    .subtitle {
+      display: block;
+      color: #595959;
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.5;
+    }
+  }
+
+  .favorite-doctor-card {
+    height: 100%;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+
+    &:hover {
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+      transform: translateY(-2px);
+    }
+
+    .ant-card-body {
+      padding: 20px;
+    }
+
+    .ant-card-actions {
+      border-top: 1px solid #f0f0f0;
+      background: #fafafa;
+
+      li {
+        margin: 12px 0;
+      }
+
+      button {
+        width: 100%;
+        height: auto;
+        padding: 8px 16px;
+        font-weight: 500;
+      }
+    }
+  }
+
+  .doctor-card-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .doctor-avatar-container {
+    margin-bottom: 16px;
+
+    .doctor-avatar {
+      border: 3px solid #e8e8e8;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .doctor-info {
+    width: 100%;
+
+    .doctor-name {
+      margin-bottom: 8px !important;
+      color: #1890ff;
+      font-size: 18px;
+    }
+
+    .doctor-specializations {
+      margin-bottom: 8px;
+
+      .ant-tag {
+        margin: 0;
+        padding: 4px 12px;
+        font-size: 13px;
+      }
+    }
+
+    .doctor-experience {
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .doctor-rating {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      font-size: 14px;
+      color: #595959;
+
+      .ant-rate {
+        margin-right: 8px;
+      }
+
+      .ant-space {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+    }
+
+    .doctor-bio {
+      margin-bottom: 0;
+      font-size: 13px;
+      color: #8c8c8c;
+      text-align: left;
+    }
+  }
+
+  .doctors-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 24px 24px;
+  }
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .favorite-doctors-page {
+    .page-header {
+      padding: 24px 16px;
+
+      .main-title {
+        font-size: 24px !important;
+      }
+
+      .subtitle {
+        font-size: 14px;
+      }
+    }
+
+    .doctors-content {
+      padding: 0 16px 16px 16px;
+    }
+  }
+}
