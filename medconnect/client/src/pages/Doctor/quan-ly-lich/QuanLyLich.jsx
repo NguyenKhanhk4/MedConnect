@@ -31,7 +31,6 @@ import {
 } from "../../../components/ui/Select";
 import { auth } from "../../../lib/firebase";
 import { getDoctorTimeSlots, createLeaveRequest } from "../../../lib/api";
-import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./QuanLyLich.scss";
 
 export default function QuanLyLich() {
@@ -77,25 +76,6 @@ export default function QuanLyLich() {
     useState(null);
   const [loadingAppointmentDetail, setLoadingAppointmentDetail] =
     useState(false);
-  const [alertMessage, setAlertMessage] = useState(null);
-  const [confirmConfig, setConfirmConfig] = useState(null);
-
-  // Helper function to show custom alert
-  const showAlert = (message) => {
-    setAlertMessage(message);
-  };
-
-  // Helper function to show custom confirm
-  const showConfirm = (message, onConfirm) => {
-    setConfirmConfig({
-      message,
-      onConfirm: () => {
-        onConfirm();
-        setConfirmConfig(null);
-      },
-      onCancel: () => setConfirmConfig(null),
-    });
-  };
 
   // Listen to authentication changes
   useEffect(() => {
@@ -602,12 +582,12 @@ export default function QuanLyLich() {
           setSelectedAppointmentDetail(response.data);
         } else {
           console.error("❌ Failed to fetch appointment:", response);
-          showAlert("Không thể tải thông tin chi tiết lịch hẹn");
+          alert("Không thể tải thông tin chi tiết lịch hẹn");
           setShowAppointmentDetail(false);
         }
       } catch (error) {
         console.error("❌ Error fetching appointment detail:", error);
-        showAlert("Có lỗi xảy ra khi tải thông tin");
+        alert("Có lỗi xảy ra khi tải thông tin");
         setShowAppointmentDetail(false);
       } finally {
         setLoadingAppointmentDetail(false);
@@ -617,7 +597,7 @@ export default function QuanLyLich() {
 
   const handleLeaveRequest = async () => {
     if (!leaveData.startDate || !leaveData.endDate) {
-      showAlert("Vui lòng chọn ngày bắt đầu và ngày kết thúc!");
+      alert("Vui lòng chọn ngày bắt đầu và ngày kết thúc!");
       return;
     }
 
@@ -630,18 +610,18 @@ export default function QuanLyLich() {
       );
 
       if (response.success) {
-        showAlert(
+        alert(
           `✅ Đã chặn ${response.data.blockedSlots} slot từ ${leaveData.startDate} đến ${leaveData.endDate}`
         );
         setShowLeaveRequest(false);
         setLeaveData({ startDate: "", endDate: "", reason: "" });
         await loadTimeSlots(); // Reload to show blocked slots
       } else {
-        showAlert("❌ Lỗi khi chặn slot: " + (response.message || "Unknown error"));
+        alert("❌ Lỗi khi chặn slot: " + (response.message || "Unknown error"));
       }
     } catch (error) {
       console.error("❌ Error blocking slots:", error);
-      showAlert("❌ Lỗi khi chặn slot: " + error.message);
+      alert("❌ Lỗi khi chặn slot: " + error.message);
     }
   };
 
@@ -667,7 +647,7 @@ export default function QuanLyLich() {
   // Handler khi xác nhận tạo leave request
   const handleConfirmBlockSlot = async () => {
     if (!blockSlotReason.trim()) {
-      showAlert("Vui lòng nhập lý do nghỉ!");
+      alert("Vui lòng nhập lý do nghỉ!");
       return;
     }
 
@@ -676,14 +656,14 @@ export default function QuanLyLich() {
     try {
       const slotId = actionMenuSlot?._id || actionMenuSlot?.id;
       if (!slotId) {
-        showAlert("Không tìm thấy thông tin slot cần nghỉ");
+        alert("Không tìm thấy thông tin slot cần nghỉ");
         return;
       }
 
       const response = await createLeaveRequest(slotId, blockSlotReason.trim());
 
       if (response.success) {
-        showAlert(
+        alert(
           `✅ Đã gửi yêu cầu nghỉ phép thành công! Vui lòng chờ manager phê duyệt.`
         );
         setShowBlockSlotDialog(false);
@@ -691,14 +671,14 @@ export default function QuanLyLich() {
         setBlockSlotReason("");
         await loadTimeSlots();
       } else {
-        showAlert(
+        alert(
           "Không thể gửi yêu cầu nghỉ phép: " +
             (response.message || "Unknown error")
         );
       }
     } catch (error) {
       console.error("❌ Error creating leave request:", error);
-      showAlert("Có lỗi xảy ra khi gửi yêu cầu nghỉ phép: " + error.message);
+      alert("Có lỗi xảy ra khi gửi yêu cầu nghỉ phép: " + error.message);
     }
   };
 
@@ -708,7 +688,7 @@ export default function QuanLyLich() {
       !bookingData.patientPhone ||
       !bookingData.reason
     ) {
-      showAlert("Vui lòng điền đầy đủ thông tin!");
+      alert("Vui lòng điền đầy đủ thông tin!");
       return;
     }
 
@@ -750,7 +730,7 @@ export default function QuanLyLich() {
           slotId = foundSlot.id || foundSlot._id;
         }
       } else {
-        showAlert("Thiếu thông tin ngày/giờ. Vui lòng thử lại!");
+        alert("Thiếu thông tin ngày/giờ. Vui lòng thử lại!");
         return;
       }
 
@@ -777,7 +757,7 @@ export default function QuanLyLich() {
       );
 
       if (response.success) {
-        showAlert("Đặt lịch thành công!");
+        alert("Đặt lịch thành công!");
         setShowBookSlot(false);
         setBookingData({
           patientName: "",
@@ -790,11 +770,11 @@ export default function QuanLyLich() {
         setSelectedTime(null);
         await loadTimeSlots();
       } else {
-        showAlert("Lỗi khi đặt lịch: " + (response.message || "Unknown error"));
+        alert("Lỗi khi đặt lịch: " + (response.message || "Unknown error"));
       }
     } catch (error) {
       console.error("❌ Error booking slot:", error);
-      showAlert("Có lỗi xảy ra khi đặt lịch: " + error.message);
+      alert("Có lỗi xảy ra khi đặt lịch: " + error.message);
     }
   };
 
@@ -810,7 +790,7 @@ export default function QuanLyLich() {
       // Sử dụng appointmentId từ slot (đã được populate từ backend)
       if (!slot || !slot.appointmentId) {
         console.error("❌❌❌ handleVideoCall - No slot or appointmentId");
-        showAlert(
+        alert(
           `Không tìm thấy lịch hẹn cho slot này. Slot ID: ${
             slot?.id || "Không có"
           }, Patient: ${slot?.patientName || "Không có"}`
@@ -930,7 +910,7 @@ export default function QuanLyLich() {
         error.message,
         error.stack
       );
-      showAlert(`Lỗi khi bắt đầu cuộc gọi video: ${error.message}`);
+      alert(`Lỗi khi bắt đầu cuộc gọi video: ${error.message}`);
     }
   };
 
@@ -939,30 +919,33 @@ export default function QuanLyLich() {
     // Check for slot ID (could be _id or id depending on mapping)
     const slotId = slot?._id || slot?.id;
     if (!slot || !slotId) {
-      showAlert("Không tìm thấy thông tin slot cần xóa");
+      alert("Không tìm thấy thông tin slot cần xóa");
       return;
     }
 
     // Confirm delete
-    showConfirm(
-      "Bạn có chắc chắn muốn xóa slot này? Slot có appointment sẽ không thể xóa.",
-      async () => {
+    const confirmDelete = window.confirm(
+      "Bạn có chắc chắn muốn xóa slot này? Slot có appointment sẽ không thể xóa."
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
 
     try {
       console.log("🗑️ Deleting slot:", slotId);
       const response = await deleteTimeSlot(slotId);
 
-        if (response.success) {
-          showAlert("Xóa slot thành công!");
-          await loadTimeSlots(); // Reload time slots
-        } else {
-          showAlert("Không thể xóa slot: " + (response.message || "Unknown error"));
-        }
-      } catch (error) {
-        console.error("❌ Error deleting slot:", error);
-        showAlert("Có lỗi xảy ra khi xóa slot: " + error.message);
+      if (response.success) {
+        alert("Xóa slot thành công!");
+        await loadTimeSlots(); // Reload time slots
+      } else {
+        alert("Không thể xóa slot: " + (response.message || "Unknown error"));
       }
-    });
+    } catch (error) {
+      console.error("❌ Error deleting slot:", error);
+      alert("Có lỗi xảy ra khi xóa slot: " + error.message);
+    }
   };
 
   if (!authUser) {
@@ -1793,24 +1776,6 @@ export default function QuanLyLich() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Custom Alert */}
-      <CustomAlert
-        message={alertMessage}
-        onClose={() => setAlertMessage(null)}
-        title="Hệ thống MedConnect"
-      />
-
-      {/* Custom Confirm */}
-      {confirmConfig && (
-        <CustomAlert
-          message={confirmConfig.message}
-          onConfirm={confirmConfig.onConfirm}
-          onClose={confirmConfig.onCancel}
-          title="Hệ thống MedConnect"
-          type="confirm"
-        />
-      )}
     </div>
   );
 }

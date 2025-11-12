@@ -928,14 +928,6 @@
 
     .schedule-content {
       overflow-x: auto;
-      
-      // Ẩn thanh trượt
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-      
-      &::-webkit-scrollbar {
-        display: none;
-      }
 
       .schedule-grid {
         min-width: 800px;

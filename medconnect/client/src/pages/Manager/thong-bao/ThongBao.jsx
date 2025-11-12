@@ -99,8 +99,6 @@ export function ThongBao() {
         return <Clock {...iconProps} />;
       case "leave_request":
         return <FileText {...iconProps} />;
-      case "payment":
-        return <FileText {...iconProps} />;
       case "system":
         return <Bell {...iconProps} />;
       default:
@@ -222,31 +220,10 @@ export function ThongBao() {
                           Mã yêu cầu: {notification.metadata.leaveRequestId}
                         </span>
                       )}
-                      {notification.metadata.invoiceNumber && (
-                        <span className="metadata-item">
-                          <FileText size={14} />
-                          Mã hóa đơn: {notification.metadata.invoiceNumber}
-                        </span>
-                      )}
                       {notification.metadata.doctorName && (
                         <span className="metadata-item">
                           <User size={14} />
                           {notification.metadata.doctorName}
-                        </span>
-                      )}
-                      {notification.metadata.patientName && (
-                        <span className="metadata-item">
-                          <User size={14} />
-                          Bệnh nhân: {notification.metadata.patientName}
-                        </span>
-                      )}
-                      {notification.metadata.total && (
-                        <span className="metadata-item">
-                          <FileText size={14} />
-                          Tổng tiền: {new Intl.NumberFormat("vi-VN", {
-                            style: "currency",
-                            currency: "VND",
-                          }).format(notification.metadata.total)}
                         </span>
                       )}
                       {notification.metadata.slotTime && (

@@ -20,7 +20,6 @@ import {
   setEducationLevelPrice,
   deleteEducationLevelPrice,
 } from "../../../lib/api";
-import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./QuanLyGiaTheoTrinhDo.scss";
 
 const { Option } = Select;
@@ -43,19 +42,6 @@ export default function QuanLyGiaTheoTrinhDo() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingPrice, setEditingPrice] = useState(null);
   const [form] = Form.useForm();
-  const [confirmConfig, setConfirmConfig] = useState(null);
-
-  // Helper function to show custom confirm
-  const showConfirm = (message, onConfirm) => {
-    setConfirmConfig({
-      message,
-      onConfirm: () => {
-        onConfirm();
-        setConfirmConfig(null);
-      },
-      onCancel: () => setConfirmConfig(null),
-    });
-  };
 
   // Fetch prices
   const fetchPrices = async () => {
@@ -160,9 +146,13 @@ export default function QuanLyGiaTheoTrinhDo() {
 
   // Handle delete price
   const handleDelete = async (priceId) => {
-    showConfirm(
-      "Bạn có chắc chắn muốn xóa giá này không?",
-      async () => {
+    Modal.confirm({
+      title: "Xác nhận xóa",
+      content: "Bạn có chắc chắn muốn xóa giá này không?",
+      okText: "Xóa",
+      okType: "danger",
+      cancelText: "Hủy",
+      onOk: async () => {
         try {
           await deleteEducationLevelPrice(priceId);
           message.success("Xóa giá thành công");
@@ -171,8 +161,8 @@ export default function QuanLyGiaTheoTrinhDo() {
           console.error("Error deleting price:", error);
           message.error("Không thể xóa giá");
         }
-      }
-    );
+      },
+    });
   };
 
   // Prepare table data
@@ -465,17 +455,6 @@ export default function QuanLyGiaTheoTrinhDo() {
           </Form.Item>
         </Form>
       </Modal>
-
-      {/* Custom Confirm */}
-      {confirmConfig && (
-        <CustomAlert
-          message={confirmConfig.message}
-          onConfirm={confirmConfig.onConfirm}
-          onClose={confirmConfig.onCancel}
-          title="Hệ thống MedConnect"
-          type="confirm"
-        />
-      )}
     </div>
   );
 }

@@ -10,7 +10,6 @@ import {
   Clock,
 } from "lucide-react";
 import { api } from "../../lib/api";
-import { CustomAlert } from "../ui/CustomAlert";
 import "./NotificationCenter.scss";
 
 export function NotificationCenter() {
@@ -18,14 +17,8 @@ export function NotificationCenter() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [alertMessage, setAlertMessage] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Helper function to show custom alert
-  const showAlert = (message) => {
-    setAlertMessage(message);
-  };
 
   // Fetch notifications (limited for dropdown)
   const fetchNotifications = async () => {
@@ -89,7 +82,7 @@ export function NotificationCenter() {
       }
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
-      showAlert("Không thể đánh dấu tất cả thông báo: " + error.message);
+      alert("Không thể đánh dấu tất cả thông báo: " + error.message);
     }
   };
 
@@ -235,13 +228,6 @@ export function NotificationCenter() {
           )}
         </div>
       )}
-
-      {/* Custom Alert */}
-      <CustomAlert
-        message={alertMessage}
-        onClose={() => setAlertMessage(null)}
-        title="Hệ thống MedConnect"
-      />
     </div>
   );
 }

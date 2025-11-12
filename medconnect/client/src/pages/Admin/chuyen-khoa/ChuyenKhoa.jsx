@@ -34,7 +34,6 @@ import {
   deleteSpecialization,
   getDoctorsBySpecialization,
 } from "../../../lib/api";
-import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./ChuyenKhoa.scss";
 
 const ChuyenKhoa = () => {
@@ -49,19 +48,6 @@ const ChuyenKhoa = () => {
   const [doctors, setDoctors] = useState([]);
   const [form] = Form.useForm();
   const [fileList, setFileList] = useState([]);
-  const [confirmConfig, setConfirmConfig] = useState(null);
-
-  // Helper function to show custom confirm
-  const showConfirm = (message, onConfirm) => {
-    setConfirmConfig({
-      message,
-      onConfirm: () => {
-        onConfirm();
-        setConfirmConfig(null);
-      },
-      onCancel: () => setConfirmConfig(null),
-    });
-  };
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
@@ -108,9 +94,13 @@ const ChuyenKhoa = () => {
     const specializationName = specialization?.name || "chuyên khoa này";
 
     // Show confirmation dialog
-    showConfirm(
-      `Bạn có chắc chắn muốn xóa chuyên khoa "${specializationName}"? Hành động này không thể hoàn tác.`,
-      async () => {
+    Modal.confirm({
+      title: "Xác nhận xóa chuyên khoa",
+      content: `Bạn có chắc chắn muốn xóa chuyên khoa "${specializationName}"? Hành động này không thể hoàn tác.`,
+      okText: "Xóa",
+      okType: "danger",
+      cancelText: "Hủy",
+      onOk: async () => {
         try {
           const result = await deleteSpecialization(id);
 
@@ -135,7 +125,7 @@ const ChuyenKhoa = () => {
           // Try to parse error message from server
           let errorMessage = "Có lỗi xảy ra khi xóa chuyên khoa";
           try {
-            const errorText = err.message || err.response?.data?.message;
+            const errorText = err.message;
             // Try to parse as JSON if it's a JSON string
             if (errorText) {
               const errorJson = JSON.parse(errorText);
@@ -152,8 +142,8 @@ const ChuyenKhoa = () => {
 
           message.error(errorMessage);
         }
-      }
-    );
+      },
+    });
   };
 
   const handleModalOk = async () => {
@@ -618,17 +608,6 @@ const ChuyenKhoa = () => {
           </div>
         )}
       </Modal>
-
-      {/* Custom Confirm */}
-      {confirmConfig && (
-        <CustomAlert
-          message={confirmConfig.message}
-          onConfirm={confirmConfig.onConfirm}
-          onClose={confirmConfig.onCancel}
-          title="Hệ thống MedConnect"
-          type="confirm"
-        />
-      )}
     </div>
   );
 };

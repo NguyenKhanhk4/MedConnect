@@ -12,6 +12,8 @@ import dotenv from "dotenv";
 dotenv.config();
 import apiRouter from "./routes/api.router.js";
 
+import mapRoutes from "./routes/mapRoutes.js";
+
 // Get __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,7 +60,7 @@ const uploadsDir = path.join(__dirname, "uploads");
 console.log(`📁 Static files directory: ${uploadsDir}`);
 app.use("/server-uploads", (req, res, next) => {
   console.log(`📄 Requesting file: ${req.path}`);
-
+  
   // Check if file exists before serving
   const filePath = path.join(uploadsDir, req.path);
   fs.access(filePath, fs.constants.F_OK, (err) => {
@@ -73,9 +75,7 @@ app.use("/server-uploads", (req, res, next) => {
         console.log(`   Files in doctors directory: ${files.length} files`);
         if (req.path.includes("doctors")) {
           const requestedFile = req.path.split("/").pop();
-          const matchingFiles = files.filter((f) =>
-            f.includes(requestedFile?.split("-")[0] || "")
-          );
+          const matchingFiles = files.filter(f => f.includes(requestedFile?.split("-")[0] || ""));
           if (matchingFiles.length > 0) {
             console.log(`   Similar files found: ${matchingFiles.join(", ")}`);
           }
@@ -121,28 +121,26 @@ mongoose
   .connect(process.env.MONGODB_URL || "mongodb://localhost:27017/MedConnect")
   .then(async () => {
     console.log("✅ Kết nối đến MongoDB thành công");
-
+    
     // Fix old unique index on Payments collection if exists
     try {
       const db = mongoose.connection.db;
       const collection = db.collection("Payments");
       const indexes = await collection.indexes();
-      const oldIndex = indexes.find(
-        (idx) => idx.name === "appointmentId_1" && idx.unique === true
+      const oldIndex = indexes.find(idx => 
+        idx.name === "appointmentId_1" && idx.unique === true
       );
-
+      
       if (oldIndex) {
         await collection.dropIndex("appointmentId_1");
-        console.log(
-          "✅ Đã xóa unique index cũ: appointmentId_1 trên collection Payments"
-        );
+        console.log("✅ Đã xóa unique index cũ: appointmentId_1 trên collection Payments");
       }
     } catch (error) {
       if (error.code !== 27 && !error.message?.includes("index not found")) {
         console.log("ℹ️ Kiểm tra index (có thể đã được xóa):", error.message);
       }
     }
-
+    
     // Tắt cron job tự động hủy appointments - không giới hạn thời gian thanh toán
     // startAppointmentCleanupJob();
     console.log(
@@ -163,3 +161,6 @@ server.listen(PORT, () => {
   console.log(`🚀 Server đang chạy tại: ${domain}`);
 });
 // });
+
+//=================== map ===================//
+app.use("/api/locations", mapRoutes);

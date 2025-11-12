@@ -29,7 +29,6 @@ import {
   getUniqueClinics,
   applyAppointmentFilters,
 } from "../../../utils/appointmentUtils";
-import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./LichHenCuaToi.scss";
 
 const STATUS = {
@@ -58,21 +57,8 @@ export function LichHenCuaToi() {
     customDateRange: null,
     selectedClinic: "",
   });
-  const [confirmConfig, setConfirmConfig] = useState(null);
 
   const navigate = useNavigate();
-
-  // Helper function to show custom confirm
-  const showConfirm = (message, onConfirm) => {
-    setConfirmConfig({
-      message,
-      onConfirm: () => {
-        onConfirm();
-        setConfirmConfig(null);
-      },
-      onCancel: () => setConfirmConfig(null),
-    });
-  };
 
   // Fetch appointments
   const { appointments, loading, setAppointments } = useAppointments();
@@ -81,9 +67,13 @@ export function LichHenCuaToi() {
   const { specializations } = useSpecializations();
 
   const handleCancelAppointment = async (appointmentId) => {
-    showConfirm(
-      "Bạn có chắc chắn muốn hủy lịch hẹn này?",
-      async () => {
+    Modal.confirm({
+      title: "Xác nhận hủy lịch hẹn",
+      content: "Bạn có chắc chắn muốn hủy lịch hẹn này?",
+      okText: "Hủy lịch hẹn",
+      cancelText: "Không",
+      okType: "danger",
+      onOk: async () => {
         try {
           // Gọi API endpoint mới
           const response = await api.put(
@@ -118,8 +108,8 @@ export function LichHenCuaToi() {
           });
           message.error(`Có lỗi xảy ra khi hủy lịch hẹn: ${error.message}`);
         }
-      }
-    );
+      },
+    });
   };
 
   // Get unique clinics from appointments
@@ -215,9 +205,6 @@ export function LichHenCuaToi() {
             <h1 className="page-title">Lịch hẹn của tôi</h1>
             <p className="page-subtitle">
               Quản lý và theo dõi các lịch hẹn khám bệnh
-            </p>
-            <p className="page-note">
-              Lưu ý : Bạn chỉ có thể dời lịch trước 24h
             </p>
           </div>
           {/* Doctor Search Filter */}
@@ -563,13 +550,11 @@ export function LichHenCuaToi() {
                       a.patientId.relationshipToOwner !== "self" && (
                         <span
                           style={{
-                            fontSize: 13,
-                            padding: "4px 12px",
-                            borderRadius: 6,
-                            background: "#3b82f6",
+                            fontSize: 12,
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            background: "#f59e0b",
                             color: "#ffffff",
-                            fontWeight: 600,
-                            display: "inline-block",
                           }}
                           title="Lịch hẹn đã được đặt hộ"
                         >
@@ -767,17 +752,6 @@ export function LichHenCuaToi() {
         appointment={selectedAppointmentForReview}
         onReviewSubmitted={handleReviewSubmitted}
       />
-
-      {/* Custom Confirm */}
-      {confirmConfig && (
-        <CustomAlert
-          message={confirmConfig.message}
-          onConfirm={confirmConfig.onConfirm}
-          onClose={confirmConfig.onCancel}
-          title="Hệ thống MedConnect"
-          type="confirm"
-        />
-      )}
     </div>
   );
 }

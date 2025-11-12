@@ -22,14 +22,6 @@ const Header = () => {
   const { user } = useAuth();
   const { userProfile } = useUserProfile();
 
-  // Get patient avatar from userProfile
-  const patientAvatar = 
-    userProfile?.avatarUrl || 
-    userProfile?.avatar || 
-    userProfile?.photoURL || 
-    user?.photoURL || 
-    null;
-
   // Navigation categories cho trang chủ
   const defaultCategories = [
     { key: "all", label: "Trang chủ", path: "/" },
@@ -454,14 +446,13 @@ const Header = () => {
                           minWidth: 220,
                         }}
                       >
-                        <Avatar 
-                          size={48} 
-                          src={patientAvatar}
-                          icon={!patientAvatar && <UserOutlined />}
-                        />
+                        <Avatar size={48} icon={<UserOutlined />} />
                         <div>
                           <div style={{ fontWeight: 700 }}>
-                             {userProfile?.fullName || userProfile?.displayName || user?.displayName || "Bệnh nhân"}
+                            {user?.displayName || "Bệnh nhân"}
+                          </div>
+                          <div style={{ fontSize: 12, color: "#666" }}>
+                            {user?.email || ""}
                           </div>
                         </div>
                       </div>
@@ -542,12 +533,11 @@ const Header = () => {
               <Avatar
                 size={48}
                 className="patient-avatar"
-                src={patientAvatar}
                 style={{
                   cursor: "pointer",
-                  backgroundColor: patientAvatar ? "transparent" : "var(--primary-color, #12c2e9)",
+                  backgroundColor: "var(--primary-color, #12c2e9)",
                 }}
-                icon={!patientAvatar && <UserOutlined />}
+                icon={<UserOutlined />}
               />
             </Dropdown>
           )}

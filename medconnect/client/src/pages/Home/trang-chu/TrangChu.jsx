@@ -14,14 +14,12 @@ import {
   HomeOutlined,
   LeftOutlined,
   RightOutlined,
-  EnvironmentOutlined,
 } from "@ant-design/icons";
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { useAuth } from "../../../hooks/useAuth";
 import { useUserProfile } from "../../../hooks/useUserProfile";
-import { useClinics } from "../../../hooks/useClinics";
 import "./TrangChu.css";
 
 const { Title, Paragraph } = Typography;
@@ -33,13 +31,6 @@ const TrangChu = () => {
   const [specializations, setSpecializations] = useState([]);
   const [featuredDoctors, setFeaturedDoctors] = useState([]);
   const [doctorsLoading, setDoctorsLoading] = useState(true);
-
-  // Fetch clinics for medical facilities section
-  const {
-    data: clinicsData,
-    isLoading: clinicsLoading,
-  } = useClinics(1, 6, "", "all", "all");
-  const clinics = clinicsData?.data?.clinics || [];
 
   const SampleNextArrow = (props) => {
     const { onClick } = props;
@@ -620,145 +611,86 @@ const TrangChu = () => {
             </Link>
           </Row>
 
-          {clinicsLoading ? (
-            <div style={{ textAlign: "center", padding: "40px 0" }}>
-              <Paragraph style={{ fontSize: "16px", color: "#666" }}>
-                Đang tải danh sách cơ sở y tế...
-              </Paragraph>
-            </div>
-          ) : clinics.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 0" }}>
-              <Paragraph style={{ fontSize: "16px", color: "#666" }}>
-                Hiện chưa có cơ sở y tế nào
-              </Paragraph>
-            </div>
-          ) : (
-            <Slider {...sliderSettings}>
-              {clinics.map((clinic) => {
-                // Handle image URL
-                let imageUrl = clinic.image || "";
-                if (imageUrl) {
-                  // Check if image is already a full URL
-                  if (
-                    !imageUrl.startsWith("http://") &&
-                    !imageUrl.startsWith("https://") &&
-                    !imageUrl.startsWith("data:")
-                  ) {
-                    const apiBase =
-                      import.meta.env.VITE_API_URL ||
-                      import.meta.env.VITE_API_BASE ||
-                      "http://localhost:3000";
-                    const imagePath = imageUrl.startsWith("/")
-                      ? imageUrl
-                      : `/${imageUrl}`;
-                    imageUrl = `${apiBase}${imagePath}`;
-                  }
-                } else {
-                  // Default placeholder if no image
-                  imageUrl = null;
-                }
-
-                return (
-                  <div key={clinic.id} style={{ padding: "0 12px" }}>
-                    <Card
-                      hoverable
-                      onClick={() =>
-                        navigate(`/ban-do-co-so-y-te?id=${clinic.id || clinic._id}`)
-                      }
-                      variant="outlined"
-                      style={{
-                        borderRadius: "16px",
-                        textAlign: "center",
-                        cursor: "pointer",
-                        height: "100%",
-                        boxShadow: "0 3px 10px rgba(0,0,0,0.05)",
-                      }}
-                      styles={{
-                        body: {
-                          padding: "24px",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "flex-start",
-                          minHeight: "280px",
-                        },
-                      }}
-                    >
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          alt={clinic.name}
-                          onError={(e) => {
-                            e.target.style.display = "none";
-                            e.target.onerror = null;
-                          }}
-                          style={{
-                            width: "150px",
-                            height: "150px",
-                            objectFit: "contain",
-                            marginBottom: "16px",
-                          }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: "150px",
-                            height: "150px",
-                            borderRadius: "12px",
-                            background: "linear-gradient(135deg, #45c3d2 0%, #007f7f 100%)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            marginBottom: "16px",
-                            fontSize: "48px",
-                            color: "white",
-                          }}
-                        >
-                          <HomeOutlined />
-                        </div>
-                      )}
-                      <Title
-                        level={4}
-                        style={{
-                          margin: "0 0 8px 0",
-                          color: "#333",
-                          fontWeight: 500,
-                          fontSize: "1.05rem",
-                        }}
-                      >
-                        {clinic.name}
-                      </Title>
-                      {clinic.address && (
-                        <Paragraph
-                          style={{
-                            margin: "0 0 4px 0",
-                            color: "#666",
-                            fontSize: "0.9rem",
-                            textAlign: "center",
-                          }}
-                        >
-                          <EnvironmentOutlined style={{ marginRight: "4px" }} />
-                          {clinic.address}
-                        </Paragraph>
-                      )}
-                      {clinic.location && (
-                        <Paragraph
-                          style={{
-                            margin: 0,
-                            color: "#999",
-                            fontSize: "0.85rem",
-                            textAlign: "center",
-                          }}
-                        >
-                          {clinic.location}
-                        </Paragraph>
-                      )}
-                    </Card>
-                  </div>
-                );
-              })}
-            </Slider>
-          )}
+          <Slider {...sliderSettings}>
+            {[
+              {
+                id: "vietduc",
+                name: "Bệnh viện Hữu nghị Việt Đức",
+                logo: "https://cdn.bookingcare.vn/fo/w1920/2023/12/28/151122-viet-duc.png",
+              },
+              {
+                id: "choray",
+                name: "Bệnh viện Chợ Rẫy",
+                logo: "https://cdn.bookingcare.vn/fo/w1920/2023/12/28/151123-cho-ray.png",
+              },
+              {
+                id: "doctorcheck",
+                name: "Doctor Check - Tầm Soát Bệnh Để Sống Thọ Hơn",
+                logo: "https://cdn.bookingcare.vn/fo/w1920/2023/12/28/151124-doctor-check.png",
+              },
+              {
+                id: "vinmec",
+                name: "Bệnh viện Đa khoa Quốc tế Vinmec",
+                logo: "https://cdn.bookingcare.vn/fo/w1920/2023/12/28/151125-vinmec.png",
+              },
+              {
+                id: "tamduc",
+                name: "Bệnh viện Tâm Đức",
+                logo: "https://cdn.bookingcare.vn/fo/w1920/2023/12/28/151126-tam-duc.png",
+              },
+              {
+                id: "hunggvuong",
+                name: "Bệnh viện Hùng Vương",
+                logo: "https://cdn.bookingcare.vn/fo/w1920/2023/12/28/151127-hung-vuong.png",
+              },
+            ].map((facility, index) => (
+              <div key={index} style={{ padding: "0 12px" }}>
+                <Card
+                  hoverable
+                  onClick={() => navigate(`/hospitals/${facility.id}`)}
+                  variant="outlined"
+                  style={{
+                    borderRadius: "16px",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    height: "100%",
+                    boxShadow: "0 3px 10px rgba(0,0,0,0.05)",
+                  }}
+                  styles={{
+                    body: {
+                      padding: "24px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    },
+                  }}
+                >
+                  <img
+                    src={facility.logo}
+                    alt={facility.name}
+                    style={{
+                      width: "150px",
+                      height: "150px",
+                      objectFit: "contain",
+                      marginBottom: "16px",
+                    }}
+                  />
+                  <Title
+                    level={4}
+                    style={{
+                      margin: 0,
+                      color: "#333",
+                      fontWeight: 500,
+                      fontSize: "1.05rem",
+                    }}
+                  >
+                    {facility.name}
+                  </Title>
+                </Card>
+              </div>
+            ))}
+          </Slider>
         </div>
       </section>
 

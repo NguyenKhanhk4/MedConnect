@@ -40,8 +40,9 @@ const KetQuaThanhToan = () => {
         if (cancel === "true") {
           try {
             await cancelPayOSPayment(orderCode);
+            console.log("✅ Payment link cancelled and appointment removed");
           } catch (cancelErr) {
-            // Silent fail - cancellation cleanup is not critical
+            console.error("Error cancelling payment:", cancelErr);
           }
           setIsSuccess(false);
           setLoading(false);
@@ -52,8 +53,9 @@ const KetQuaThanhToan = () => {
         if (status === "failed") {
           try {
             await cancelPayOSPayment(orderCode);
+            console.log("✅ Payment failed - appointment removed");
           } catch (cancelErr) {
-            // Silent fail - cancellation cleanup is not critical
+            console.error("Error cancelling payment:", cancelErr);
           }
           setIsSuccess(false);
           setLoading(false);
@@ -89,8 +91,9 @@ const KetQuaThanhToan = () => {
           if (isCancelled || isFailed) {
             try {
               await cancelPayOSPayment(orderCode);
+              console.log("✅ Payment cancelled/failed - appointment removed");
             } catch (cancelErr) {
-              // Silent fail - cancellation cleanup is not critical
+              console.error("Error cancelling payment:", cancelErr);
             }
           }
         } else {
@@ -98,6 +101,7 @@ const KetQuaThanhToan = () => {
           setIsSuccess(false);
         }
       } catch (err) {
+        console.error("Error verifying payment:", err);
         setError("Có lỗi xảy ra khi xác minh thanh toán");
         setIsSuccess(false);
       } finally {
@@ -179,6 +183,13 @@ const KetQuaThanhToan = () => {
                 danger
               >
                 Đặt lịch lại
+              </Button>,
+              <Button
+                size="large"
+                key="appointments"
+                onClick={handleViewAppointments}
+              >
+                Xem lịch hẹn
               </Button>,
               <Button size="large" key="home" onClick={handleBackToHome}>
                 Về trang chủ

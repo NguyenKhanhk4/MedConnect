@@ -31,7 +31,6 @@ import {
   getEducationLevelPrices,
 } from "../../../lib/api";
 import { RescheduleModal } from "../../../components/RescheduleModal/RescheduleModal";
-import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./QuanLyLichBacSi.scss";
 
 export default function QuanLyLichBacSi() {
@@ -48,29 +47,6 @@ export default function QuanLyLichBacSi() {
   const [selectedSpecializationId, setSelectedSpecializationId] = useState("");
   const [specializations, setSpecializations] = useState([]);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
-
-  // All doctors for reschedule dropdown (separate from filtered doctors)
-  const [allDoctorsForReschedule, setAllDoctorsForReschedule] = useState([]);
-  const [loadingAllDoctors, setLoadingAllDoctors] = useState(false);
-  const [alertMessage, setAlertMessage] = useState(null);
-  const [confirmConfig, setConfirmConfig] = useState(null);
-
-  // Helper function to show custom alert
-  const showAlert = (message) => {
-    setAlertMessage(message);
-  };
-
-  // Helper function to show custom confirm
-  const showConfirm = (message, onConfirm) => {
-    setConfirmConfig({
-      message,
-      onConfirm: () => {
-        onConfirm();
-        setConfirmConfig(null);
-      },
-      onCancel: () => setConfirmConfig(null),
-    });
-  };
 
   // Leave request states
 
@@ -128,39 +104,11 @@ export default function QuanLyLichBacSi() {
   // Education level prices state
   const [educationLevelPrices, setEducationLevelPrices] = useState({});
 
-  // Load all doctors for reschedule dropdown
-  const loadAllDoctorsForReschedule = useCallback(async () => {
-    try {
-      setLoadingAllDoctors(true);
-      // Load all verified and active doctors (no filters)
-      const response = await api.get("/api/managers/doctors");
-      if (response.success) {
-        const doctors = response.data.doctors || [];
-        console.log(
-          `[Manager] Loaded ${doctors.length} doctors for reschedule dropdown`
-        );
-        setAllDoctorsForReschedule(doctors);
-      } else {
-        console.error(
-          "[Manager] Failed to load all doctors for reschedule:",
-          response
-        );
-        setAllDoctorsForReschedule([]);
-      }
-    } catch (error) {
-      console.error("Error loading all doctors for reschedule:", error);
-      setAllDoctorsForReschedule([]);
-    } finally {
-      setLoadingAllDoctors(false);
-    }
-  }, []);
-
   // Load specializations on mount
   useEffect(() => {
     loadSpecializations();
     loadEducationLevelPrices();
-    loadAllDoctorsForReschedule(); // Load all doctors for reschedule dropdown
-  }, [loadAllDoctorsForReschedule]);
+  }, []);
 
   // Reload education level prices when doctor changes (to ensure latest prices)
   useEffect(() => {
@@ -418,7 +366,7 @@ export default function QuanLyLichBacSi() {
 
   const handleGenerateSlots = async () => {
     if (!selectedDoctorId) {
-      showAlert("Vui lòng chọn bác sĩ!");
+      alert("Vui lòng chọn bác sĩ!");
       return;
     }
 
@@ -435,7 +383,7 @@ export default function QuanLyLichBacSi() {
         // Different messages based on response
         if (createdCount === 0) {
           // No slots created (already have enough slots for current month)
-          showAlert(
+          alert(
             `ℹ️ Hiện tại bác sĩ đã có ${existingSlots} slot trong tháng này.\n\nKhông cần tạo thêm slot lúc này.`
           );
         } else {
@@ -450,17 +398,15 @@ export default function QuanLyLichBacSi() {
             message += `\n\n💡 LƯU Ý: Bác sĩ còn ${totalSlots} slot. Nên tạo thêm slot trong thời gian tới.`;
           }
 
-          showAlert(message);
+          alert(message);
         }
         await loadTimeSlots();
       } else {
-        showAlert(
-          "❌ Lỗi khi tạo slots: " + (response.message || "Unknown error")
-        );
+        alert("❌ Lỗi khi tạo slots: " + (response.message || "Unknown error"));
       }
     } catch (error) {
       console.error("❌ Error generating slots:", error);
-      showAlert("❌ Lỗi khi tạo slots: " + error.message);
+      alert("❌ Lỗi khi tạo slots: " + error.message);
     } finally {
       setGenerating(false);
     }
@@ -741,12 +687,12 @@ export default function QuanLyLichBacSi() {
         if (response.success) {
           setSelectedAppointmentDetail(response.data);
         } else {
-          showAlert("Không thể tải thông tin chi tiết lịch hẹn");
+          alert("Không thể tải thông tin chi tiết lịch hẹn");
           setShowAppointmentDetail(false);
         }
       } catch (error) {
         console.error("Error fetching appointment detail:", error);
-        showAlert("Có lỗi xảy ra khi tải thông tin");
+        alert("Có lỗi xảy ra khi tải thông tin");
         setShowAppointmentDetail(false);
       } finally {
         setLoadingAppointmentDetail(false);
@@ -997,7 +943,7 @@ export default function QuanLyLichBacSi() {
     }
 
     if (!selectedDoctorId) {
-      showAlert("Vui lòng chọn bác sĩ!");
+      alert("Vui lòng chọn bác sĩ!");
       return;
     }
 
@@ -1045,7 +991,7 @@ export default function QuanLyLichBacSi() {
           slotId = foundSlot.id || foundSlot._id;
         }
       } else {
-        showAlert("Thiếu thông tin ngày/giờ. Vui lòng thử lại!");
+        alert("Thiếu thông tin ngày/giờ. Vui lòng thử lại!");
         return;
       }
 
@@ -1057,7 +1003,7 @@ export default function QuanLyLichBacSi() {
         bookingData.clinicId;
 
       if (!defaultClinicId) {
-        showAlert(
+        alert(
           "Bác sĩ chưa có phòng khám mặc định. Vui lòng cập nhật thông tin bác sĩ trước."
         );
         return;
@@ -1109,7 +1055,7 @@ export default function QuanLyLichBacSi() {
       );
 
       if (response.success) {
-        showAlert(
+        alert(
           "Đã gửi yêu cầu thanh toán đặt lịch. Vui lòng thanh toán để hoàn tất đặt lịch."
         );
         // Close form and reset
@@ -1144,7 +1090,7 @@ export default function QuanLyLichBacSi() {
         const errorMsg =
           response.message || response.error?.message || "Unknown error";
         console.error("❌ Error response:", response);
-        showAlert("Lỗi khi đặt lịch: " + errorMsg);
+        alert("Lỗi khi đặt lịch: " + errorMsg);
         // Close form even on error
         setShowBookSlot(false);
       }
@@ -1159,7 +1105,7 @@ export default function QuanLyLichBacSi() {
         error.response?.data?.message ||
         error.message ||
         "Có lỗi xảy ra khi đặt lịch";
-      showAlert("Có lỗi xảy ra khi đặt lịch: " + errorMsg);
+      alert("Có lỗi xảy ra khi đặt lịch: " + errorMsg);
       // Close form even on error
       setShowBookSlot(false);
     }
@@ -1181,33 +1127,34 @@ export default function QuanLyLichBacSi() {
     // Check for slot ID (could be _id or id depending on mapping)
     const slotId = slot?._id || slot?.id;
     if (!slot || !slotId || !selectedDoctorId) {
-      showAlert("Không tìm thấy thông tin slot cần xóa");
+      alert("Không tìm thấy thông tin slot cần xóa");
       return;
     }
 
     // Confirm delete
-    showConfirm(
-      "Bạn có chắc chắn muốn xóa slot này? Slot có appointment sẽ không thể xóa.",
-      async () => {
-        try {
-          const response = await api.delete(
-            `/api/managers/doctors/${selectedDoctorId}/time-slots/${slotId}`
-          );
-
-          if (response.success) {
-            showAlert("Xóa slot thành công!");
-            await loadTimeSlots(); // Reload time slots
-          } else {
-            showAlert(
-              "Không thể xóa slot: " + (response.message || "Unknown error")
-            );
-          }
-        } catch (error) {
-          console.error("❌ Error deleting slot:", error);
-          showAlert("Có lỗi xảy ra khi xóa slot: " + error.message);
-        }
-      }
+    const confirmDelete = window.confirm(
+      "Bạn có chắc chắn muốn xóa slot này? Slot có appointment sẽ không thể xóa."
     );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      const response = await api.delete(
+        `/api/managers/doctors/${selectedDoctorId}/time-slots/${slotId}`
+      );
+
+      if (response.success) {
+        alert("Xóa slot thành công!");
+        await loadTimeSlots(); // Reload time slots
+      } else {
+        alert("Không thể xóa slot: " + (response.message || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("❌ Error deleting slot:", error);
+      alert("Có lỗi xảy ra khi xóa slot: " + error.message);
+    }
   };
 
   const selectedDoctor = doctors.find((d) => d._id === selectedDoctorId);
@@ -2785,40 +2732,6 @@ export default function QuanLyLichBacSi() {
                   <h3 className="detail-section-title">
                     📅 Thông tin dời lịch
                   </h3>
-                  {selectedAppointmentDetail.rescheduleType && (
-                    <div className="detail-item">
-                      <span className="detail-label">Lý do dời lịch:</span>
-                      <span className="detail-value">
-                        {selectedAppointmentDetail.rescheduleType ===
-                        "doctor_busy"
-                          ? "🔴 Bác sĩ bận (dời hộ bệnh nhân sang bác sĩ khác)"
-                          : selectedAppointmentDetail.rescheduleType ===
-                            "patient_request"
-                          ? "🟡 Bệnh nhân yêu cầu (dời theo yêu cầu của bệnh nhân)"
-                          : selectedAppointmentDetail.rescheduleType ===
-                            "manager_initiated"
-                          ? "🟢 Manager tự động dời (dời do lý do khác)"
-                          : "Không xác định"}
-                      </span>
-                    </div>
-                  )}
-                  {selectedAppointmentDetail.rescheduleRequestedBy && (
-                    <div className="detail-item">
-                      <span className="detail-label">Người yêu cầu:</span>
-                      <span className="detail-value">
-                        {selectedAppointmentDetail.rescheduleRequestedBy ===
-                        "doctor"
-                          ? "Bác sĩ"
-                          : selectedAppointmentDetail.rescheduleRequestedBy ===
-                            "patient"
-                          ? "Bệnh nhân"
-                          : selectedAppointmentDetail.rescheduleRequestedBy ===
-                            "manager"
-                          ? "Manager"
-                          : "Không xác định"}
-                      </span>
-                    </div>
-                  )}
                   <div className="detail-item">
                     <span className="detail-label">Thời gian cũ:</span>
                     <span className="detail-value">
@@ -2890,9 +2803,7 @@ export default function QuanLyLichBacSi() {
                 <div className="detail-actions">
                   <Button
                     className="reschedule-button"
-                    onClick={async () => {
-                      // Reload all doctors before opening reschedule modal to ensure fresh data
-                      await loadAllDoctorsForReschedule();
+                    onClick={() => {
                       setShowRescheduleModal(true);
                       setShowAppointmentDetail(false);
                     }}
@@ -2923,9 +2834,7 @@ export default function QuanLyLichBacSi() {
                           status: selectedAppointmentDetail.status,
                         };
                         // Manager không có quyền gọi video
-                        showAlert(
-                          "Chỉ bác sĩ mới có thể bắt đầu cuộc gọi video"
-                        );
+                        alert("Chỉ bác sĩ mới có thể bắt đầu cuộc gọi video");
                         setShowAppointmentDetail(false);
                       }}
                     >
@@ -2960,9 +2869,6 @@ export default function QuanLyLichBacSi() {
             setShowRescheduleModal(false);
             setSelectedAppointmentDetail(null);
           }}
-          allowChangeDoctor={true} // Allow manager to change doctor
-          doctors={allDoctorsForReschedule} // Pass all doctors for reschedule dropdown
-          specializations={specializations} // Pass specializations for filtering
           customSubmitHandler={async (requestBody) => {
             // Custom handler for manager to directly reschedule (no approval needed)
             const response = await rescheduleAppointmentByManager(
@@ -2970,89 +2876,15 @@ export default function QuanLyLichBacSi() {
               requestBody.newDateTime,
               requestBody.reason,
               requestBody.mode,
-              requestBody.clinicId,
-              requestBody.newDoctorId, // Pass newDoctorId if doctor was changed
-              requestBody.rescheduleType // Pass rescheduleType
+              requestBody.clinicId
             );
             return response;
           }}
           onSuccess={async (response) => {
             if (response?.success) {
-              // Check if doctor was changed during reschedule
-              const responseNewDoctorId = response?.data?.newDoctorId;
-              const newAppointment = response?.data?.newAppointment;
-
-              // Get new doctor ID from response or from newAppointment
-              let newDoctorId = null;
-              if (responseNewDoctorId) {
-                newDoctorId = responseNewDoctorId;
-              } else if (newAppointment?.doctorId) {
-                newDoctorId =
-                  newAppointment.doctorId._id || newAppointment.doctorId;
-              }
-
-              const currentDoctorId = selectedDoctorId;
-
-              // If doctor was changed, switch to new doctor and reload slots
-              if (
-                newDoctorId &&
-                newDoctorId.toString() !== currentDoctorId?.toString()
-              ) {
-                console.log(
-                  `🔄 Doctor changed during reschedule: ${currentDoctorId} -> ${newDoctorId}`
-                );
-                // Update selected doctor to new doctor
-                setSelectedDoctorId(newDoctorId);
-                // Find and set the new doctor in doctors list
-                const newDoctor = allDoctorsForReschedule.find(
-                  (d) => d._id.toString() === newDoctorId.toString()
-                );
-                if (newDoctor) {
-                  setSelectedDoctor(newDoctor);
-                }
-                // Reload slots for the new doctor
-                const weekRange = getWeekRange();
-                try {
-                  setLoading(true);
-                  const slotsResponse = await api.get(
-                    `/api/managers/doctors/${newDoctorId}/time-slots?startDate=${weekRange.startDate}&endDate=${weekRange.endDate}&limit=1000`
-                  );
-                  if (slotsResponse.success && slotsResponse.data?.slots) {
-                    setTimeSlots(slotsResponse.data.slots);
-                    console.log(
-                      `✅ Loaded ${slotsResponse.data.slots.length} slots for new doctor ${newDoctorId}`
-                    );
-                  }
-                } catch (error) {
-                  console.error("Error loading slots for new doctor:", error);
-                } finally {
-                  setLoading(false);
-                }
-              } else {
-                // Same doctor, just reload slots
-                console.log("🔄 Same doctor, reloading slots");
-                await loadTimeSlots();
-              }
+              await loadTimeSlots(); // Reload slots to show updated appointment
             }
           }}
-        />
-      )}
-
-      {/* Custom Alert */}
-      <CustomAlert
-        message={alertMessage}
-        onClose={() => setAlertMessage(null)}
-        title="Hệ thống MedConnect"
-      />
-
-      {/* Custom Confirm */}
-      {confirmConfig && (
-        <CustomAlert
-          message={confirmConfig.message}
-          onConfirm={confirmConfig.onConfirm}
-          onClose={confirmConfig.onCancel}
-          title="Hệ thống MedConnect"
-          type="confirm"
         />
       )}
     </div>

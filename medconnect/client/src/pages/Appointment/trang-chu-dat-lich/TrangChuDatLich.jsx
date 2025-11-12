@@ -85,16 +85,13 @@ const TrangChuDatLich = () => {
             <Col xs={24} lg={12}>
               <Card className="main-cta-card">
                 <div className="cta-content">
-                  <div className="cta-icon-square">
-                    <CalendarOutlined className="cta-icon" />
+                  <div className="cta-icon">
+                    <CalendarOutlined />
                   </div>
                   <div className="cta-text">
-                    <Title level={2} className="cta-title">
-                      Đặt lịch đơn lẻ
-                    </Title>
-                    <Paragraph className="cta-description">
+                    <Title level={2}>Đặt lịch đơn lẻ</Title>
+                    <Paragraph>
                       Đặt lịch khám một chuyên khoa, một bác sĩ trong một lần
-                      với quy trình đơn giản
                     </Paragraph>
                   </div>
                   <Button
@@ -102,34 +99,33 @@ const TrangChuDatLich = () => {
                     size="large"
                     icon={<ArrowRightOutlined />}
                     onClick={handleStartBooking}
-                    className="cta-button-single"
+                    className="cta-button"
                   >
-                    Đặt lịch ngay nào
+                    Đặt lịch ngay
                   </Button>
                 </div>
               </Card>
             </Col>
             <Col xs={24} lg={12}>
-              <Card className="main-cta-card-multi">
+              <Card className="main-cta-card" style={{ background: "#f0f7ff" }}>
                 <div className="cta-content">
-                  <div className="cta-icon-square">
-                    <ClockCircleOutlined className="cta-icon" />
+                  <div className="cta-icon">
+                    <AppstoreOutlined />
                   </div>
                   <div className="cta-text">
-                    <Title level={2} className="cta-title">
-                      Đặt nhiều lịch
-                    </Title>
-                    <Paragraph className="cta-description">
+                    <Title level={2}>Đặt lịch nhiều chuyên khoa</Title>
+                    <Paragraph>
                       Đặt nhiều lịch khám trong cùng một ngày, gom thành một
-                      phiên khám tiện lợi
+                      phiên khám
                     </Paragraph>
                   </div>
                   <Button
                     type="primary"
                     size="large"
-                    icon={<ArrowRightOutlined />}
+                    icon={<AppstoreOutlined />}
                     onClick={handleStartMultiSpecializationBooking}
-                    className="cta-button-multi"
+                    className="cta-button"
+                    style={{ background: "#1890ff", borderColor: "#1890ff" }}
                   >
                     Đặt nhiều lịch
                   </Button>

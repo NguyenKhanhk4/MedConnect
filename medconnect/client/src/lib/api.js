@@ -1,4 +1,3 @@
-// IMPORTANT: Ensure base URL points to backend port (3000)
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // Auth functions
@@ -21,7 +20,7 @@ export async function getCurrentUser() {
       error.message.includes("ERR_CONNECTION_REFUSED")
     ) {
       console.error(
-        "Backend server is not running. Please start the server at http://localhost:3000" // FIXED: Changed from 5000 to 3000
+        "Backend server is not running. Please start the server at http://localhost:3000"
       );
       // Return null instead of throwing to allow app to continue
       return null;
@@ -51,7 +50,7 @@ export async function getCurrentPatientProfile() {
       error.message.includes("ERR_CONNECTION_REFUSED")
     ) {
       console.error(
-        "Backend server is not running. Please start the server at http://localhost:3000" // FIXED: Changed from 5000 to 3000
+        "Backend server is not running. Please start the server at http://localhost:3000"
       );
       // Return null instead of throwing to allow app to continue
       return null;
@@ -271,14 +270,8 @@ export async function getPatientPrescriptions(patientId) {
   return r.json();
 }
 
-export async function getPatientPayments(params = {}) {
-  const searchParams = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      searchParams.append(key, value);
-    }
-  });
-  const r = await fetch(`${BASE}/api/patients/me/payments?${searchParams}`, {
+export async function getPatientPayments(patientId) {
+  const r = await fetch(`${BASE}/api/patients/${patientId}/payments`, {
     credentials: "include",
   });
   if (!r.ok) throw new Error(await r.text());
@@ -854,9 +847,7 @@ export async function rescheduleAppointmentByManager(
   newDateTime,
   reason,
   mode,
-  clinicId,
-  newDoctorId,
-  rescheduleType
+  clinicId
 ) {
   const r = await fetch(
     `${BASE}/api/managers/appointments/${appointmentId}/reschedule`,
@@ -864,14 +855,7 @@ export async function rescheduleAppointmentByManager(
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({
-        newDateTime,
-        reason,
-        mode,
-        clinicId,
-        newDoctorId,
-        rescheduleType,
-      }),
+      body: JSON.stringify({ newDateTime, reason, mode, clinicId }),
     }
   );
   if (!r.ok) throw new Error(await r.text());
@@ -1255,6 +1239,7 @@ export async function getAdminSpecializations() {
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+
 export async function getDoctorsBySpecialization(specializationId) {
   const r = await fetch(
     `${BASE}/api/admin/specializations/${specializationId}/doctors`,

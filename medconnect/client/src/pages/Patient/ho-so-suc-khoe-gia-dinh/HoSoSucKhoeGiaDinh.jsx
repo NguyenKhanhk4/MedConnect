@@ -24,7 +24,6 @@ import dayjs from "dayjs";
 const { RangePicker } = DatePicker;
 import { getRelationshipText } from "../../../utils/familyMemberUtils";
 import { applyFilters } from "../../../utils/filterUtils";
-import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./HoSoSucKhoeGiaDinh.scss";
 
 export function HoSoSucKhoeGiaDinh() {
@@ -39,25 +38,6 @@ export function HoSoSucKhoeGiaDinh() {
   const [memberToDelete, setMemberToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [alertMessage, setAlertMessage] = useState(null);
-  const [confirmConfig, setConfirmConfig] = useState(null);
-
-  // Helper function to show custom alert
-  const showAlert = (message) => {
-    setAlertMessage(message);
-  };
-
-  // Helper function to show custom confirm
-  const showConfirm = (message, onConfirm) => {
-    setConfirmConfig({
-      message,
-      onConfirm: () => {
-        onConfirm();
-        setConfirmConfig(null);
-      },
-      onCancel: () => setConfirmConfig(null),
-    });
-  };
 
   // Filter state
   const [filters, setFilters] = useState({
@@ -193,47 +173,49 @@ export function HoSoSucKhoeGiaDinh() {
 
   const handleDeleteMember = async (memberId, memberName, e) => {
     e.stopPropagation(); // Prevent dropdown from closing
-    
-    showConfirm(
-      `Bạn có chắc chắn muốn xóa ${memberName}? Hành động này sẽ hủy tất cả các lịch hẹn chưa hoàn thành và không thể hoàn tác.`,
-      async () => {
-        try {
-          setIsDeleting(true);
-          // Delete all Patient records for this family member
-          const member = familyMembers.find((m) => m._id === memberId);
-          if (member && member.allPatientIds) {
-            // Delete all Patient IDs associated with this family member
-            for (const patientId of member.allPatientIds) {
-              await deleteFamilyMember(patientId);
-            }
-          } else {
-            // Fallback: delete by the main ID
-            await deleteFamilyMember(memberId);
-          }
+    if (
+      !window.confirm(
+        `Bạn có chắc chắn muốn xóa ${memberName}? Hành động này sẽ hủy tất cả các lịch hẹn chưa hoàn thành và không thể hoàn tác.`
+      )
+    ) {
+      return;
+    }
 
-          // Refresh family members list from server
-          const updatedMembers = await refreshFamilyMembers();
+    try {
+      setIsDeleting(true);
+      // Delete all Patient records for this family member
+      const member = familyMembers.find((m) => m._id === memberId);
+      if (member && member.allPatientIds) {
+        // Delete all Patient IDs associated with this family member
+        for (const patientId of member.allPatientIds) {
+          await deleteFamilyMember(patientId);
+        }
+      } else {
+        // Fallback: delete by the main ID
+        await deleteFamilyMember(memberId);
+      }
 
-          // If deleted member was selected, select first available or clear selection
-          if (selectedPatientId === memberId) {
-            if (updatedMembers.length > 0) {
-              setSelectedPatientId(updatedMembers[0]._id);
-            } else {
-              setSelectedPatientId(null);
-            }
-          }
+      // Refresh family members list from server
+      const updatedMembers = await refreshFamilyMembers();
 
-          showAlert("Đã xóa người thân thành công");
-          setShowSelector(false);
-        } catch (error) {
-          console.error("Error deleting family member:", error);
-          showAlert("Có lỗi xảy ra khi xóa người thân. Vui lòng thử lại.");
-        } finally {
-          setIsDeleting(false);
-          setMemberToDelete(null);
+      // If deleted member was selected, select first available or clear selection
+      if (selectedPatientId === memberId) {
+        if (updatedMembers.length > 0) {
+          setSelectedPatientId(updatedMembers[0]._id);
+        } else {
+          setSelectedPatientId(null);
         }
       }
-    );
+
+      alert("Đã xóa người thân thành công");
+      setShowSelector(false);
+    } catch (error) {
+      console.error("Error deleting family member:", error);
+      alert("Có lỗi xảy ra khi xóa người thân. Vui lòng thử lại.");
+    } finally {
+      setIsDeleting(false);
+      setMemberToDelete(null);
+    }
   };
 
   return (
@@ -1163,24 +1145,6 @@ export function HoSoSucKhoeGiaDinh() {
           </p>
         </div>
       ) : null}
-
-      {/* Custom Alert */}
-      <CustomAlert
-        message={alertMessage}
-        onClose={() => setAlertMessage(null)}
-        title="Hệ thống MedConnect"
-      />
-
-      {/* Custom Confirm */}
-      {confirmConfig && (
-        <CustomAlert
-          message={confirmConfig.message}
-          onConfirm={confirmConfig.onConfirm}
-          onClose={confirmConfig.onCancel}
-          title="Hệ thống MedConnect"
-          type="confirm"
-        />
-      )}
     </div>
   );
 }

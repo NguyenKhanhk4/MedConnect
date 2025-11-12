@@ -7,7 +7,6 @@ import {
   getDoctorProfileWithFallback,
   getDoctorDashboardStatsWithFallback,
 } from "../../../lib/api";
-import { CustomAlert } from "../../../components/ui/CustomAlert";
 import QuanLyLich from "../quan-ly-lich/QuanLyLich";
 import LichHen from "../lich-hen/LichHen";
 import HoSoKham from "../ho-so-kham/HoSoKham";
@@ -16,12 +15,6 @@ export default function TrangChu() {
   const [doctorInfo, setDoctorInfo] = useState(null);
   const [dashboardStats, setDashboardStats] = useState(null);
   const [activeMenu, setActiveMenu] = useState(null);
-  const [alertMessage, setAlertMessage] = useState(null);
-
-  // Helper function to show custom alert
-  const showAlert = (message) => {
-    setAlertMessage(message);
-  };
 
   const doctorAvatar = doctorInfo?.avatarUrl || doctorInfo?.imageUrl;
   const doctorName = doctorInfo?.name || doctorInfo?.fullName || "Doctor";
@@ -181,7 +174,7 @@ export default function TrangChu() {
                               try {
                                 // Validate file size (max 2MB)
                                 if (file.size > 2 * 1024 * 1024) {
-                                  showAlert(
+                                  alert(
                                     "Kích thước ảnh không được vượt quá 2MB"
                                   );
                                   return;
@@ -189,7 +182,7 @@ export default function TrangChu() {
 
                                 // Validate file type
                                 if (!file.type.startsWith("image/")) {
-                                  showAlert("Vui lòng chọn file ảnh hợp lệ");
+                                  alert("Vui lòng chọn file ảnh hợp lệ");
                                   return;
                                 }
 
@@ -231,7 +224,7 @@ export default function TrangChu() {
                                   await api.put("/api/doctors/me/profile", {
                                     avatarUrl: base64,
                                   });
-                                  showAlert(
+                                  alert(
                                     "Ảnh đại diện đã được cập nhật thành công"
                                   );
 
@@ -247,7 +240,7 @@ export default function TrangChu() {
                                 img.src = URL.createObjectURL(file);
                               } catch (error) {
                                 console.error("Error updating avatar:", error);
-                                showAlert(
+                                alert(
                                   "Có lỗi xảy ra khi cập nhật ảnh đại diện"
                                 );
                               }
@@ -288,13 +281,6 @@ export default function TrangChu() {
           </div>
         </main>
       </div>
-
-      {/* Custom Alert */}
-      <CustomAlert
-        message={alertMessage}
-        onClose={() => setAlertMessage(null)}
-        title="Hệ thống MedConnect"
-      />
     </div>
   );
 }

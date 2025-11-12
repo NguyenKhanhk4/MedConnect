@@ -3360,11 +3360,10 @@ export async function getDoctorTimeSlots(req, res) {
       // Fetch appointments for these slots
       // Exclude ALL rescheduled appointments (they are replaced by new appointments)
       // A rescheduled appointment means the old appointment is no longer active
-      // Also exclude cancelled appointments - they should not appear in the schedule
       const appointments = await Appointment.find({
         slotId: { $in: slotIds },
-        // Filter out ALL appointments with status "rescheduled" or "cancelled" - they should not appear in the schedule
-        status: { $nin: ["rescheduled", "cancelled"] },
+        // Filter out ALL appointments with status "rescheduled" - they should not appear in the schedule
+        status: { $ne: "rescheduled" },
       })
         .populate({
           path: "patientId",
@@ -3447,7 +3446,7 @@ export async function getDoctorTimeSlots(req, res) {
           // Map appointment statuses to display statuses
           const statusMap = {
             pending_doctor: "pending",
-            accepted: "accepted", // Keep as "accepted" to match frontend expectations
+            accepted: "confirmed",
             in_progress: "in_progress",
             cancelled: "cancelled",
             done: "completed",

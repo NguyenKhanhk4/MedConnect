@@ -20,7 +20,6 @@ import {
   updateDoctorProfile,
   changePassword,
 } from "../../../lib/api";
-import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./CaiDat.scss";
 
 // Helper function to get full image URL
@@ -47,13 +46,6 @@ const CaiDat = () => {
     confirmPassword: "",
   });
   const [passwordErrors, setPasswordErrors] = useState({});
-  const [alertMessage, setAlertMessage] = useState(null);
-
-  // Helper function to show custom alert
-  const showAlert = (message) => {
-    setAlertMessage(message);
-  };
-
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -147,13 +139,13 @@ const CaiDat = () => {
           })
         );
 
-        showAlert("Thông tin đã được cập nhật thành công");
+        alert("Thông tin đã được cập nhật thành công");
       } else {
-        showAlert("Có lỗi xảy ra khi cập nhật thông tin");
+        alert("Có lỗi xảy ra khi cập nhật thông tin");
       }
     } catch (error) {
       console.error("Error updating profile:", error);
-      showAlert("Có lỗi xảy ra khi cập nhật thông tin");
+      alert("Có lỗi xảy ra khi cập nhật thông tin");
     }
   };
 
@@ -270,7 +262,7 @@ const CaiDat = () => {
         passwordData.newPassword
       );
 
-      showAlert("Mật khẩu đã được thay đổi thành công");
+      alert("Mật khẩu đã được thay đổi thành công");
       setPasswordData({
         currentPassword: "",
         newPassword: "",
@@ -295,10 +287,10 @@ const CaiDat = () => {
             newPassword: "Mật khẩu mới phải khác mật khẩu hiện tại",
           });
         } else {
-          showAlert(errorMessage || "Có lỗi xảy ra khi đổi mật khẩu");
+          alert(errorMessage || "Có lỗi xảy ra khi đổi mật khẩu");
         }
       } else {
-        showAlert(
+        alert(
           error.response?.message ||
             error.message ||
             "Có lỗi xảy ra khi thay đổi mật khẩu"
@@ -356,7 +348,7 @@ const CaiDat = () => {
 
     // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      showAlert("Ảnh quá lớn, vui lòng chọn ảnh nhỏ hơn 5MB");
+      alert("Ảnh quá lớn, vui lòng chọn ảnh nhỏ hơn 5MB");
       return;
     }
 
@@ -377,10 +369,10 @@ const CaiDat = () => {
       // Dispatch custom event to update sidebar
       window.dispatchEvent(new CustomEvent("avatarUpdated"));
 
-      showAlert("Cập nhật ảnh đại diện thành công!");
+      alert("Cập nhật ảnh đại diện thành công!");
     } catch (error) {
       console.error("Error updating avatar:", error);
-      showAlert("Có lỗi xảy ra khi cập nhật ảnh đại diện");
+      alert("Có lỗi xảy ra khi cập nhật ảnh đại diện");
     } finally {
       setUploadingAvatar(false);
       // Reset file input
@@ -394,7 +386,7 @@ const CaiDat = () => {
 
     // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      showAlert("Ảnh quá lớn, vui lòng chọn ảnh nhỏ hơn 5MB");
+      alert("Ảnh quá lớn, vui lòng chọn ảnh nhỏ hơn 5MB");
       return;
     }
 
@@ -413,10 +405,10 @@ const CaiDat = () => {
         setDoctorInfo(updatedDoctor);
       }
 
-      showAlert("Cập nhật ảnh chứng chỉ hành nghề thành công!");
+      alert("Cập nhật ảnh chứng chỉ hành nghề thành công!");
     } catch (error) {
       console.error("Error updating license image:", error);
-      showAlert("Có lỗi xảy ra khi cập nhật ảnh chứng chỉ hành nghề");
+      alert("Có lỗi xảy ra khi cập nhật ảnh chứng chỉ hành nghề");
     } finally {
       setUploadingLicense(false);
       // Reset file input
@@ -954,13 +946,6 @@ const CaiDat = () => {
           </div>
         </div>
       </div>
-
-      {/* Custom Alert */}
-      <CustomAlert
-        message={alertMessage}
-        onClose={() => setAlertMessage(null)}
-        title="Hệ thống MedConnect"
-      />
     </div>
   );
 };

@@ -3,7 +3,6 @@ import { api } from "../../../lib/api";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { FileText, Search, Calendar, Download } from "lucide-react";
-import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./QuanLyHoaDon.scss";
 
 export default function QuanLyHoaDon() {
@@ -16,25 +15,6 @@ export default function QuanLyHoaDon() {
   const [totalPages, setTotalPages] = useState(1);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [alertMessage, setAlertMessage] = useState(null);
-  const [confirmConfig, setConfirmConfig] = useState(null);
-
-  // Helper function to show custom alert
-  const showAlert = (message) => {
-    setAlertMessage(message);
-  };
-
-  // Helper function to show custom confirm
-  const showConfirm = (message, onConfirm) => {
-    setConfirmConfig({
-      message,
-      onConfirm: () => {
-        onConfirm();
-        setConfirmConfig(null);
-      },
-      onCancel: () => setConfirmConfig(null),
-    });
-  };
 
   useEffect(() => {
     loadInvoices();
@@ -77,11 +57,11 @@ export default function QuanLyHoaDon() {
         setTotalPages(response.data.pagination?.pages || 1);
       } else {
         console.error("Failed to load invoices:", response.message);
-        showAlert("Không thể tải danh sách hóa đơn");
+        alert("Không thể tải danh sách hóa đơn");
       }
     } catch (error) {
       console.error("Error loading invoices:", error);
-      showAlert("Có lỗi xảy ra khi tải danh sách hóa đơn");
+      alert("Có lỗi xảy ra khi tải danh sách hóa đơn");
     } finally {
       setLoading(false);
     }
@@ -122,7 +102,9 @@ export default function QuanLyHoaDon() {
       pending_manager: "Yêu cầu thanh toán",
       captured: "Đã thanh toán",
       initiated: "Đang xử lý",
-      
+      failed: "Thất bại",
+      refunded: "Đã hoàn tiền",
+      cancelled: "Đã hủy",
     };
     return texts[status] || status;
   };
@@ -160,13 +142,13 @@ export default function QuanLyHoaDon() {
       : "Chưa thanh toán";
     const patientDob = invoice.patientDateOfBirth
       ? formatDateOnlyForDoc(invoice.patientDateOfBirth)
-      : "Không";
+      : "N/A";
     const genderText =
       invoice.patientGender === "male"
         ? "Nam"
         : invoice.patientGender === "female"
         ? "Nữ"
-        : invoice.patientGender || "Không";
+        : invoice.patientGender || "N/A";
 
     const itemsRows =
       invoice.items
@@ -477,7 +459,7 @@ export default function QuanLyHoaDon() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading invoice:", error);
-      showAlert("Có lỗi khi tải xuống hóa đơn. Vui lòng thử lại.");
+      alert("Có lỗi khi tải xuống hóa đơn. Vui lòng thử lại.");
     }
   };
 
@@ -485,27 +467,29 @@ export default function QuanLyHoaDon() {
     // Xác nhận trước khi xóa
     const confirmMessage = `Bạn có chắc chắn muốn xóa hóa đơn "${invoice.invoiceNumber}"?\n\nLưu ý: Chỉ có thể xóa hóa đơn chưa thanh toán hoặc đã hủy.`;
 
-    showConfirm(confirmMessage, async () => {
-      try {
-        const response = await api.delete(
-          `/api/managers/invoices/${invoice._id}`
-        );
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
 
-        if (response.success) {
-          showAlert("Xóa hóa đơn thành công");
-          // Reload danh sách hóa đơn
-          loadInvoices();
-        } else {
-          showAlert(response.message || "Có lỗi khi xóa hóa đơn");
-        }
-      } catch (error) {
-        console.error("Error deleting invoice:", error);
-        const errorMessage =
-          error.response?.data?.message ||
-          "Có lỗi khi xóa hóa đơn. Vui lòng thử lại.";
-        showAlert(errorMessage);
+    try {
+      const response = await api.delete(
+        `/api/managers/invoices/${invoice._id}`
+      );
+
+      if (response.success) {
+        alert("Xóa hóa đơn thành công");
+        // Reload danh sách hóa đơn
+        loadInvoices();
+      } else {
+        alert(response.message || "Có lỗi khi xóa hóa đơn");
       }
-    });
+    } catch (error) {
+      console.error("Error deleting invoice:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        "Có lỗi khi xóa hóa đơn. Vui lòng thử lại.";
+      alert(errorMessage);
+    }
   };
 
   const filteredInvoices = invoices.filter((invoice) => {
@@ -582,7 +566,9 @@ export default function QuanLyHoaDon() {
               <option value="all">Tất cả trạng thái</option>
               <option value="captured">Đã thanh toán</option>
               <option value="initiated">Đang xử lý</option>
-              
+              <option value="failed">Thất bại</option>
+              <option value="refunded">Đã hoàn tiền</option>
+              <option value="cancelled">Đã hủy</option>
             </select>
           </div>
         </div>
@@ -653,24 +639,6 @@ export default function QuanLyHoaDon() {
             Sau
           </Button>
         </div>
-      )}
-
-      {/* Custom Alert */}
-      <CustomAlert
-        message={alertMessage}
-        onClose={() => setAlertMessage(null)}
-        title="Hệ thống MedConnect"
-      />
-
-      {/* Custom Confirm */}
-      {confirmConfig && (
-        <CustomAlert
-          message={confirmConfig.message}
-          onConfirm={confirmConfig.onConfirm}
-          onClose={confirmConfig.onCancel}
-          title="Hệ thống MedConnect"
-          type="confirm"
-        />
       )}
     </div>
   );

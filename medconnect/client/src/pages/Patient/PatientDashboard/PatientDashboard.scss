@@ -13,82 +13,20 @@
 
 /* Common border style override for all cards */
 .card,
+.stat-card,
 .appointment-card,
 .welcome-section,
 .quick-action-card {
   border: 2px solid #cbd5e1 !important;
 }
 
-/* Stat cards with stat-card-white class should have white background and black text */
-/* DO NOT override stat-card-white - let TheThongKe.scss handle it */
+/* Ensure stat cards have white background - highest priority */
+.stat-card,
 .stat-card.stat-card-white,
-div.stat-card.stat-card-white {
-  background: #ffffff !important;
+.stat-card[class*="stat-card"],
+div.stat-card {
   background-color: #ffffff !important;
-  border: 2px solid #cbd5e1 !important;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1) !important;
-  transition: all 0.3s ease !important;
-  cursor: pointer !important;
-
-  /* Only apply text colors to specific elements, NOT icons */
-  .stat-card-title,
-  .stat-card-value,
-  .stat-card-description,
-  .stat-card-trend {
-    color: inherit;
-  }
-
-  /* Explicitly allow icon colors from inline styles and CSS variables */
-  /* DO NOT override icon colors - let inline styles and CSS variables control them */
-  .stat-card-icon {
-    /* Background color set inline */
-
-    svg,
-    .stat-icon {
-      /* Use CSS variable for color if set, otherwise let inline style/props work */
-      /* Remove any color inheritance that might make icons black */
-    }
-
-    /* Ensure SVG paths can use their stroke colors */
-    svg path,
-    svg circle,
-    svg rect,
-    svg line {
-      /* stroke comes from CSS variable or inline style */
-    }
-  }
-
-  &::before {
-    display: block !important; /* Show left border accent */
-  }
-
-  &:hover {
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    border-color: #cbd5e1 !important;
-    transform: translateY(-4px) !important;
-    box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15), 0 2px 4px 0 rgba(0, 0, 0, 0.1) !important;
-  }
-
-  &:active {
-    transform: translateY(-2px) !important;
-  }
-
-  .stat-card-title {
-    color: #374151 !important;
-  }
-
-  .stat-card-value {
-    color: #111827 !important;
-  }
-
-  .stat-card-description {
-    color: #6b7280 !important;
-  }
-
-  .stat-card-trend {
-    color: #374151 !important;
-  }
+  background: #ffffff !important;
 }
 
 /* Main content responsive */

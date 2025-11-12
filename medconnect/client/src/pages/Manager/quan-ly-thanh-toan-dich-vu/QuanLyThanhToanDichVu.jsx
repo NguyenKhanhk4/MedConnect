@@ -12,7 +12,6 @@ import {
   Check,
   AlertCircle,
 } from "lucide-react";
-import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./QuanLyThanhToanDichVu.scss";
 
 export default function QuanLyThanhToanDichVu() {
@@ -30,29 +29,11 @@ export default function QuanLyThanhToanDichVu() {
   const [processing, setProcessing] = useState(false);
   const [creatingLink, setCreatingLink] = useState(false);
   const [activeTab, setActiveTab] = useState("all"); // all | booking | service
-  const [alertMessage, setAlertMessage] = useState(null);
-  const [confirmConfig, setConfirmConfig] = useState(null);
-
-  // Helper function to show custom alert
-  const showAlert = (message) => {
-    setAlertMessage(message);
-  };
-
-  // Helper function to show custom confirm
-  const showConfirm = (message, onConfirm) => {
-    setConfirmConfig({
-      message,
-      onConfirm: () => {
-        onConfirm();
-        setConfirmConfig(null);
-      },
-      onCancel: () => setConfirmConfig(null),
-    });
-  };
+  const [statusFilter, setStatusFilter] = useState("pending"); // pending | initiated | all
 
   useEffect(() => {
     loadPayments();
-  }, [page, activeTab]);
+  }, [page, activeTab, statusFilter]);
 
   // Xử lý returnUrl sau khi thanh toán PayOS (chạy riêng khi component mount)
   useEffect(() => {
@@ -73,13 +54,13 @@ export default function QuanLyThanhToanDichVu() {
 
       if (response.success && response.data) {
         if (status === "success" && response.data.paid) {
-          showAlert("Thanh toán thành công!");
+          alert("Thanh toán thành công!");
           // Xóa params ngay để tránh xử lý lại khi reload
           setSearchParams({});
           // Reload danh sách để cập nhật
           await loadPayments();
         } else if (status === "failed") {
-          showAlert("Thanh toán thất bại. Vui lòng thử lại.");
+          alert("Thanh toán thất bại. Vui lòng thử lại.");
           setSearchParams({});
         }
       } else {
@@ -89,7 +70,7 @@ export default function QuanLyThanhToanDichVu() {
 
         const checkPaymentStatus = async () => {
           if (retryCount >= maxRetries) {
-            showAlert(
+            alert(
               "Đang xử lý thanh toán. Vui lòng đợi vài giây rồi tải lại trang."
             );
             setSearchParams({});
@@ -103,7 +84,7 @@ export default function QuanLyThanhToanDichVu() {
                 `/api/payments/payos/check-status/${orderCode}`
               );
               if (retryResponse.success && retryResponse.data?.paid) {
-                showAlert("Thanh toán thành công!");
+                alert("Thanh toán thành công!");
                 setSearchParams({});
                 await loadPayments();
               } else if (retryCount < maxRetries) {
@@ -137,6 +118,14 @@ export default function QuanLyThanhToanDichVu() {
       params.append("limit", "20");
       if (activeTab === "booking") params.append("invoiceType", "booking");
       if (activeTab === "service") params.append("invoiceType", "service");
+      if (statusFilter !== "all") {
+        if (statusFilter === "pending") {
+          // Hiển thị cả pending_manager và initiated (đang chờ thanh toán)
+          params.append("status", "pending_manager,initiated");
+        } else {
+          params.append("status", statusFilter);
+        }
+      }
 
       const response = await api.get(
         `/api/managers/service-payments/pending?${params.toString()}`
@@ -147,11 +136,11 @@ export default function QuanLyThanhToanDichVu() {
         setTotalPages(response.data.pagination?.pages || 1);
       } else {
         console.error("Failed to load payments:", response.message);
-        showAlert("Không thể tải danh sách yêu cầu thanh toán");
+        alert("Không thể tải danh sách yêu cầu thanh toán");
       }
     } catch (error) {
       console.error("Error loading payments:", error);
-      showAlert("Có lỗi xảy ra khi tải danh sách yêu cầu thanh toán");
+      alert("Có lỗi xảy ra khi tải danh sách yêu cầu thanh toán");
     } finally {
       setLoading(false);
     }
@@ -212,7 +201,7 @@ export default function QuanLyThanhToanDichVu() {
           prevPayments.map((p) => (p._id === payment._id ? updatedPayment : p))
         );
       } else {
-        showAlert(response.message || "Không thể tạo link thanh toán");
+        alert(response.message || "Không thể tạo link thanh toán");
         setShowBankModal(false);
         setSelectedPayment(null);
       }
@@ -222,7 +211,7 @@ export default function QuanLyThanhToanDichVu() {
         error.response?.data?.message ||
         error.message ||
         "Có lỗi xảy ra khi tạo link thanh toán";
-      showAlert(errorMsg);
+      alert(errorMsg);
       setShowBankModal(false);
       setSelectedPayment(null);
     } finally {
@@ -235,12 +224,12 @@ export default function QuanLyThanhToanDichVu() {
 
     const amount = parseInt(amountPaid);
     if (!amount || amount <= 0) {
-      showAlert("Vui lòng nhập số tiền hợp lệ");
+      alert("Vui lòng nhập số tiền hợp lệ");
       return;
     }
 
     if (amount > selectedPayment.total) {
-      showAlert("Số tiền thanh toán không được vượt quá tổng tiền");
+      alert("Số tiền thanh toán không được vượt quá tổng tiền");
       return;
     }
 
@@ -257,30 +246,32 @@ export default function QuanLyThanhToanDichVu() {
         ? `Số tiền thừa: ${formatCurrency(amount - selectedPayment.total)}\n`
         : ``);
 
-    showConfirm(confirmMessage, async () => {
-      try {
-        setProcessing(true);
-        const response = await api.post(
-          `/api/managers/service-payments/${selectedPayment._id}/cash`,
-          { amountPaid: amount }
-        );
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
 
-        if (response.success) {
-          showAlert(response.message || "Thanh toán tiền mặt thành công");
-          setShowCashModal(false);
-          setSelectedPayment(null);
-          setAmountPaid("");
-          loadPayments(); // Reload danh sách
-        } else {
-          showAlert(response.message || "Không thể xử lý thanh toán tiền mặt");
-        }
-      } catch (error) {
-        console.error("Error processing cash payment:", error);
-        showAlert("Có lỗi xảy ra khi xử lý thanh toán tiền mặt");
-      } finally {
-        setProcessing(false);
+    try {
+      setProcessing(true);
+      const response = await api.post(
+        `/api/managers/service-payments/${selectedPayment._id}/cash`,
+        { amountPaid: amount }
+      );
+
+      if (response.success) {
+        alert(response.message || "Thanh toán tiền mặt thành công");
+        setShowCashModal(false);
+        setSelectedPayment(null);
+        setAmountPaid("");
+        loadPayments(); // Reload danh sách
+      } else {
+        alert(response.message || "Không thể xử lý thanh toán tiền mặt");
       }
-    });
+    } catch (error) {
+      console.error("Error processing cash payment:", error);
+      alert("Có lỗi xảy ra khi xử lý thanh toán tiền mặt");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const filteredPayments = payments.filter((payment) => {
@@ -340,6 +331,18 @@ export default function QuanLyThanhToanDichVu() {
             </Button>
           ))}
         </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setPage(1);
+            setStatusFilter(e.target.value);
+          }}
+          style={{ padding: 6, borderRadius: 6, border: "1px solid #e5e7eb" }}
+        >
+          <option value="pending">Chờ xử lý</option>
+          <option value="initiated">Đang chờ thanh toán</option>
+          <option value="all">Tất cả trạng thái</option>
+        </select>
       </div>
 
       {/* Search */}
@@ -489,24 +492,6 @@ export default function QuanLyThanhToanDichVu() {
             // Không reload danh sách để tránh chuyển trạng thái ngay lập tức
           }}
           formatCurrency={formatCurrency}
-        />
-      )}
-
-      {/* Custom Alert */}
-      <CustomAlert
-        message={alertMessage}
-        onClose={() => setAlertMessage(null)}
-        title="Hệ thống MedConnect"
-      />
-
-      {/* Custom Confirm */}
-      {confirmConfig && (
-        <CustomAlert
-          message={confirmConfig.message}
-          onConfirm={confirmConfig.onConfirm}
-          onClose={confirmConfig.onCancel}
-          title="Hệ thống MedConnect"
-          type="confirm"
         />
       )}
     </div>

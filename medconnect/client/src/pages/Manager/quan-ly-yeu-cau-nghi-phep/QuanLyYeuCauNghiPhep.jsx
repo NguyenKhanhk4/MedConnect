@@ -9,7 +9,6 @@ import {
 } from "../../../components/ui/Dialog";
 import { Input } from "../../../components/ui/Input";
 import { Check, X, Clock, User, Calendar } from "lucide-react";
-import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./QuanLyYeuCauNghiPhep.scss";
 
 export default function QuanLyYeuCauNghiPhep() {
@@ -19,25 +18,6 @@ export default function QuanLyYeuCauNghiPhep() {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [filterStatus, setFilterStatus] = useState("pending");
-  const [alertMessage, setAlertMessage] = useState(null);
-  const [confirmConfig, setConfirmConfig] = useState(null);
-
-  // Helper function to show custom alert
-  const showAlert = (message) => {
-    setAlertMessage(message);
-  };
-
-  // Helper function to show custom confirm
-  const showConfirm = (message, onConfirm) => {
-    setConfirmConfig({
-      message,
-      onConfirm: () => {
-        onConfirm();
-        setConfirmConfig(null);
-      },
-      onCancel: () => setConfirmConfig(null),
-    });
-  };
 
   useEffect(() => {
     loadLeaveRequests();
@@ -53,46 +33,47 @@ export default function QuanLyYeuCauNghiPhep() {
       if (response.success) {
         setLeaveRequests(response.data.leaveRequests || []);
       } else {
-        showAlert("Không thể tải danh sách yêu cầu nghỉ phép");
+        alert("Không thể tải danh sách yêu cầu nghỉ phép");
       }
     } catch (error) {
       console.error("Error loading leave requests:", error);
-      showAlert("Có lỗi xảy ra khi tải danh sách yêu cầu nghỉ phép");
+      alert("Có lỗi xảy ra khi tải danh sách yêu cầu nghỉ phép");
     } finally {
       setLoading(false);
     }
   };
 
   const handleApprove = async (leaveRequestId) => {
-    showConfirm(
-      "Bạn có chắc chắn muốn chấp nhận yêu cầu nghỉ phép này?",
-      async () => {
-        try {
-          const response = await api.post(
-            `/api/managers/leave-requests/${leaveRequestId}/approve`
-          );
+    if (
+      !window.confirm("Bạn có chắc chắn muốn chấp nhận yêu cầu nghỉ phép này?")
+    ) {
+      return;
+    }
 
-          if (response.success) {
-            showAlert("✅ Đã chấp nhận yêu cầu nghỉ phép");
-            await loadLeaveRequests();
-          } else {
-            showAlert(
-              "❌ Không thể chấp nhận: " + (response.message || "Unknown error")
-            );
-          }
-        } catch (error) {
-          console.error("Error approving leave request:", error);
-          showAlert("Có lỗi xảy ra khi chấp nhận yêu cầu nghỉ phép");
-        }
+    try {
+      const response = await api.post(
+        `/api/managers/leave-requests/${leaveRequestId}/approve`
+      );
+
+      if (response.success) {
+        alert("✅ Đã chấp nhận yêu cầu nghỉ phép");
+        await loadLeaveRequests();
+      } else {
+        alert(
+          "❌ Không thể chấp nhận: " + (response.message || "Unknown error")
+        );
       }
-    );
+    } catch (error) {
+      console.error("Error approving leave request:", error);
+      alert("Có lỗi xảy ra khi chấp nhận yêu cầu nghỉ phép");
+    }
   };
 
   const handleReject = async () => {
     if (!selectedRequest) return;
 
     if (!rejectionReason.trim()) {
-      showAlert("Vui lòng nhập lý do từ chối");
+      alert("Vui lòng nhập lý do từ chối");
       return;
     }
 
@@ -105,17 +86,17 @@ export default function QuanLyYeuCauNghiPhep() {
       );
 
       if (response.success) {
-        showAlert("✅ Đã từ chối yêu cầu nghỉ phép");
+        alert("✅ Đã từ chối yêu cầu nghỉ phép");
         setShowRejectDialog(false);
         setSelectedRequest(null);
         setRejectionReason("");
         await loadLeaveRequests();
       } else {
-        showAlert("❌ Không thể từ chối: " + (response.message || "Unknown error"));
+        alert("❌ Không thể từ chối: " + (response.message || "Unknown error"));
       }
     } catch (error) {
       console.error("Error rejecting leave request:", error);
-      showAlert("Có lỗi xảy ra khi từ chối yêu cầu nghỉ phép");
+      alert("Có lỗi xảy ra khi từ chối yêu cầu nghỉ phép");
     }
   };
 

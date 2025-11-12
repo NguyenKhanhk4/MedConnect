@@ -3,7 +3,6 @@ import { api, updateAppointmentStatus } from "../../../lib/api";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { X, Check, FileText, Search } from "lucide-react";
-import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./HoaDonDichVu.scss";
 
 export default function HoaDonDichVu({ appointment, onClose, onSuccess }) {
@@ -14,12 +13,6 @@ export default function HoaDonDichVu({ appointment, onClose, onSuccess }) {
   const [servicePaymentStatus, setServicePaymentStatus] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [autoCompleted, setAutoCompleted] = useState(false);
-  const [alertMessage, setAlertMessage] = useState(null);
-
-  // Helper function to show custom alert
-  const showAlert = (message) => {
-    setAlertMessage(message);
-  };
 
   useEffect(() => {
     if (appointment) {
@@ -57,11 +50,11 @@ export default function HoaDonDichVu({ appointment, onClose, onSuccess }) {
       if (response.success) {
         setServices(response.data.servicePrices || []);
       } else {
-        showAlert("Không thể tải danh sách dịch vụ");
+        alert("Không thể tải danh sách dịch vụ");
       }
     } catch (error) {
       console.error("Error loading services:", error);
-      showAlert("Có lỗi xảy ra khi tải danh sách dịch vụ");
+      alert("Có lỗi xảy ra khi tải danh sách dịch vụ");
     } finally {
       setLoading(false);
     }
@@ -107,7 +100,7 @@ export default function HoaDonDichVu({ appointment, onClose, onSuccess }) {
 
   const handleRequestPayment = async () => {
     if (selectedServices.length === 0) {
-      showAlert("Vui lòng chọn ít nhất một dịch vụ");
+      alert("Vui lòng chọn ít nhất một dịch vụ");
       return;
     }
 
@@ -126,7 +119,7 @@ export default function HoaDonDichVu({ appointment, onClose, onSuccess }) {
       );
 
       if (response.success) {
-        showAlert(response.message || "Yêu cầu thanh toán đã được gửi đến manager");
+        alert(response.message || "Yêu cầu thanh toán đã được gửi đến manager");
         // Reload để cập nhật trạng thái
         checkServicePayment();
         // Reset selected services
@@ -136,11 +129,11 @@ export default function HoaDonDichVu({ appointment, onClose, onSuccess }) {
           onSuccess();
         }
       } else {
-        showAlert(response.message || "Không thể gửi yêu cầu thanh toán");
+        alert(response.message || "Không thể gửi yêu cầu thanh toán");
       }
     } catch (error) {
       console.error("Error requesting service payment:", error);
-      showAlert("Có lỗi xảy ra khi gửi yêu cầu thanh toán");
+      alert("Có lỗi xảy ra khi gửi yêu cầu thanh toán");
     } finally {
       setCreating(false);
     }
@@ -317,13 +310,6 @@ export default function HoaDonDichVu({ appointment, onClose, onSuccess }) {
           </div>
         </div>
       </div>
-
-      {/* Custom Alert */}
-      <CustomAlert
-        message={alertMessage}
-        onClose={() => setAlertMessage(null)}
-        title="Hệ thống MedConnect"
-      />
     </div>
   );
 }

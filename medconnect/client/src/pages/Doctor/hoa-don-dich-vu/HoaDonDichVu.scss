@@ -6,11 +6,10 @@
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 20px;
-  padding-top: 60px; // Đẩy modal xuống vừa đủ để không bị header che
 }
 
 .service-invoice-modal {
@@ -21,13 +20,6 @@
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-
-  // Ẩn thanh trượt
-  &::-webkit-scrollbar {
-    display: none;
-  }
-  -ms-overflow-style: none; // IE and Edge
-  scrollbar-width: none; // Firefox
 }
 
 .service-invoice-header {
@@ -177,12 +169,23 @@
     overflow-y: auto;
     padding-right: 8px;
 
-    // Ẩn thanh trượt
     &::-webkit-scrollbar {
-      display: none;
+      width: 8px;
     }
-    -ms-overflow-style: none; // IE and Edge
-    scrollbar-width: none; // Firefox
+
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+
+      &:hover {
+        background: #94a3b8;
+      }
+    }
 
     .service-item {
       display: flex;

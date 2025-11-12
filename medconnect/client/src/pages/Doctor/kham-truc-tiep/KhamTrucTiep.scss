@@ -49,14 +49,6 @@ $success: #10b981;
   border-radius: 0.5rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
   overflow-y: auto;
-  
-  // Ẩn thanh trượt
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  
-  &::-webkit-scrollbar {
-    display: none;
-  }
 
   // Ensure content doesn't overlap Sidebar
   pointer-events: auto;
@@ -116,14 +108,6 @@ $success: #10b981;
   flex: 1;
   overflow-y: auto;
   padding: 0;
-  
-  // Ẩn thanh trượt
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  
-  &::-webkit-scrollbar {
-    display: none;
-  }
 }
 
 .consultation-form-content {
@@ -138,14 +122,6 @@ $success: #10b981;
   background: white;
   border-bottom: 2px solid #e5e7eb;
   overflow-x: auto;
-  
-  // Ẩn thanh trượt
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  
-  &::-webkit-scrollbar {
-    display: none;
-  }
 
   .tab-btn {
     padding: 0.875rem 1.5rem;

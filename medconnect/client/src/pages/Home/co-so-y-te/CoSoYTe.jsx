@@ -61,22 +61,21 @@ const CoSoYTe = () => {
     setCurrentPage(1);
   };
 
-  const handleFacilityClick = (facility) => {
-    // Navigate to map page with clinic ID
-    navigate(`/ban-do-co-so-y-te?id=${facility.id || facility._id}`);
+  const handleFacilityClick = (facilityId) => {
+    // Navigate to facility detail or doctors in this facility
+    console.log("Navigate to facility detail:", facilityId);
   };
 
   const FacilityCard = ({ facility }) => (
     <Card
       className="facility-card"
       hoverable
-      onClick={() => handleFacilityClick(facility)}
+      onClick={() => handleFacilityClick(facility.id)}
       style={{
         marginBottom: "16px",
         borderRadius: "12px",
         border: "1px solid #f0f0f0",
         boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
-        cursor: "pointer",
       }}
     >
       <Row gutter={16} align="middle">
@@ -146,10 +145,10 @@ const CoSoYTe = () => {
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                handleFacilityClick(facility);
+                handleFacilityClick(facility.id);
               }}
             >
-              Xem trên bản đồ
+              Xem chi tiết
             </Button>
             <Button
               size="large"
