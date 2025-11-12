@@ -1,0 +1,89 @@
+/* Patient Dashboard - Main SCSS File */
+
+// Import all component styles
+@import "../AppSidebar/AppSidebar.scss";
+@import "../dau-trang-benh-nhan/DauTrangBenhNhan.scss";
+@import "../phan-chao-mung/PhanChaoMung.scss";
+@import "../the-thong-ke/TheThongKe.scss";
+@import "../lich-kham/LichKham.scss";
+@import "../lich-hen-sap-toi/LichHenSapToi.scss";
+@import "../hanh-dong-nhanh/HanhDongNhanh.scss";
+
+/* All styles are now imported from separate component files */
+
+/* Common border style override for all cards */
+.card,
+.stat-card,
+.appointment-card,
+.welcome-section,
+.quick-action-card {
+  border: 2px solid #cbd5e1 !important;
+}
+
+/* Ensure stat cards have doctor style with #17B0D0 background - highest priority */
+.stat-card,
+.stat-card.stat-card-white,
+.stat-card[class*="stat-card"],
+div.stat-card {
+  background: #17B0D0 !important;
+  background-color: #17B0D0 !important;
+  border: none !important;
+  box-shadow: 0 4px 20px rgba(23, 176, 208, 0.3);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  
+  * {
+    color: #ffffff !important;
+    opacity: 1 !important;
+  }
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
+    pointer-events: none;
+    opacity: 1 !important;
+  }
+  
+  &:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 30px rgba(23, 176, 208, 0.4);
+    background: #17B0D0 !important;
+    background-color: #17B0D0 !important;
+  }
+}
+
+/* Main content responsive */
+.main-content {
+  /* No margin needed - flex layout handles spacing */
+  display: block;
+}
+
+/* Main grid layout: Calendar + Upcoming Appointments on left, Quick Actions on right */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-main-grid {
+    grid-template-columns: 2fr 1fr !important;
+  }
+}
+
+.dashboard-left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.dashboard-right-column {
+  width: 100%;
+}
