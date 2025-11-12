@@ -258,7 +258,15 @@ export async function getDoctorAppointments(req, res) {
     const skip = (page - 1) * limit;
 
     const filter = { doctorId: doctor._id };
-    if (status) filter.status = status;
+    // Exclude pending_doctor status from doctor's schedule (auto-accepted appointments only)
+    // All new appointments are automatically accepted, so pending_doctor is no longer used
+    if (status) {
+      // If status is explicitly requested, use it (but pending_doctor will return empty)
+      filter.status = status;
+    } else {
+      // If no status filter, exclude pending_doctor (show only accepted and other statuses)
+      filter.status = { $ne: "pending_doctor" };
+    }
     if (date) {
       const startDate = new Date(date);
       const endDate = new Date(date);
@@ -267,9 +275,9 @@ export async function getDoctorAppointments(req, res) {
     }
 
     // CRITICAL: Only show appointments that have been paid (paymentStatus = "paid")
-    // This ensures appointments created by manager booking only appear after payment success
-    // For manager booking flow, appointments MUST have paymentStatus = "paid" to appear
-    // Legacy appointments without paymentStatus are also excluded to ensure consistency
+    // Unpaid appointments should NOT appear in doctor's schedule
+    // This ensures only confirmed/paid bookings are visible to doctors
+    // Legacy appointments without paymentStatus are excluded to ensure consistency
     filter.paymentStatus = "paid";
 
     const appointments = await Appointment.find(filter)
@@ -450,6 +458,7 @@ export async function getDoctorAppointments(req, res) {
       }
 
       // Ensure new fields have default values for backward compatibility
+      // Note: reason field is included via ...apt spread, but ensure it's explicitly available
       return {
         ...apt,
         patientId, // Use properly populated patientId
@@ -464,6 +473,7 @@ export async function getDoctorAppointments(req, res) {
             ? apt.amountPaid
             : 0,
         paymentStatus: apt.paymentStatus || "unpaid",
+        reason: apt.reason || null, // Explicitly include reason field
       };
     });
 
@@ -524,13 +534,13 @@ export async function getDoctorDashboardStats(req, res) {
       today.getDate() + 1
     );
 
-    // Today's appointments (include: pending_doctor, accepted, in_progress, done, no_show)
-    // Exclude: cancelled, rejected (these are not considered "appointments")
+    // Today's appointments (include: accepted, in_progress, done, no_show)
+    // Exclude: pending_doctor (removed), cancelled, rejected (these are not considered "appointments")
     const todayAppointments = await Appointment.countDocuments({
       doctorId: doctor._id,
       scheduledStart: { $gte: startOfDay, $lt: endOfDay },
       status: {
-        $in: ["pending_doctor", "accepted", "in_progress", "done", "no_show"],
+        $in: ["accepted", "in_progress", "done", "no_show"],
       },
     });
 
@@ -552,12 +562,9 @@ export async function getDoctorDashboardStats(req, res) {
     // Total available slots = empty slots + cancelled/rejected slots
     const availableSlots = availableSlotsCount + cancelledRejectedSlots;
 
-    // Pending appointments (appointments in today that need doctor's confirmation)
-    const pendingAppointments = await Appointment.countDocuments({
-      doctorId: doctor._id,
-      scheduledStart: { $gte: startOfDay, $lt: endOfDay },
-      status: "pending_doctor",
-    });
+    // Pending appointments (no longer used - all appointments are auto-accepted)
+    // Set to 0 since pending_doctor status has been removed
+    const pendingAppointments = 0;
 
     // All stats are for today only - removed weekly appointments calculation
     // This field is no longer used as we only show today's data
@@ -3358,14 +3365,21 @@ export async function getDoctorTimeSlots(req, res) {
       });
 
       // Fetch appointments for these slots
-      // Exclude ALL rescheduled appointments (they are replaced by new appointments)
+      // Exclude ALL rescheduled, cancelled, and pending_doctor appointments
+      // pending_doctor status has been removed - all appointments are auto-accepted
       // A rescheduled appointment means the old appointment is no longer active
       // Also exclude cancelled appointments - they should not appear in the schedule
+      // CRITICAL: Only show appointments that have been paid (paymentStatus = "paid")
+      // Unpaid appointments should NOT appear in doctor's schedule
       const appointments = await Appointment.find({
         slotId: { $in: slotIds },
-        // Filter out ALL appointments with status "rescheduled" or "cancelled" - they should not appear in the schedule
-        status: { $nin: ["rescheduled", "cancelled"] },
+        // Filter out ALL appointments with status "rescheduled", "cancelled", or "pending_doctor"
+        // Only show accepted, in_progress, done, rejected, no_show appointments
+        status: { $nin: ["rescheduled", "cancelled", "pending_doctor"] },
+        // Only show paid appointments
+        paymentStatus: "paid",
       })
+        .select("reason status mode rescheduledFromId slotId patientId paymentStatus") // Explicitly select fields needed
         .populate({
           path: "patientId",
           select: "fullName",
@@ -3445,8 +3459,8 @@ export async function getDoctorTimeSlots(req, res) {
         let displayStatus = slot.status;
         if (appointment) {
           // Map appointment statuses to display statuses
+          // Note: pending_doctor status has been removed - all appointments are auto-accepted
           const statusMap = {
-            pending_doctor: "pending",
             accepted: "accepted", // Keep as "accepted" to match frontend expectations
             in_progress: "in_progress",
             cancelled: "cancelled",

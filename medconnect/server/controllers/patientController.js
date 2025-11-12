@@ -880,10 +880,11 @@ export async function bookAppointment(req, res) {
     // Check if slot is really available by checking for active appointments
     // A slot is available if it has no active appointments using it
     // This handles the case where slot status is "booked" but the appointment was cancelled
+    // Note: pending_doctor status has been removed - all appointments are auto-accepted
     const activeAppointments = await Appointment.find({
       slotId: slotId,
       status: {
-        $in: ["pending_doctor", "accepted", "in_progress", "done"],
+        $in: ["accepted", "in_progress", "done"],
       },
     })
       .select("slotId status")
@@ -3102,7 +3103,7 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
     const activeAppointments = await Appointment.find({
       slotId: slotId,
       status: {
-        $in: ["pending_doctor", "accepted", "in_progress", "done"],
+        $in: ["accepted", "in_progress", "done"],
       },
     })
       .select("slotId status")
@@ -3305,7 +3306,7 @@ export async function createPaymentForSingleAppointment(req, res) {
     const activeAppointments = await Appointment.find({
       slotId: slotId,
       status: {
-        $in: ["pending_doctor", "accepted", "in_progress", "done"],
+        $in: ["accepted", "in_progress", "done"],
       },
     })
       .select("slotId status")
