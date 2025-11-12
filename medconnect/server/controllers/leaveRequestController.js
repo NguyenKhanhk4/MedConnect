@@ -7,7 +7,7 @@ import { ok, fail } from "../utils/response.js";
 import { ERROR_CODES } from "../constants/index.js";
 
 /**
- * Tạo yêu cầu nghỉ phép (bác sĩ)
+ * Tạo yêu cầu nghỉ phép (bác sĩ) - theo date range
  */
 export async function createLeaveRequest(req, res) {
   try {
@@ -31,53 +31,39 @@ export async function createLeaveRequest(req, res) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Doctor profile not found");
     }
 
-    const { slotId, reason } = req.body;
+    const { startDate, endDate, reason } = req.body;
 
-    if (!slotId || !reason || !reason.trim()) {
+    if (!startDate || !endDate || !reason || !reason.trim()) {
       return fail(
         res,
         400,
         ERROR_CODES.INVALID_INPUT,
-        "Slot ID and reason are required"
+        "Start date, end date and reason are required"
       );
     }
 
-    // Kiểm tra slot có tồn tại và thuộc về bác sĩ này không
-    const slot = await DoctorTimeSlot.findOne({
-      _id: slotId,
-      doctorId: doctor._id,
-    });
+    // Parse dates
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
 
-    if (!slot) {
-      return fail(
-        res,
-        404,
-        ERROR_CODES.NOT_FOUND,
-        "Slot not found or does not belong to this doctor"
-      );
-    }
-
-    // Kiểm tra slot đã có appointment chưa
-    const existingAppointment = await Appointment.findOne({
-      slotId: slot._id,
-      status: {
-        $in: ["pending_doctor", "accepted", "in_progress"],
-      },
-    });
-
-    if (existingAppointment) {
+    if (start > end) {
       return fail(
         res,
         400,
         ERROR_CODES.INVALID_INPUT,
-        "Cannot request leave for a slot with an active appointment"
+        "Start date must be before end date"
       );
     }
 
-    // Kiểm tra đã có leave request pending cho slot này chưa
+    // Kiểm tra đã có leave request pending cho khoảng thời gian này chưa (overlap check)
+    // Overlap occurs when: startDate <= end AND endDate >= start
     const existingRequest = await LeaveRequest.findOne({
-      slotId: slot._id,
+      doctorId: doctor._id,
       status: "pending",
+      startDate: { $lte: end },
+      endDate: { $gte: start },
     });
 
     if (existingRequest) {
@@ -85,14 +71,48 @@ export async function createLeaveRequest(req, res) {
         res,
         400,
         ERROR_CODES.INVALID_INPUT,
-        "There is already a pending leave request for this slot"
+        "There is already a pending leave request that overlaps with this date range"
+      );
+    }
+
+    // Tìm tất cả slot trong khoảng thời gian để kiểm tra có appointment không
+    const slotsInRange = await DoctorTimeSlot.find({
+      doctorId: doctor._id,
+      startAt: { $gte: start, $lte: end },
+    });
+
+    if (slotsInRange.length === 0) {
+      return fail(
+        res,
+        404,
+        ERROR_CODES.NOT_FOUND,
+        "No slots found in the specified date range"
+      );
+    }
+
+    // Kiểm tra có slot nào có appointment active không
+    const slotIds = slotsInRange.map((slot) => slot._id);
+    const activeAppointments = await Appointment.find({
+      slotId: { $in: slotIds },
+      status: {
+        $in: ["pending_doctor", "accepted", "in_progress"],
+      },
+    });
+
+    if (activeAppointments.length > 0) {
+      return fail(
+        res,
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        `Cannot request leave: ${activeAppointments.length} slot(s) have active appointments`
       );
     }
 
     // Tạo leave request
     const leaveRequest = new LeaveRequest({
       doctorId: doctor._id,
-      slotId: slot._id,
+      startDate: start,
+      endDate: end,
       reason: reason.trim(),
       status: "pending",
     });
@@ -100,7 +120,7 @@ export async function createLeaveRequest(req, res) {
     await leaveRequest.save();
 
     console.log(
-      `✅ Leave request created: ${leaveRequest._id} for doctor ${doctor.fullName} at slot ${slot.startAt}`
+      `✅ Leave request created: ${leaveRequest._id} for doctor ${doctor.fullName} from ${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}`
     );
 
     // Send notification to all managers
@@ -121,7 +141,8 @@ export async function createLeaveRequest(req, res) {
       message: "Leave request created successfully",
       leaveRequest: {
         _id: leaveRequest._id,
-        slotId: leaveRequest.slotId,
+        startDate: leaveRequest.startDate,
+        endDate: leaveRequest.endDate,
         reason: leaveRequest.reason,
         status: leaveRequest.status,
         createdAt: leaveRequest.createdAt,
@@ -161,10 +182,6 @@ export async function getLeaveRequests(req, res) {
           path: "specializationIds",
           select: "name",
         },
-      })
-      .populate({
-        path: "slotId",
-        select: "startAt endAt status",
       })
       .populate({
         path: "reviewedBy",
@@ -219,9 +236,7 @@ export async function approveLeaveRequest(req, res) {
 
     const { leaveRequestId } = req.params;
 
-    const leaveRequest = await LeaveRequest.findById(leaveRequestId).populate(
-      "slotId"
-    );
+    const leaveRequest = await LeaveRequest.findById(leaveRequestId);
 
     if (!leaveRequest) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Leave request not found");
@@ -236,32 +251,61 @@ export async function approveLeaveRequest(req, res) {
       );
     }
 
-    // Kiểm tra slot có appointment active không
-    const existingAppointment = await Appointment.findOne({
-      slotId: leaveRequest.slotId._id,
+    // Tìm tất cả slot trong khoảng thời gian
+    const start = new Date(leaveRequest.startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(leaveRequest.endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const slotsInRange = await DoctorTimeSlot.find({
+      doctorId: leaveRequest.doctorId,
+      startAt: { $gte: start, $lte: end },
+    });
+
+    if (slotsInRange.length === 0) {
+      return fail(
+        res,
+        404,
+        ERROR_CODES.NOT_FOUND,
+        "No slots found in the specified date range"
+      );
+    }
+
+    // Kiểm tra có slot nào có appointment active không
+    const slotIds = slotsInRange.map((slot) => slot._id);
+    const activeAppointments = await Appointment.find({
+      slotId: { $in: slotIds },
       status: {
         $in: ["pending_doctor", "accepted", "in_progress"],
       },
     });
 
-    if (existingAppointment) {
+    if (activeAppointments.length > 0) {
       return fail(
         res,
         400,
         ERROR_CODES.INVALID_INPUT,
-        "Cannot approve leave request for a slot with an active appointment"
+        `Cannot approve leave request: ${activeAppointments.length} slot(s) have active appointments`
       );
     }
 
-    // Block slot
-    leaveRequest.slotId.status = "blocked";
-    leaveRequest.slotId.leaveReason = leaveRequest.reason;
-    await leaveRequest.slotId.save();
+    // Block tất cả slot trong range
+    let blockedCount = 0;
+    for (const slot of slotsInRange) {
+      // Chỉ block slot available (không block slot đã booked)
+      if (slot.status === "available") {
+        slot.status = "blocked";
+        slot.leaveReason = leaveRequest.reason;
+        await slot.save();
+        blockedCount++;
+      }
+    }
 
     // Update leave request
     leaveRequest.status = "approved";
     leaveRequest.reviewedBy = user._id;
     leaveRequest.reviewedAt = new Date();
+    leaveRequest.blockedSlotsCount = blockedCount;
     await leaveRequest.save();
 
     console.log(

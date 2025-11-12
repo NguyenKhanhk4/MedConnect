@@ -219,18 +219,16 @@ export default function QuanLyYeuCauNghiPhep() {
                 <div className="time-info">
                   <Calendar size={16} />
                   <span>
-                    {request.slotId?.startAt
-                      ? new Date(request.slotId.startAt).toLocaleString(
-                          "vi-VN",
-                          {
-                            weekday: "long",
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )
+                    {request.startDate && request.endDate
+                      ? `${new Date(request.startDate).toLocaleDateString("vi-VN", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })} - ${new Date(request.endDate).toLocaleDateString("vi-VN", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}`
                       : "N/A"}
                   </span>
                 </div>
