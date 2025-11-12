@@ -19,6 +19,117 @@ import {
 import { ok, fail } from "../utils/response.js";
 import { ERROR_CODES } from "../constants/index.js";
 import { sendMail } from "../utils/email.js";
+import { toE164 } from "../helpers/auth.js";
+
+/**
+ * Resolve currently authenticated user from Firebase claims.
+ * If the user record does not exist yet (e.g. first login via Google), automatically
+ * provision a patient user so patient endpoints can operate correctly.
+ *
+ * @param {object} claims - Decoded Firebase session claims
+ * @returns {Promise<{ user: object|null, appUserId: import("mongoose").Types.ObjectId|null }>}
+ */
+async function resolveUserFromClaims(claims = {}) {
+  let appUserId = claims?.app_user_id || null;
+  let user = null;
+
+  if (appUserId) {
+    try {
+      user = await User.findById(appUserId).lean();
+    } catch (err) {
+      console.warn("⚠️ resolveUserFromClaims: invalid app_user_id in claims", {
+        appUserId,
+        error: err?.message,
+      });
+      user = null;
+      appUserId = null;
+    }
+  }
+
+  const email =
+    claims?.email && typeof claims.email === "string"
+      ? claims.email.toLowerCase().trim()
+      : null;
+
+  if (!user && email) {
+    user = await User.findOne({ email }).lean();
+    if (user) {
+      appUserId = user._id;
+    }
+  }
+
+  if (!user && email) {
+    const allowedRoles = ["patient", "doctor", "admin", "manager"];
+    const claimedRole =
+      typeof claims?.role === "string" ? claims.role.toLowerCase() : null;
+    const resolvedRole = allowedRoles.includes(claimedRole)
+      ? claimedRole
+      : "patient";
+
+    const firebaseProvider = claims?.firebase?.sign_in_provider;
+    let authProvider = "google";
+    if (firebaseProvider === "password") authProvider = "local";
+    else if (firebaseProvider === "phone") authProvider = "phone";
+
+    const rawPhone =
+      claims?.phone_number || claims?.phone || claims?.phoneNumber;
+    const normalizedPhone = rawPhone ? toE164(rawPhone) : "";
+
+    const rawName =
+      claims?.name ||
+      claims?.displayName ||
+      claims?.fullName ||
+      (email ? email.split("@")[0] : "");
+    const fullName = rawName ? String(rawName).trim() : "Người dùng mới";
+
+    const payload = {
+      email,
+      role: resolvedRole,
+      status: "active",
+      fullName,
+      authProvider,
+      emailVerified:
+        typeof claims?.email_verified === "boolean"
+          ? claims.email_verified
+          : true,
+      phoneVerified: Boolean(normalizedPhone),
+    };
+
+    if (normalizedPhone) {
+      payload.phone = normalizedPhone;
+    }
+
+    if (claims?.uid && typeof claims.uid === "string") {
+      payload.firebaseUID = claims.uid;
+    }
+
+    try {
+      const newUserDoc = await User.create(payload);
+      user = newUserDoc.toObject();
+      appUserId = newUserDoc._id;
+      console.log("✅ Auto-provisioned user from auth claims:", {
+        userId: appUserId,
+        email,
+      });
+    } catch (createErr) {
+      if (createErr?.code === 11000) {
+        // Duplicate key (likely phone/email created concurrently) – re-fetch
+        user = await User.findOne({ email }).lean();
+        if (user) {
+          appUserId = user._id;
+        }
+      } else {
+        console.error(
+          "❌ resolveUserFromClaims: failed to auto-provision user:",
+          createErr
+        );
+        throw createErr;
+      }
+    }
+  }
+
+  return { user, appUserId: user ? appUserId : null };
+}
 
 /**
  * Get all patients (for admin/manager)
@@ -222,33 +333,9 @@ export async function getCurrentPatientProfile(req, res) {
   try {
     const claims = req.user || {};
 
-    // Try to get app_user_id first, fall back to email-based lookup
-    let appUserId = claims.app_user_id;
-    let user;
-
-    if (appUserId) {
-      // Use app_user_id if available
-      user = await User.findById(appUserId).lean();
-    } else {
-      // Fall back to email-based lookup (compatible with Google login)
-      const userEmail = claims.email;
-      if (!userEmail) {
-        console.log("❌ No app_user_id or email found in token");
-        return fail(
-          res,
-          401,
-          ERROR_CODES.UNAUTHORIZED,
-          "User ID or email not found in token"
-        );
-      }
-
-      console.log("🔍 Looking up user by email:", userEmail);
-      user = await User.findOne({ email: userEmail }).lean();
-
-      if (user) {
-        appUserId = user._id;
-      }
-    }
+    const { user, appUserId: resolvedAppUserId } = await resolveUserFromClaims(
+      claims
+    );
 
     if (!user) {
       return fail(res, 404, ERROR_CODES.USER_NOT_FOUND, "User not found");
@@ -269,7 +356,7 @@ export async function getCurrentPatientProfile(req, res) {
       // Find patient profile for the user (only "self" relationship, not family members)
       // Filter by relationshipToOwner === "self" or relationshipToOwner is null/undefined (for legacy data)
       patient = await Patient.findOne({
-        userId: appUserId,
+        userId: resolvedAppUserId,
         $or: [
           { relationshipToOwner: "self" },
           { relationshipToOwner: { $exists: false } },
@@ -277,11 +364,38 @@ export async function getCurrentPatientProfile(req, res) {
         ],
       }).lean();
 
+      console.log(
+        "🔍 getCurrentPatientProfile - Patient found:",
+        patient
+          ? {
+              _id: patient._id,
+              fullName: patient.fullName,
+              phone: patient.phone,
+              address: patient.address,
+              ethnicity: patient.ethnicity,
+              occupation: patient.occupation,
+              citizenId: patient.citizenId,
+              houseNumber: patient.houseNumber,
+              bloodType: patient.bloodType,
+              allergyNotes: patient.allergyNotes,
+              medicalHistory: patient.medicalHistory,
+              healthInsurance: patient.healthInsurance,
+              dob: patient.dob,
+              gender: patient.gender,
+              representativeName: patient.representativeName,
+              notes: patient.notes,
+            }
+          : "No patient found"
+      );
+
       if (!patient) {
         // Create a basic patient profile if it doesn't exist
-        console.log("Creating new patient profile for user:", appUserId);
+        console.log(
+          "Creating new patient profile for user:",
+          resolvedAppUserId
+        );
         const newPatient = new Patient({
-          userId: appUserId,
+          userId: resolvedAppUserId,
           fullName: user.fullName || "Chưa cập nhật",
           phone: user.phone || "",
           relationshipToOwner: "self", // Explicitly set to "self" for user's own profile
@@ -294,16 +408,18 @@ export async function getCurrentPatientProfile(req, res) {
       }
     } else {
       // For non-patient users (doctor, admin, manager), check if Patient exists and remove it
-      const existingPatient = await Patient.findOne({ userId: appUserId });
+      const existingPatient = await Patient.findOne({
+        userId: resolvedAppUserId,
+      });
       if (existingPatient) {
         console.warn(
-          `⚠️ Patient record found for ${user.role} user ${appUserId}, removing it...`
+          `⚠️ Patient record found for ${user.role} user ${resolvedAppUserId}, removing it...`
         );
         await Patient.findByIdAndDelete(existingPatient._id);
         console.log(`✅ Removed Patient record: ${existingPatient._id}`);
       }
       console.log(
-        `ℹ️ User ${appUserId} is a ${user.role}, no patient profile needed`
+        `ℹ️ User ${resolvedAppUserId} is a ${user.role}, no patient profile needed`
       );
     }
 
@@ -323,39 +439,42 @@ export async function getCurrentPatientProfile(req, res) {
       profile: patient
         ? {
             _id: patient._id,
-            fullName: patient.fullName,
-            dob: patient.dob,
-            gender: patient.gender,
-            ethnicity: patient.ethnicity,
-            occupation: patient.occupation,
-            citizenId: patient.citizenId,
-            phone: patient.phone,
-            email: patient.email,
-            address: patient.address,
-            houseNumber: patient.houseNumber,
-            avatarUrl: patient.avatarUrl,
+            fullName: patient.fullName || "",
+            dob: patient.dob || null,
+            gender: patient.gender || "",
+            ethnicity: patient.ethnicity || "",
+            occupation: patient.occupation || "",
+            citizenId: patient.citizenId || "",
+            phone: patient.phone || "",
+            email: patient.email || "",
+            address: patient.address || "",
+            houseNumber: patient.houseNumber || "",
+            avatarUrl: patient.avatarUrl || null,
             // Người đại diện
-            representativeName: patient.representativeName,
-            representativeCitizenId: patient.representativeCitizenId,
-            representativeRelation: patient.representativeRelation,
-            representativePhone: patient.representativePhone,
+            representativeName: patient.representativeName || "",
+            representativeCitizenId: patient.representativeCitizenId || "",
+            representativeRelation: patient.representativeRelation || "",
+            representativePhone: patient.representativePhone || "",
             // Thông tin y tế
-            bloodType: patient.bloodType,
-            allergyNotes: patient.allergyNotes,
-            medicalHistory: patient.medicalHistory,
-            healthInsurance: patient.healthInsurance,
-            healthInsuranceIssueDate: patient.healthInsuranceIssueDate,
-            healthInsuranceExpiryDate: patient.healthInsuranceExpiryDate,
+            bloodType: patient.bloodType || "",
+            allergyNotes: patient.allergyNotes || "",
+            medicalHistory: Array.isArray(patient.medicalHistory)
+              ? patient.medicalHistory
+              : [],
+            healthInsurance: patient.healthInsurance || "",
+            healthInsuranceIssueDate: patient.healthInsuranceIssueDate || null,
+            healthInsuranceExpiryDate:
+              patient.healthInsuranceExpiryDate || null,
             // Ghi chú
-            notes: patient.notes,
+            notes: patient.notes || "",
             // Legacy fields
-            nationalId: patient.nationalId,
-            wardCode: patient.wardCode,
-            districtCode: patient.districtCode,
-            provinceCode: patient.provinceCode,
-            relationshipToOwner: patient.relationshipToOwner,
-            createdAt: patient.createdAt,
-            updatedAt: patient.updatedAt,
+            nationalId: patient.nationalId || null,
+            wardCode: patient.wardCode || null,
+            districtCode: patient.districtCode || null,
+            provinceCode: patient.provinceCode || null,
+            relationshipToOwner: patient.relationshipToOwner || "self",
+            createdAt: patient.createdAt || null,
+            updatedAt: patient.updatedAt || null,
             isComplete: !!(
               patient.fullName &&
               patient.dob &&
@@ -365,6 +484,26 @@ export async function getCurrentPatientProfile(req, res) {
           }
         : null,
     };
+
+    console.log("📤 getCurrentPatientProfile - Returning profileData:", {
+      hasProfile: !!profileData.profile,
+      profileFields: profileData.profile
+        ? {
+            fullName: profileData.profile.fullName,
+            phone: profileData.profile.phone,
+            address: profileData.profile.address,
+            ethnicity: profileData.profile.ethnicity,
+            occupation: profileData.profile.occupation,
+            citizenId: profileData.profile.citizenId,
+            houseNumber: profileData.profile.houseNumber,
+            bloodType: profileData.profile.bloodType,
+            allergyNotes: profileData.profile.allergyNotes,
+            medicalHistory: profileData.profile.medicalHistory,
+            dob: profileData.profile.dob,
+            gender: profileData.profile.gender,
+          }
+        : "No profile",
+    });
 
     return ok(res, profileData);
   } catch (error) {
@@ -901,8 +1040,6 @@ export async function bookAppointment(req, res) {
     }
 
     // Check if slot is really available by checking for active appointments
-    // A slot is available if it has no active appointments using it
-    // This handles the case where slot status is "booked" but the appointment was cancelled
     const activeAppointments = await Appointment.find({
       slotId: slotId,
       status: {
@@ -1000,41 +1137,22 @@ export async function getPatientAppointments(req, res) {
   try {
     const claims = req.user || {};
 
-    // Try to get app_user_id first, fall back to email-based lookup
-    let appUserId = claims.app_user_id;
-    let user;
-
-    if (appUserId) {
-      user = await User.findById(appUserId).lean();
-    } else {
-      const userEmail = claims.email;
-      if (!userEmail) {
-        return fail(
-          res,
-          401,
-          ERROR_CODES.UNAUTHORIZED,
-          "User ID or email not found in token"
-        );
-      }
-      user = await User.findOne({ email: userEmail }).lean();
-      if (user) {
-        appUserId = user._id;
-      }
-    }
-
+    const { user, appUserId } = await resolveUserFromClaims(claims);
     if (!user) {
       return fail(res, 404, ERROR_CODES.USER_NOT_FOUND, "User not found");
     }
 
+    const resolvedAppUserId = appUserId || user._id;
+
     // Find all patients for this user (including family members)
-    let patients = await Patient.find({ userId: appUserId });
+    let patients = await Patient.find({ userId: resolvedAppUserId });
 
     if (!patients || patients.length === 0) {
       // Create a basic patient profile if it doesn't exist
-      console.log("Creating new patient profile for user:", appUserId);
+      console.log("Creating new patient profile for user:", resolvedAppUserId);
 
       const newPatient = new Patient({
-        userId: appUserId,
+        userId: resolvedAppUserId,
         fullName: user.fullName || "Chưa cập nhật",
         phone: user.phone || "",
         isComplete: false,
@@ -1757,14 +1875,10 @@ export async function getPatientConsultationAdvice(req, res) {
                     (1000 * 60)
                 )
               : null),
-          consultationDateTime: consultationDateTime,
           diagnoses: advice.diagnoses || [],
           medications: advice.medications || [],
-          attachmentUrl: advice.attachmentUrl,
-          notes: advice.notes,
-          appointment: advice.appointmentId,
-          clinic: advice.clinicId,
-          doctor: advice.doctorId,
+          notes: advice.notes || "",
+          attachmentUrl: advice.attachmentUrl || null,
         },
       };
     });
@@ -1907,47 +2021,51 @@ export async function getFamilyMemberConsultationSummaries(req, res) {
               .join(", ")
           : "Không có đơn thuốc";
 
-      // Format documents
+      // Format documents (lab results + imaging results)
       const documents = [];
-      if (summary.attachmentUrl) {
-        documents.push({
-          name: `Tài liệu khám.pdf`,
-          type: "pdf",
+      if (summary.labResults && summary.labResults.length > 0) {
+        summary.labResults.forEach((lab) => {
+          documents.push({
+            name: `${lab.testName} - Kết quả xét nghiệm.pdf`,
+            type: "pdf",
+          });
         });
       }
-
-      // Get date from appointment if available, otherwise from summary
-      const appointmentStart = summary.appointmentId?.scheduledStart;
-      const formattedDate = appointmentStart
-        ? new Date(appointmentStart).toLocaleDateString("vi-VN")
-        : summary.createdAt
-        ? new Date(summary.createdAt).toLocaleDateString("vi-VN")
-        : "Không xác định";
+      if (summary.imagingResults && summary.imagingResults.length > 0) {
+        summary.imagingResults.forEach((img) => {
+          documents.push({
+            name: `${img.type} - Kết quả hình ảnh.pdf`,
+            type: "pdf",
+          });
+        });
+      }
 
       return {
         id: summary._id,
         specialty:
           summary.doctorId?.specializationIds?.[0]?.name || "Không xác định",
-        date: formattedDate,
+        date: new Date(summary.visitDate).toLocaleDateString("vi-VN"),
         doctor: `BS. ${summary.doctorId?.fullName || "Không xác định"}`,
         diagnosis: primaryDiagnosis,
         prescription: medicationsText,
         documents: documents,
         // Full details for modal
         fullDetails: {
-          visitDate: appointmentStart || summary.createdAt,
-          reasonForVisit: summary.appointmentId?.reason || "Không có",
-          treatmentResult: summary.treatmentMethod || "Không có",
-          diagnoses: summary.diagnoses || [],
-          vitals: summary.vitals || {},
-          labResults: summary.labResults || [],
-          imagingResults: summary.imagingResults || [],
-          medications: summary.medications || [],
-          procedures: summary.procedures || [],
-          summaryText: summary.summaryText || summary.summary || "",
-          treatmentMethod: summary.treatmentMethod || "",
-          followUpInstructions: summary.followUpInstructions || "",
-          nextAppointmentDate: summary.nextAppointmentDate || null,
+          visitDate: summary.visitDate,
+          reasonForVisit: summary.reasonForVisit,
+          treatmentResult: summary.treatmentResult,
+          diagnoses: summary.diagnoses,
+          vitals: summary.vitals,
+          labResults: summary.labResults,
+          imagingResults: summary.imagingResults,
+          medications: summary.medications,
+          procedures: summary.procedures,
+          summaryText: summary.summaryText,
+          treatmentMethod: summary.treatmentMethod,
+          followUpInstructions: summary.followUpInstructions,
+          nextAppointmentDate: summary.nextAppointmentDate,
+          appointment: summary.appointmentId,
+          clinic: summary.clinicId,
         },
       };
     });
@@ -2034,7 +2152,7 @@ export async function getFamilyMemberConsultationAdvice(req, res) {
       .lean();
 
     const total = await ConsultationAdvice.countDocuments({
-      patientId: patientId,
+      patientId: patient._id,
     });
 
     // Format the response (same as getPatientConsultationAdvice)
@@ -2153,7 +2271,8 @@ export async function getFamilyMemberConsultationAdvice(req, res) {
             advice.durationMinutes ||
             (appointmentStart && appointmentEnd
               ? Math.round(
-                  (new Date(appointmentEnd) - new Date(appointmentStart)) /
+                  (new Date(appointmentEnd).getTime() -
+                    new Date(appointmentStart).getTime()) /
                     (1000 * 60)
                 )
               : null),
@@ -2625,31 +2744,12 @@ export async function removeFavoriteDoctor(req, res) {
 export async function getDoctorVisitCount(req, res) {
   try {
     const claims = req.user || {};
-    let appUserId = claims.app_user_id;
-    let user;
-
-    if (appUserId) {
-      user = await User.findById(appUserId).lean();
-    } else {
-      const userEmail = claims.email;
-      if (!userEmail) {
-        return fail(
-          res,
-          401,
-          ERROR_CODES.UNAUTHORIZED,
-          "User ID or email not found in token"
-        );
-      }
-      user = await User.findOne({ email: userEmail }).lean();
-      if (user) {
-        appUserId = user._id;
-      }
-    }
-
+    const { user, appUserId } = await resolveUserFromClaims(claims);
     if (!user) {
       return fail(res, 404, ERROR_CODES.USER_NOT_FOUND, "User not found");
     }
 
+    const resolvedAppUserId = appUserId || user._id;
     const { doctorId } = req.params;
 
     if (!doctorId) {
@@ -2657,7 +2757,7 @@ export async function getDoctorVisitCount(req, res) {
     }
 
     // Find all patients for this user
-    const patients = await Patient.find({ userId: appUserId });
+    const patients = await Patient.find({ userId: resolvedAppUserId });
     if (!patients || patients.length === 0) {
       return ok(res, { visitCount: 0 });
     }
@@ -3079,9 +3179,6 @@ export async function getPatientPayments(req, res) {
 /**
  * Calculate payment summary for single appointment (pre-payment flow)
  * POST /api/patients/appointments/calculate-payment-summary
- *
- * Tính toán payment summary cho single appointment mà chưa tạo appointment trong DB
- * Tương tự calculatePaymentSummary cho nhiều lịch nhưng chỉ có 1 appointment
  */
 export async function calculatePaymentSummaryForSingleAppointment(req, res) {
   try {
@@ -3106,6 +3203,9 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
       scheduledStart,
       scheduledEnd,
       patientId,
+      bookForSelf, // NEW: Get bookForSelf from request body
+      gateway = "payos", // Add gateway parameter
+      method = "qr", // Add method parameter
     } = req.body;
 
     // Validate required fields
@@ -3134,28 +3234,27 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
         res,
         400,
         ERROR_CODES.INVALID_INPUT,
-        "clinicId is required for offline appointments"
+        "Clinic ID is required for offline appointments"
       );
     }
 
     // Get patient profile
     let patient;
-    if (patientId) {
-      patient = await Patient.findOne({
-        _id: patientId,
-        userId: appUserId,
-      });
+    let targetPatientId = null;
 
-      if (!patient) {
-        return fail(
-          res,
-          403,
-          ERROR_CODES.UNAUTHORIZED,
-          "Patient not found or does not belong to you"
-        );
-      }
-    } else {
-      patient = await Patient.findOne({ userId: appUserId });
+    // IMPORTANT: Check bookForSelf flag first, then patientId
+    if (bookForSelf === true || !patientId) {
+      // Booking for self - find user's own patient record
+      console.log("📝 Booking for SELF - finding user own patient record");
+      patient = await Patient.findOne({
+        userId: appUserId,
+        $or: [
+          { relationshipToOwner: "self" },
+          { relationshipToOwner: { $exists: false } },
+          { relationshipToOwner: null },
+        ],
+      }).populate("userId");
+
       if (!patient) {
         const user = await User.findById(appUserId);
         if (!user) {
@@ -3166,203 +3265,24 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
           userId: appUserId,
           fullName: user.fullName || "Chưa cập nhật",
           phone: user.phone || "",
+          relationshipToOwner: "self",
           isComplete: false,
         });
 
         await newPatient.save();
+        await newPatient.populate("userId");
         patient = newPatient;
       }
-    }
 
-    // Verify the time slot exists and is available
-    const timeSlot = await DoctorTimeSlot.findById(slotId);
-    if (!timeSlot) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Time slot not found");
-    }
-
-    if (timeSlot.doctorId.toString() !== doctorId) {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        "Time slot does not belong to the selected doctor"
+      // IMPORTANT: For self booking, targetPatientId should be NULL (not patient._id)
+      targetPatientId = null;
+      console.log("✅ Booking for SELF - targetPatientId = null");
+    } else {
+      // Booking for family member - use provided patientId
+      console.log(
+        "📝 Booking for FAMILY - using provided patientId:",
+        patientId
       );
-    }
-
-    // Check if slot is really available by checking for active appointments
-    const activeAppointments = await Appointment.find({
-      slotId: slotId,
-      status: {
-        $in: ["pending_doctor", "accepted", "in_progress", "done"],
-      },
-    })
-      .select("slotId status")
-      .lean();
-
-    if (activeAppointments.length > 0) {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        "Time slot is no longer available"
-      );
-    }
-
-    // Get doctor info
-    const doctor = await Doctor.findById(doctorId)
-      .populate("specializationIds", "name")
-      .lean();
-
-    if (!doctor) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Doctor not found");
-    }
-
-    // Get clinic info if offline
-    let clinic = null;
-    if (mode === "offline" && clinicId) {
-      clinic = await Clinic.findById(clinicId).lean();
-    }
-
-    // Prepare appointment data for price calculation
-    const appointmentData = {
-      doctorId: doctor._id,
-      mode: mode,
-      scheduledStart: new Date(scheduledStart),
-      scheduledEnd: new Date(scheduledEnd),
-      clinicId: clinicId || undefined,
-    };
-
-    // Calculate price
-    const price = await calculateAppointmentBookingFee(appointmentData);
-
-    // Get specialization names
-    const specializationNames =
-      doctor.specializationIds
-        ?.map((s) => (typeof s === "object" ? s.name : s))
-        .join(", ") || "";
-
-    // Format scheduled time
-    const scheduledDate = new Date(scheduledStart);
-    const timeText = scheduledDate.toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    return ok(res, {
-      totalAmount: price,
-      appointmentSummary: {
-        doctorId: doctor._id,
-        doctorName: doctor.fullName,
-        specializationName: specializationNames || "N/A",
-        mode: mode,
-        scheduledStart: scheduledStart,
-        scheduledEnd: scheduledEnd,
-        clinicId: clinicId || null,
-        clinicName: clinic?.name || null,
-        reason: reason || "",
-        price: price,
-        bookingFee: price,
-        timeText: timeText,
-      },
-      appointmentsCount: 1,
-    });
-  } catch (error) {
-    console.error(
-      "❌ Error in calculatePaymentSummaryForSingleAppointment:",
-      error
-    );
-    return fail(
-      res,
-      500,
-      ERROR_CODES.SERVER_ERROR,
-      error.message || String(error)
-    );
-  }
-}
-
-/**
- * Create payment for single appointment (pre-payment flow)
- * POST /api/patients/appointments/create-payment
- *
- * Flow mới:
- * 1. Nhận appointment data từ request body (chưa tạo appointment trong DB)
- * 2. Validate appointment data
- * 3. Tính toán payment
- * 4. Tạo Payment record với appointmentData (lưu appointment data để tạo sau khi thanh toán thành công)
- * 5. Tạo PayOS payment link
- * 6. Return payUrl để redirect user đến PayOS
- * 7. Sau khi thanh toán thành công (webhook), tạo appointment từ payment.appointmentData
- */
-export async function createPaymentForSingleAppointment(req, res) {
-  try {
-    const claims = req.user || {};
-    const appUserId = claims.app_user_id;
-
-    if (!appUserId) {
-      return fail(
-        res,
-        401,
-        ERROR_CODES.UNAUTHORIZED,
-        "User ID not found in token"
-      );
-    }
-
-    const {
-      doctorId,
-      slotId,
-      mode,
-      clinicId,
-      reason,
-      scheduledStart,
-      scheduledEnd,
-      patientId,
-      gateway = "payos",
-      method = "qr",
-    } = req.body;
-
-    // Validate gateway
-    if (!["payos", "vnpay", "momo"].includes(gateway)) {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        "Gateway must be payos, vnpay, or momo"
-      );
-    }
-
-    // Validate required fields
-    if (!doctorId || !slotId || !mode || !scheduledStart || !scheduledEnd) {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        "Missing required fields: doctorId, slotId, mode, scheduledStart, scheduledEnd"
-      );
-    }
-
-    // Validate mode
-    if (!["online", "offline"].includes(mode)) {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        "Mode must be 'online' or 'offline'"
-      );
-    }
-
-    // If offline mode, clinicId is required
-    if (mode === "offline" && !clinicId) {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        "clinicId is required for offline appointments"
-      );
-    }
-
-    // Get patient profile
-    let patient;
-    if (patientId) {
       patient = await Patient.findOne({
         _id: patientId,
         userId: appUserId,
@@ -3376,25 +3296,10 @@ export async function createPaymentForSingleAppointment(req, res) {
           "Patient not found or does not belong to you"
         );
       }
-    } else {
-      patient = await Patient.findOne({ userId: appUserId }).populate("userId");
-      if (!patient) {
-        const user = await User.findById(appUserId);
-        if (!user) {
-          return fail(res, 404, ERROR_CODES.USER_NOT_FOUND, "User not found");
-        }
 
-        const newPatient = new Patient({
-          userId: appUserId,
-          fullName: user.fullName || "Chưa cập nhật",
-          phone: user.phone || "",
-          isComplete: false,
-        });
-
-        await newPatient.save();
-        await newPatient.populate("userId");
-        patient = newPatient;
-      }
+      // IMPORTANT: For family booking, use the provided patientId
+      targetPatientId = patientId;
+      console.log("✅ Booking for FAMILY - targetPatientId =", targetPatientId);
     }
 
     // Verify the time slot exists and is available
@@ -3422,6 +3327,7 @@ export async function createPaymentForSingleAppointment(req, res) {
       .select("slotId status")
       .lean();
 
+    // Slot is not available if there's an active appointment using it
     if (activeAppointments.length > 0) {
       return fail(
         res,
@@ -3490,6 +3396,18 @@ export async function createPaymentForSingleAppointment(req, res) {
       scheduledEnd: appointmentScheduledEnd,
       reason: reason || "",
     };
+
+    // IMPORTANT: Only add patientId if booking for family (targetPatientId is not null)
+    if (targetPatientId) {
+      appointmentData.patientId = targetPatientId;
+      console.log("✅ Added patientId to appointmentData:", targetPatientId);
+    } else {
+      console.log(
+        "✅ No patientId added to appointmentData (booking for self)"
+      );
+    }
+
+    console.log("📤 Final appointmentData:", appointmentData);
 
     // Calculate price
     const price = await calculateAppointmentBookingFee({
@@ -3729,3 +3647,6 @@ export async function createPaymentForSingleAppointment(req, res) {
     );
   }
 }
+
+// IMPORTANT: Export alias để tương thích với route import
+export { calculatePaymentSummaryForSingleAppointment as createPaymentForSingleAppointment };

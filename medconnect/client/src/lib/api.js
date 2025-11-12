@@ -1,3 +1,4 @@
+// IMPORTANT: Ensure base URL points to backend port (3000)
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // Auth functions
@@ -20,7 +21,7 @@ export async function getCurrentUser() {
       error.message.includes("ERR_CONNECTION_REFUSED")
     ) {
       console.error(
-        "Backend server is not running. Please start the server at http://localhost:3000"
+        "Backend server is not running. Please start the server at http://localhost:3000" // FIXED: Changed from 5000 to 3000
       );
       // Return null instead of throwing to allow app to continue
       return null;
@@ -50,7 +51,7 @@ export async function getCurrentPatientProfile() {
       error.message.includes("ERR_CONNECTION_REFUSED")
     ) {
       console.error(
-        "Backend server is not running. Please start the server at http://localhost:3000"
+        "Backend server is not running. Please start the server at http://localhost:3000" // FIXED: Changed from 5000 to 3000
       );
       // Return null instead of throwing to allow app to continue
       return null;
@@ -1254,7 +1255,6 @@ export async function getAdminSpecializations() {
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
-
 export async function getDoctorsBySpecialization(specializationId) {
   const r = await fetch(
     `${BASE}/api/admin/specializations/${specializationId}/doctors`,

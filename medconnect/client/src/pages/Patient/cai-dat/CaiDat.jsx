@@ -33,39 +33,9 @@ export function CaiDat() {
     loading: profileLoading,
   } = useUserProfile();
   const [activeTab, setActiveTab] = useState("profile");
-  const [formData, setFormData] = useState({
-    fullName: "",
-    phone: "",
-    gender: "",
-    email: "",
-    birthDate: "",
-    bloodType: "",
-    address: "",
-    allergies: "",
-    // Thông tin cá nhân bổ sung
-    ethnicity: "",
-    occupation: "",
-    citizenId: "",
-    // Địa chỉ chi tiết (không có wardCode, districtCode, provinceCode)
-    houseNumber: "",
-    // Người đại diện
-    representativeName: "",
-    representativeCitizenId: "",
-    representativeRelation: "",
-    representativePhone: "",
-    // Tiền sử y tế
-    medicalHistory: [],
-    // Bảo hiểm y tế
-    healthInsurance: "",
-    healthInsuranceIssueDate: "",
-    healthInsuranceExpiryDate: "",
-    // Ghi chú
-    notes: "",
-    // Password change fields
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
+
+  // Initialize formData with a function to ensure it's only called once
+  const [formData, setFormData] = useState(() => getInitialFormData());
   const [isSaving, setIsSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -78,6 +48,8 @@ export function CaiDat() {
     confirm: false,
   });
   const [alertMessage, setAlertMessage] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   // Helper function to show custom alert
   const showAlert = (message) => {
@@ -91,14 +63,53 @@ export function CaiDat() {
     }));
   };
 
-  // Update form data when user profile loads
+  // Update form data when user profile loads or after refresh
   useEffect(() => {
-    if (userProfile) {
-      setFormData(mapProfileToFormData(userProfile));
-    } else if (!profileLoading) {
-      setFormData(getInitialFormData());
+    // Wait for profile to finish loading
+    if (profileLoading) {
+      console.log("⏳ CaiDat - Profile is still loading...");
+      return;
     }
-  }, [userProfile, profileLoading]);
+
+    // Only update if we have a valid userProfile
+    if (userProfile && Object.keys(userProfile).length > 0) {
+      console.log("🔄 CaiDat - Updating formData from userProfile:", {
+        fullName: userProfile.fullName,
+        phone: userProfile.phone,
+        address: userProfile.address,
+        ethnicity: userProfile.ethnicity,
+        occupation: userProfile.occupation,
+        citizenId: userProfile.citizenId,
+        houseNumber: userProfile.houseNumber,
+        bloodType: userProfile.bloodType,
+        allergyNotes: userProfile.allergyNotes,
+        medicalHistory: userProfile.medicalHistory,
+        dob: userProfile.dob,
+        gender: userProfile.gender,
+      });
+
+      const newFormData = mapProfileToFormData(userProfile);
+      console.log("🔄 CaiDat - Mapped formData:", {
+        fullName: newFormData.fullName,
+        phone: newFormData.phone,
+        address: newFormData.address,
+        ethnicity: newFormData.ethnicity,
+        occupation: newFormData.occupation,
+        citizenId: newFormData.citizenId,
+        houseNumber: newFormData.houseNumber,
+        birthDate: newFormData.birthDate,
+        gender: newFormData.gender,
+        bloodType: newFormData.bloodType,
+        allergies: newFormData.allergies,
+        medicalHistory: newFormData.medicalHistory,
+      });
+
+      setFormData(newFormData);
+      if (!hasInitialized) {
+        setHasInitialized(true);
+      }
+    }
+  }, [userProfile, profileLoading, refreshTrigger]); // Remove hasInitialized from dependencies
 
   const tabs = [
     { id: "profile", label: "Hồ sơ", icon: User },
@@ -396,10 +407,19 @@ export function CaiDat() {
       };
 
       // Call API to update patient profile
-      const response = await updateCurrentPatientProfile(updateData);
+      await updateCurrentPatientProfile(updateData);
 
-      // Refresh the profile data
-      await refreshProfile();
+      // Refresh the profile data and wait for it to complete
+      const updatedProfile = await refreshProfile();
+
+      // Update formData directly with the refreshed profile data
+      if (updatedProfile) {
+        const updatedFormData = mapProfileToFormData(updatedProfile);
+        setFormData(updatedFormData);
+      } else {
+        // Fallback: trigger form data update using refresh trigger
+        setRefreshTrigger((prev) => prev + 1);
+      }
 
       // Show success message
       showAlert("Cập nhật thông tin thành công!");
@@ -1063,7 +1083,6 @@ export function CaiDat() {
             </div>
           </div>
         )}
-
       </div>
 
       {/* Custom Alert */}
