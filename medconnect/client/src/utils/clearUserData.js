@@ -57,12 +57,12 @@ export const clearUserData = async () => {
 
     console.log("All user data cleared successfully");
 
-    // Force reload to ensure clean state
-    window.location.reload();
+    // Force redirect to homepage instead of reload
+    window.location.href = "/";
   } catch (error) {
     console.error("Error clearing user data:", error);
-    // Fallback: just reload the page
-    window.location.reload();
+    // Fallback: redirect to homepage
+    window.location.href = "/";
   }
 };
 

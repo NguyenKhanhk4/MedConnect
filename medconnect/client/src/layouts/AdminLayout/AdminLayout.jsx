@@ -66,10 +66,11 @@ const AdminLayout = () => {
   const handleLogout = async () => {
     try {
       await clearUserData();
+      // clearUserData already redirects to homepage, but ensure it happens
     } catch (error) {
       console.error("Error during admin logout:", error);
-      // Fallback: just reload the page
-      window.location.reload();
+      // Fallback: redirect to homepage
+      window.location.href = "/";
     }
   };
 
