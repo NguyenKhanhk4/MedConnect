@@ -60,18 +60,10 @@ router.get("/doctors/:doctorId/pricing", getDoctorPricing);
 router.post("/appointments", authGuard, bookAppointment);
 
 // Calculate payment summary for single appointment (NEW FLOW - pre-payment)
-router.post(
-  "/appointments/calculate-payment-summary",
-  authGuard,
-  calculatePaymentSummaryForSingleAppointment
-);
+router.post("/appointments/calculate-payment-summary", authGuard, calculatePaymentSummaryForSingleAppointment);
 
 // Create payment for single appointment (NEW FLOW - pre-payment)
-router.post(
-  "/appointments/create-payment",
-  authGuard,
-  createPaymentForSingleAppointment
-);
+router.post("/appointments/create-payment", authGuard, createPaymentForSingleAppointment);
 
 // Get patient's appointments
 router.get("/me/appointments", authGuard, getPatientAppointments);
@@ -85,7 +77,7 @@ router.put(
 // Get appointment details by ID
 router.get("/me/appointments/:appointmentId", authGuard, getAppointmentDetails);
 
-// Get patient stats
+// Get patient stats 
 router.get("/me/stats", authGuard, async (req, res) => {
   try {
     const claims = req.user || {};
@@ -99,11 +91,8 @@ router.get("/me/stats", authGuard, async (req, res) => {
       });
     }
 
-    // Find patient by user ID with relationshipToOwner: "self" (user's own profile, not family members)
-    let patient = await Patient.findOne({
-      userId: appUserId,
-      relationshipToOwner: "self",
-    });
+    // Find patient by user ID, create if not exists
+    let patient = await Patient.findOne({ userId: appUserId });
     if (!patient) {
       // Create a basic patient profile if it doesn't exist
       console.log("Creating new patient profile for user:", appUserId);
@@ -120,7 +109,6 @@ router.get("/me/stats", authGuard, async (req, res) => {
         userId: appUserId,
         fullName: user.fullName || "Chưa cập nhật",
         phone: user.phone || "",
-        relationshipToOwner: "self", // IMPORTANT: Mark as self profile
         isComplete: false,
       });
 

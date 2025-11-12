@@ -18,11 +18,10 @@
   }
 }
 
-/* Stat Card - Force white background and black text */
+/* Stat Card - Allow colored backgrounds based on type */
 .stat-card {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
-  border: 1.5px solid #e2e8f0 !important;
+  /* Background and border will be set inline based on stat type */
+  border: 1.5px solid #e2e8f0;
   border-radius: 1rem;
   padding: 1.75rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
@@ -54,19 +53,14 @@
     opacity: 1;
   }
 
-  /* Override any other background styles */
-  &[style*="background"] {
-    background-color: #ffffff !important;
-    background: #ffffff !important;
-  }
+  /* Allow inline background styles to override - no CSS override needed */
 
   /* Hover effect - lift card more and change border color */
   &:hover {
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    /* Keep background color from inline style, just darken it slightly */
+    filter: brightness(0.98);
     transform: translateY(-8px) scale(1.01);
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.08) !important;
-    border-color: #cbd5e1 !important;
 
     .stat-card-icon {
       transform: scale(1.05) rotate(5deg);
@@ -88,10 +82,7 @@
     color: inherit !important;
   }
 
-  /* Icons should keep their inline color or data-stat-type color */
-  .stat-icon {
-    /* Don't override icon color - let inline style or data-stat-type handle it */
-  }
+  /* Icons should keep their inline color or data-stat-type color - no override needed */
 
   &-loading {
     display: flex;
@@ -306,16 +297,15 @@
   }
 }
 
-/* Force white background for stat cards - highest priority */
+/* Allow colored backgrounds for stat cards */
 .stat-card-white {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
+  /* Background will be set inline based on stat type */
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
   transform: translateY(0);
   border-radius: 1rem;
 
-  /* Hover effect - allow transform and shadow */
+  /* Hover effect - keep white background */
   &:hover {
     background-color: #ffffff !important;
     background: #ffffff !important;
@@ -334,11 +324,6 @@
     color: inherit !important;
   }
 
-  /* Icons should keep their color from inline style or data-stat-type */
-  .stat-icon {
-    /* Don't override - let inline style or data-stat-type handle it */
-  }
-
   .stat-card-title {
     color: #374151 !important;
   }
@@ -352,20 +337,29 @@
   }
 }
 
-/* Override any teal/blue background - highest specificity */
+/* Force white background for stat-card-white and variants so cards stay white both
+   in normal and hover states (prevents other rules from making them colored until hover) */
 .stat-card.stat-card-white,
-.stat-card.stat-card-white.stat-card-loading,
+.patient-content .stat-card.stat-card-white,
+.patient-dashboard .stat-card.stat-card-white,
 div.stat-card.stat-card-white {
   background-color: #ffffff !important;
   background: #ffffff !important;
+}
+
+/* Allow colored backgrounds - respect inline styles */
+.stat-card.stat-card-white,
+.stat-card.stat-card-white.stat-card-loading,
+div.stat-card.stat-card-white {
+  /* Background will be set inline - don't force white */
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
   transform: translateY(0);
 
-  /* Hover effect */
+  /* Hover effect - keep background color but slightly darker */
   &:hover {
-    background-color: #ffffff !important;
-    background: #ffffff !important;
+    /* Keep background color from inline style, just darken it slightly */
+    filter: brightness(0.98);
     transform: translateY(-6px);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15), 0 4px 8px rgba(0, 0, 0, 0.1) !important;
   }
@@ -380,14 +374,9 @@ div.stat-card.stat-card-white {
   *:not(.stat-icon) {
     color: inherit !important;
   }
-
-  /* Icons should keep their color from inline style or data-stat-type */
-  .stat-icon {
-    /* Don't override - let inline style or data-stat-type handle it */
-  }
 }
 
-/* Override any other stat-card styles from other pages - highest specificity */
+/* Allow colored backgrounds - respect inline styles */
 .patient-content .stat-card,
 .patient-content .stat-card.stat-card-white,
 .patient-content .stat-card.stat-card-loading,
@@ -397,8 +386,7 @@ div.stat-card.stat-card-white {
 .patient-dashboard .stat-card.stat-card-white,
 [class*="patient"] .stat-card,
 [class*="patient"] .stat-card.stat-card-white {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
+  /* Background will be set inline - don't force white */
   border: 2px solid #cbd5e1 !important;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -415,7 +403,7 @@ div.stat-card.stat-card-white {
   border-radius: 1rem !important;
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
 
-  /* Hover effect - allow transform and shadow */
+  /* Hover effect - keep white background */
   &:hover {
     background-color: #ffffff !important;
     background: #ffffff !important;

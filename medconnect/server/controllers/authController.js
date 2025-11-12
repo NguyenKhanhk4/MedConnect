@@ -12,7 +12,6 @@ import Doctor from "../models/doctor.model.js";
 import AuthProvider from "../models/auth_providers.model.js";
 import PasswordReset from "../models/passwordReset.model.js";
 import EducationLevelPrice from "../models/educationLevelPrice.model.js";
-import Notification from "../models/notification.model.js";
 import { ok, fail } from "../utils/response.js";
 import {
   COOKIE_NAME,
@@ -532,31 +531,6 @@ export async function registerDoctor(req, res) {
 
     console.log("[registerDoctor] success for user:", userDoc._id);
 
-    // Create welcome notification for doctor
-    try {
-      await Notification.create({
-        userId: userDoc._id,
-        type: "system",
-        title: "Đăng ký thành công!",
-        message: `Xin chào ${userDoc.fullName}! Tài khoản của bạn đang được admin phê duyệt. Vui lòng đợi thông báo từ email bạn đã đăng ký.`,
-        priority: "medium",
-        relatedId: userDoc._id,
-        relatedType: "registration",
-        metadata: {
-          registrationDate: new Date().toISOString(),
-          role: userDoc.role,
-          status: userDoc.status,
-        },
-      });
-      console.log("✅ Doctor welcome notification created successfully");
-    } catch (notificationError) {
-      console.error(
-        "⚠️ Failed to create doctor welcome notification:",
-        notificationError.message
-      );
-      // Don't block registration if notification fails
-    }
-
     return ok(res, {
       message:
         "Đăng ký thành công! Tài khoản của bạn đang được admin phê duyệt. Vui lòng đợi thông báo từ email bạn đã đăng ký.",
@@ -745,7 +719,7 @@ export async function register(req, res) {
       console.warn("Failed to create AuthProvider record:", e.message || e);
     }
 
-    // For patients: send welcome email and create welcome notification
+    // For patients: send welcome email
     // Frontend will handle auto-login using the customToken
     if ((role || "patient").toLowerCase() === "patient") {
       try {
@@ -757,30 +731,6 @@ export async function register(req, res) {
           emailError.message
         );
         // Don't block registration if email fails
-      }
-
-      // Create welcome notification for patient
-      try {
-        await Notification.create({
-          userId: userDoc._id,
-          type: "system",
-          title: "Chào mừng đến với MedConnect!",
-          message: `Xin chào ${userDoc.fullName}! Cảm ơn bạn đã đăng ký tài khoản tại MedConnect. Bạn có thể bắt đầu đặt lịch hẹn với bác sĩ ngay bây giờ.`,
-          priority: "low",
-          relatedId: userDoc._id,
-          relatedType: "registration",
-          metadata: {
-            registrationDate: new Date().toISOString(),
-            role: userDoc.role,
-          },
-        });
-        console.log("✅ Welcome notification created successfully");
-      } catch (notificationError) {
-        console.error(
-          "⚠️ Failed to create welcome notification:",
-          notificationError.message
-        );
-        // Don't block registration if notification fails
       }
     }
 
@@ -851,7 +801,6 @@ export async function googleRegister(req, res) {
 
     // 1) find-or-create User theo email
     let userDoc = await User.findOne({ email });
-    let isNewUser = false;
     if (!userDoc) {
       try {
         userDoc = await User.create({
@@ -864,7 +813,6 @@ export async function googleRegister(req, res) {
           ...(decoded.phone_number ? { phone: decoded.phone_number } : {}),
           authProvider: "google",
         });
-        isNewUser = true;
         console.log("[GG-REG] User.create OK:", String(userDoc._id));
       } catch (e) {
         console.error("[GG-REG] User.create FAILED:", {
@@ -934,44 +882,7 @@ export async function googleRegister(req, res) {
     );
 
     console.log("[GG-REG] SUCCESS userId:", String(userDoc._id));
-
-    // Create welcome notification for new users (only if user was just created)
-    if (isNewUser && normalizedRole === "patient") {
-      try {
-        // Check if notification already exists to avoid duplicates
-        const existingNotification = await Notification.findOne({
-          userId: userDoc._id,
-          relatedType: "registration",
-        });
-
-        if (!existingNotification) {
-          await Notification.create({
-            userId: userDoc._id,
-            type: "system",
-            title: "Chào mừng đến với MedConnect!",
-            message: `Xin chào ${userDoc.fullName}! Cảm ơn bạn đã đăng ký tài khoản tại MedConnect qua Google. Bạn có thể bắt đầu đặt lịch hẹn với bác sĩ ngay bây giờ.`,
-            priority: "low",
-            relatedId: userDoc._id,
-            relatedType: "registration",
-            metadata: {
-              registrationDate: new Date().toISOString(),
-              role: userDoc.role,
-              provider: "google",
-            },
-          });
-          console.log(
-            "✅ Google registration welcome notification created for patient"
-          );
-        }
-      } catch (notificationError) {
-        console.error(
-          "⚠️ Failed to create Google registration welcome notification:",
-          notificationError.message
-        );
-        // Don't block registration if notification fails
-      }
-    }
-
+    
     // For patients: automatically create session cookie to auto-login
     if (normalizedRole === "patient") {
       try {
@@ -988,14 +899,9 @@ export async function googleRegister(req, res) {
           path: "/",
         });
 
-        console.log(
-          "✅ Auto-login session created for patient after Google registration"
-        );
+        console.log("✅ Auto-login session created for patient after Google registration");
       } catch (sessionError) {
-        console.warn(
-          "Failed to create session cookie for Google registration:",
-          sessionError.message
-        );
+        console.warn("Failed to create session cookie for Google registration:", sessionError.message);
         // Continue anyway - frontend might handle it
       }
     }

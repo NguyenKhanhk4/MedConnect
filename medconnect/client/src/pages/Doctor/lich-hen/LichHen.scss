@@ -839,47 +839,6 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   font-weight: 500;
 }
 
-.appointment-reason-container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  align-items: flex-start;
-}
-
-.appointment-reschedule-badge-wrapper {
-  margin-bottom: 0.25rem;
-}
-
-.appointment-reschedule-badge {
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
-  color: white !important;
-  border: none !important;
-  padding: 0.375rem 0.75rem !important;
-  border-radius: 0.5rem !important;
-  font-size: 0.75rem !important;
-  font-weight: 600 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 0.25rem !important;
-  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3) !important;
-  transition: all 0.3s ease !important;
-  cursor: pointer !important;
-
-  &:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 8px rgba(99, 102, 241, 0.4) !important;
-    background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%) !important;
-  }
-}
-
-.appointment-reason-text {
-  color: $gray-700;
-  font-size: 0.875rem;
-  font-weight: 500;
-  line-height: 1.5;
-  word-break: break-word;
-}
-
 .appointment-list-status {
   display: flex;
   align-items: center;
@@ -915,62 +874,95 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
 
 // Force override status colors with higher specificity
 .appointment-list-card .bg-green-500,
+.appointment-list-card .bg-green-600,
 .appointment-list-card .bg-purple-500,
 .appointment-list-card .bg-red-500,
 .appointment-list-card .bg-orange-500,
 .appointment-list-card .bg-blue-500,
 .appointment-list-card .bg-emerald-500,
 .appointment-list-card .bg-gray-500,
+.appointment-list-card .bg-indigo-500,
+.appointment-list-td .bg-green-500,
+.appointment-list-td .bg-green-600,
+.appointment-list-td .bg-purple-500,
+.appointment-list-td .bg-red-500,
+.appointment-list-td .bg-orange-500,
+.appointment-list-td .bg-blue-500,
+.appointment-list-td .bg-emerald-500,
+.appointment-list-td .bg-gray-500,
+.appointment-list-td .bg-indigo-500,
 .appointment-list-card [class*="bg-"].rounded-full,
 .appointment-list-card .badge[class*="bg-"],
 .appointment-list-td .badge[class*="bg-"] {
   color: white !important;
   border: none !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
   border-radius: 0.75rem !important;
-  padding: 0.25rem 0.5rem !important;
+  padding: 0.375rem 0.75rem !important;
   font-weight: 700 !important;
-  font-size: 0.75rem !important;
+  font-size: 0.8125rem !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 0.25rem !important;
+  gap: 0.375rem !important;
 
   // Make icon smaller in badges
   svg {
-    width: 0.625rem !important;
-    height: 0.625rem !important;
+    width: 0.75rem !important;
+    height: 0.75rem !important;
     flex-shrink: 0 !important;
   }
 }
 
 // Specific colors for each status - Direct CSS approach
-.appointment-list-card .bg-green-600 {
-  background-color: #0ee6cc !important; // Xanh lá - Đã chấp nhận
+.appointment-list-card .bg-green-500,
+.appointment-list-card .bg-green-600,
+.appointment-list-td .bg-green-500,
+.appointment-list-td .bg-green-600 {
+  background-color: #10b981 !important; // Xanh lá đậm - Đã chấp nhận
+  color: white !important;
 }
 
-.appointment-list-card .bg-purple-500 {
-  background-color: #45c3d2 !important; // Xanh teal - Chờ bác sĩ xác nhận
+.appointment-list-card .bg-purple-500,
+.appointment-list-td .bg-purple-500 {
+  background-color: #a855f7 !important; // Tím - Chờ bác sĩ xác nhận
+  color: white !important;
 }
 
-.appointment-list-card .bg-red-500 {
+.appointment-list-card .bg-red-500,
+.appointment-list-td .bg-red-500 {
   background-color: #ef4444 !important; // Đỏ - Bác sĩ từ chối
+  color: white !important;
 }
 
-.appointment-list-card .bg-orange-500 {
+.appointment-list-card .bg-orange-500,
+.appointment-list-td .bg-orange-500 {
   background-color: #f97316 !important; // Cam - Bệnh nhân hủy
+  color: white !important;
 }
 
-.appointment-list-card .bg-blue-500 {
+.appointment-list-card .bg-blue-500,
+.appointment-list-td .bg-blue-500 {
   background-color: #3b82f6 !important; // Xanh dương - Đang khám
+  color: white !important;
 }
 
-.appointment-list-card .bg-emerald-500 {
+.appointment-list-card .bg-emerald-500,
+.appointment-list-td .bg-emerald-500 {
   background-color: #10b981 !important; // Xanh lá - Hoàn thành
+  color: white !important;
 }
 
-.appointment-list-card .bg-gray-500 {
-  background-color: #526282 !important; // Xám - Không đến khám
+.appointment-list-card .bg-gray-500,
+.appointment-list-td .bg-gray-500 {
+  background-color: #6b7280 !important; // Xám - Không đến khám
+  color: white !important;
+}
+
+.appointment-list-card .bg-indigo-500,
+.appointment-list-td .bg-indigo-500 {
+  background-color: #6366f1 !important; // Indigo - Đã dời lịch
+  color: white !important;
 }
 
 // Status badges with correct colors
@@ -1317,26 +1309,23 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
     min-height: 2.5rem !important;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
 
-    // Make text white and bold for better contrast
-    color: white !important;
+    // Make text dark and bold for better contrast - DO NOT force white
     text-transform: none !important;
     letter-spacing: 0.5px !important;
     line-height: 1.4 !important;
 
-    // Icon styling - larger icon
+    // Icon styling - larger icon with dark color
     svg {
       width: 1.125rem !important;
       height: 1.125rem !important;
       flex-shrink: 0 !important;
       stroke-width: 2.5 !important;
-      color: white !important;
     }
 
     // Status text styling - ensure text is clear and visible
     .appointment-detail-status-text {
       font-size: 1rem !important;
       font-weight: 700 !important;
-      color: white !important;
       display: inline-block !important;
       line-height: 1.4 !important;
       letter-spacing: 0.5px !important;
@@ -1346,7 +1335,6 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
     span:not(.appointment-detail-status-text) {
       font-size: 1rem !important;
       font-weight: 700 !important;
-      color: white !important;
       display: inline-flex !important;
       align-items: center !important;
       gap: 0.5rem !important;
@@ -1355,118 +1343,109 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
 }
 
 // Specific status colors for detail view - ensure good contrast and visibility
-// Use data-status attributes to apply correct colors
-.appointment-detail-status-badge .badge[data-status="accepted"],
-.appointment-detail-item .badge[data-status="accepted"] {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-  color: white !important;
-  border: 2px solid #047857 !important;
-}
-
-.appointment-detail-status-badge .badge[data-status="in_progress"],
-.appointment-detail-item .badge[data-status="in_progress"] {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-  color: white !important;
-  border: 2px solid #1d4ed8 !important;
-}
-
-.appointment-detail-status-badge .badge[data-status="done"],
-.appointment-detail-item .badge[data-status="done"] {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-  color: white !important;
-  border: 2px solid #047857 !important;
-}
-
-.appointment-detail-status-badge .badge[data-status="rejected"],
-.appointment-detail-item .badge[data-status="rejected"] {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
-  color: white !important;
-  border: 2px solid #b91c1c !important;
-}
-
-.appointment-detail-status-badge .badge[data-status="cancelled"],
-.appointment-detail-item .badge[data-status="cancelled"] {
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%) !important;
-  color: white !important;
-  border: 2px solid #c2410c !important;
-}
-
-.appointment-detail-status-badge .badge[data-status="no_show"],
-.appointment-detail-item .badge[data-status="no_show"] {
-  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
-  color: white !important;
-  border: 2px solid #374151 !important;
-}
-
-.appointment-detail-status-badge .badge[data-status="pending_doctor"],
-.appointment-detail-item .badge[data-status="pending_doctor"] {
-  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%) !important;
-  color: white !important;
-  border: 2px solid #7e22ce !important;
-}
-
-.appointment-detail-status-badge .badge[data-status="rescheduled"],
-.appointment-detail-item .badge[data-status="rescheduled"] {
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
-  color: white !important;
-  border: 2px solid #4338ca !important;
-}
-
-// Fallback for class-based badges (backward compatibility)
+// Support both old classes (bg-green-500) and new classes (bg-green-100, text-green-800)
 .appointment-detail-status-badge .badge.bg-green-500,
-.appointment-detail-item .badge.bg-green-500 {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-  color: white !important;
-  border: 2px solid #047857 !important;
+.appointment-detail-status-badge .badge.bg-green-100,
+.appointment-detail-item .badge.bg-green-500,
+.appointment-detail-item .badge.bg-green-100 {
+  background-color: #d1fae5 !important; // Light green background
+  color: #065f46 !important; // Dark green text
+  border: 2px solid #10b981 !important; // Green border
+
+  svg {
+    color: #065f46 !important; // Dark green icon
+  }
 }
 
 .appointment-detail-status-badge .badge.bg-blue-500,
-.appointment-detail-item .badge.bg-blue-500 {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-  color: white !important;
-  border: 2px solid #1d4ed8 !important;
+.appointment-detail-status-badge .badge.bg-blue-100,
+.appointment-detail-item .badge.bg-blue-500,
+.appointment-detail-item .badge.bg-blue-100 {
+  background-color: #dbeafe !important; // Light blue background
+  color: #1e40af !important; // Dark blue text
+  border: 2px solid #3b82f6 !important; // Blue border
+
+  svg {
+    color: #1e40af !important; // Dark blue icon
+  }
 }
 
 .appointment-detail-status-badge .badge.bg-emerald-500,
-.appointment-detail-item .badge.bg-emerald-500 {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-  color: white !important;
-  border: 2px solid #047857 !important;
+.appointment-detail-status-badge .badge.bg-emerald-100,
+.appointment-detail-item .badge.bg-emerald-500,
+.appointment-detail-item .badge.bg-emerald-100 {
+  background-color: #d1fae5 !important; // Light emerald background
+  color: #065f46 !important; // Dark emerald text
+  border: 2px solid #10b981 !important; // Emerald border
+
+  svg {
+    color: #065f46 !important; // Dark emerald icon
+  }
 }
 
 .appointment-detail-status-badge .badge.bg-red-500,
-.appointment-detail-item .badge.bg-red-500 {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
-  color: white !important;
-  border: 2px solid #b91c1c !important;
+.appointment-detail-status-badge .badge.bg-red-100,
+.appointment-detail-item .badge.bg-red-500,
+.appointment-detail-item .badge.bg-red-100 {
+  background-color: #fee2e2 !important; // Light red background
+  color: #991b1b !important; // Dark red text
+  border: 2px solid #ef4444 !important; // Red border
+
+  svg {
+    color: #991b1b !important; // Dark red icon
+  }
 }
 
 .appointment-detail-status-badge .badge.bg-orange-500,
-.appointment-detail-item .badge.bg-orange-500 {
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%) !important;
-  color: white !important;
-  border: 2px solid #c2410c !important;
+.appointment-detail-status-badge .badge.bg-orange-100,
+.appointment-detail-item .badge.bg-orange-500,
+.appointment-detail-item .badge.bg-orange-100 {
+  background-color: #fed7aa !important; // Light orange background
+  color: #c2410c !important; // Dark orange text
+  border: 2px solid #f97316 !important; // Orange border
+
+  svg {
+    color: #c2410c !important; // Dark orange icon
+  }
 }
 
 .appointment-detail-status-badge .badge.bg-gray-500,
-.appointment-detail-item .badge.bg-gray-500 {
-  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
-  color: white !important;
-  border: 2px solid #374151 !important;
+.appointment-detail-status-badge .badge.bg-gray-100,
+.appointment-detail-item .badge.bg-gray-500,
+.appointment-detail-item .badge.bg-gray-100 {
+  background-color: #f3f4f6 !important; // Light gray background
+  color: #374151 !important; // Dark gray text
+  border: 2px solid #6b7280 !important; // Gray border
+
+  svg {
+    color: #374151 !important; // Dark gray icon
+  }
 }
 
 .appointment-detail-status-badge .badge.bg-purple-500,
-.appointment-detail-item .badge.bg-purple-500 {
-  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%) !important;
-  color: white !important;
-  border: 2px solid #7e22ce !important;
+.appointment-detail-status-badge .badge.bg-purple-100,
+.appointment-detail-item .badge.bg-purple-500,
+.appointment-detail-item .badge.bg-purple-100 {
+  background-color: #f3e8ff !important; // Light purple background
+  color: #6b21a8 !important; // Dark purple text
+  border: 2px solid #a855f7 !important; // Purple border
+
+  svg {
+    color: #6b21a8 !important; // Dark purple icon
+  }
 }
 
 .appointment-detail-status-badge .badge.bg-indigo-500,
-.appointment-detail-item .badge.bg-indigo-500 {
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
-  color: white !important;
-  border: 2px solid #4338ca !important;
+.appointment-detail-status-badge .badge.bg-indigo-100,
+.appointment-detail-item .badge.bg-indigo-500,
+.appointment-detail-item .badge.bg-indigo-100 {
+  background-color: #e0e7ff !important; // Light indigo background
+  color: #3730a3 !important; // Dark indigo text
+  border: 2px solid #6366f1 !important; // Indigo border
+
+  svg {
+    color: #3730a3 !important; // Dark indigo icon
+  }
 }
 
 .appointment-reject {

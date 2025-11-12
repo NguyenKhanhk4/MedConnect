@@ -120,6 +120,7 @@ export default function QuanLyLichBacSi() {
 
   // Reschedule modal states
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleWithNewDoctor, setRescheduleWithNewDoctor] = useState(false);
 
   // Education level prices state
   const [educationLevelPrices, setEducationLevelPrices] = useState({});
@@ -270,7 +271,14 @@ export default function QuanLyLichBacSi() {
   }, [doctors, selectedDoctorId]);
 
   // Load time slots when doctor or date changes
-  // Note: loadTimeSlots is defined below using useCallback
+  useEffect(() => {
+    if (selectedDoctorId) {
+      loadTimeSlots();
+    } else {
+      setTimeSlots([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDoctorId, currentDate]);
 
   const loadSpecializations = async () => {
     try {
@@ -354,7 +362,7 @@ export default function QuanLyLichBacSi() {
     return `${startDate} - ${endDate}`;
   };
 
-  const loadTimeSlots = useCallback(async () => {
+  const loadTimeSlots = async () => {
     if (!selectedDoctorId) return;
 
     try {
@@ -375,16 +383,7 @@ export default function QuanLyLichBacSi() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDoctorId, currentDate]);
-
-  // Auto-load time slots when doctor or date changes
-  useEffect(() => {
-    if (selectedDoctorId) {
-      loadTimeSlots();
-    } else {
-      setTimeSlots([]);
-    }
-  }, [selectedDoctorId, currentDate, loadTimeSlots]);
+  };
 
   const handleGenerateSlots = async () => {
     if (!selectedDoctorId) {
@@ -495,7 +494,9 @@ export default function QuanLyLichBacSi() {
         reason: slot.reason || null,
         mode: slot.mode || null,
         appointmentId: slot.appointmentId || null,
-        rescheduledFromId: slot.rescheduledFromId || null, // Flag to identify rescheduled appointments
+        rescheduledFromId: slot.rescheduledFromId || null, // Flag to identify rescheduled appointments (for old appointments)
+        rescheduleReason: slot.rescheduleReason || null, // Flag to identify rescheduled appointments (for updated appointments)
+        rescheduledAt: slot.rescheduledAt || null, // Flag to identify rescheduled appointments
         leaveReason: slot.leaveReason || null, // Lý do nghỉ
         hasPendingLeaveRequest: slot.hasPendingLeaveRequest || false, // Flag leave request đang pending
         isEmpty: false,
@@ -582,7 +583,7 @@ export default function QuanLyLichBacSi() {
       case "booked":
         return "#10b981";
       case "blocked":
-        return "#f97316"; // Orange color for blocked slots (doctor on leave)
+        return "#6b7280";
       default:
         return "#6b7280";
     }
@@ -591,12 +592,15 @@ export default function QuanLyLichBacSi() {
   const getStatusText = (
     status,
     hasPendingLeaveRequest = false,
-    rescheduledFromId = null
+    rescheduledFromId = null,
+    rescheduleReason = null,
+    rescheduledAt = null
   ) => {
     if (!status) return "Không xác định";
 
     // Nếu slot này từ appointment đã dời lịch, hiển thị "Đã dời lịch" (ưu tiên cao nhất)
-    if (rescheduledFromId) {
+    // Kiểm tra cả rescheduledFromId (cho appointments cũ) và rescheduleReason/rescheduledAt (cho appointments mới được cập nhật)
+    if (rescheduledFromId || rescheduleReason || rescheduledAt) {
       return "Đã dời lịch";
     }
 
@@ -634,16 +638,16 @@ export default function QuanLyLichBacSi() {
       case "pending":
         return "Chờ duyệt";
       case "confirmed":
-        // Nếu có rescheduledFromId, hiển thị "Đã dời lịch" thay vì "Đã xác nhận"
-        if (rescheduledFromId) {
+        // Nếu có rescheduledFromId, rescheduleReason hoặc rescheduledAt, hiển thị "Đã dời lịch" thay vì "Đã xác nhận"
+        if (rescheduledFromId || rescheduleReason || rescheduledAt) {
           return "Đã dời lịch";
         }
         return "Đã xác nhận";
       case "completed":
         return "Hoàn thành";
       case "booked":
-        // Nếu có rescheduledFromId, hiển thị "Đã dời lịch" thay vì "Đã đặt"
-        if (rescheduledFromId) {
+        // Nếu có rescheduledFromId, rescheduleReason hoặc rescheduledAt, hiển thị "Đã dời lịch" thay vì "Đã đặt"
+        if (rescheduledFromId || rescheduleReason || rescheduledAt) {
           return "Đã dời lịch";
         }
         return "Đã đặt";
@@ -1679,7 +1683,9 @@ export default function QuanLyLichBacSi() {
                                         {getStatusText(
                                           slot.status,
                                           slot.hasPendingLeaveRequest,
-                                          slot.rescheduledFromId
+                                          slot.rescheduledFromId,
+                                          slot.rescheduleReason,
+                                          slot.rescheduledAt
                                         )}
                                       </div>
                                       <button
@@ -1702,26 +1708,18 @@ export default function QuanLyLichBacSi() {
                                           ? getStatusText(
                                               slot.status,
                                               false,
+                                              null,
+                                              null,
                                               null
                                             )
                                           : getStatusText(
                                               slot.status,
                                               slot.hasPendingLeaveRequest,
-                                              slot.rescheduledFromId
+                                              slot.rescheduledFromId,
+                                              slot.rescheduleReason,
+                                              slot.rescheduledAt
                                             )}
                                       </div>
-                                      {slot.status === "blocked" &&
-                                        slot.leaveReason && (
-                                          <div
-                                            className="status-text-small"
-                                            style={{
-                                              fontSize: "11px",
-                                              marginTop: "2px",
-                                            }}
-                                          >
-                                            {slot.leaveReason}
-                                          </div>
-                                        )}
                                     </div>
                                   ) : (
                                     <div
@@ -1734,7 +1732,9 @@ export default function QuanLyLichBacSi() {
                                         {getStatusText(
                                           slot.status,
                                           slot.hasPendingLeaveRequest,
-                                          slot.rescheduledFromId
+                                          slot.rescheduledFromId,
+                                          slot.rescheduleReason,
+                                          slot.rescheduledAt
                                         )}
                                       </div>
                                     </div>
@@ -2832,19 +2832,33 @@ export default function QuanLyLichBacSi() {
                 </div>
               )}
 
-              {/* Reschedule button - only show for pending_doctor or accepted status */}
+              {/* Reschedule buttons - only show for pending_doctor or accepted status */}
               {(selectedAppointmentDetail.status === "pending_doctor" ||
                 selectedAppointmentDetail.status === "accepted") && (
                 <div className="detail-actions">
                   <Button
                     className="reschedule-button"
                     onClick={() => {
+                      setRescheduleWithNewDoctor(false);
+                      setShowRescheduleModal(true);
+                      setShowAppointmentDetail(false);
+                    }}
+                    style={{ marginRight: 8 }}
+                  >
+                    <Calendar size={16} style={{ marginRight: 8 }} />
+                    Dời lịch
+                  </Button>
+                  <Button
+                    className="reschedule-button"
+                    variant="outline"
+                    onClick={() => {
+                      setRescheduleWithNewDoctor(true);
                       setShowRescheduleModal(true);
                       setShowAppointmentDetail(false);
                     }}
                   >
                     <Calendar size={16} style={{ marginRight: 8 }} />
-                    Dời lịch
+                    Dời lịch sang bác sĩ khác
                   </Button>
                 </div>
               )}
@@ -2904,8 +2918,10 @@ export default function QuanLyLichBacSi() {
           appointment={selectedAppointmentDetail}
           onClose={() => {
             setShowRescheduleModal(false);
+            setRescheduleWithNewDoctor(false);
             setSelectedAppointmentDetail(null);
           }}
+          allowDoctorChange={rescheduleWithNewDoctor}
           customSubmitHandler={async (requestBody) => {
             // Custom handler for manager to directly reschedule (no approval needed)
             const response = await rescheduleAppointmentByManager(
@@ -2921,50 +2937,7 @@ export default function QuanLyLichBacSi() {
           }}
           onSuccess={async (response) => {
             if (response?.success) {
-              // Check if appointment was rescheduled to a different doctor
-              const newAppointment = response.data?.newAppointment;
-              const originalAppointment = response.data?.originalAppointment;
-
-              if (newAppointment && newAppointment.doctorId) {
-                const newDoctorId =
-                  newAppointment.doctorId._id || newAppointment.doctorId;
-                const originalDoctorId =
-                  selectedAppointmentDetail?.doctorId?._id ||
-                  selectedAppointmentDetail?.doctorId;
-
-                // If rescheduled to different doctor
-                if (newDoctorId && newDoctorId !== originalDoctorId) {
-                  console.log(
-                    `🔄 Rescheduled to different doctor: ${newDoctorId} (from ${originalDoctorId})`
-                  );
-
-                  // If currently viewing the original doctor, reload to see the blocked slot
-                  if (selectedDoctorId === originalDoctorId) {
-                    console.log(
-                      `🔄 Reloading original doctor's schedule to show blocked slot`
-                    );
-                    await loadTimeSlots();
-                  }
-
-                  // If currently viewing the new doctor, switch to it and reload
-                  // Otherwise, if viewing original doctor, stay on it to see the blocked slot
-                  // The user can manually switch to the new doctor if needed
-                  if (selectedDoctorId === newDoctorId) {
-                    // Already viewing new doctor, just reload
-                    await loadTimeSlots();
-                  } else if (selectedDoctorId !== originalDoctorId) {
-                    // Viewing a different doctor, switch to new doctor
-                    setSelectedDoctorId(newDoctorId);
-                    // useEffect will automatically trigger loadTimeSlots()
-                  }
-                } else {
-                  // Same doctor, just reload
-                  await loadTimeSlots();
-                }
-              } else {
-                // Fallback: just reload current doctor
-                await loadTimeSlots();
-              }
+              await loadTimeSlots(); // Reload slots to show updated appointment
             }
           }}
         />

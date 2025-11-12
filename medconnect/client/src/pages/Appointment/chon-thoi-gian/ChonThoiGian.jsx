@@ -173,11 +173,95 @@ const ChonThoiGian = () => {
 
   useEffect(() => {
     if (location.state?.doctor) {
-      setDoctor(location.state.doctor);
+      // Normalize doctor data to ensure consistent structure
+      const doctorData = location.state.doctor;
+
+      // Convert specializations to specializationIds if needed (from favorite doctors page)
+      let specializationIds = doctorData.specializationIds;
+      if (!specializationIds && doctorData.specializations) {
+        specializationIds = doctorData.specializations;
+      }
+
+      // Always normalize doctor data first
+      const normalizeDoctorData = (data) => {
+        return {
+          ...data,
+          specializationIds: specializationIds || data.specializationIds || [],
+          ratingAvg:
+            data.ratingAvg !== undefined && data.ratingAvg !== null
+              ? Number(data.ratingAvg)
+              : 0,
+          ratingCount:
+            data.ratingCount !== undefined && data.ratingCount !== null
+              ? Number(data.ratingCount)
+              : 0,
+          // Preserve all fields
+          educationLevel: data.educationLevel,
+          yearsExperience: data.yearsExperience,
+          bio: data.bio,
+          avatarUrl: data.avatarUrl,
+        };
+      };
+
+      // If educationLevel is missing, fetch full doctor details from API
+      const fetchFullDoctorDetails = async () => {
+        console.log("[ChonThoiGian] Doctor data from state:", {
+          _id: doctorData._id,
+          educationLevel: doctorData.educationLevel,
+          hasEducationLevel: !!doctorData.educationLevel,
+          fullName: doctorData.fullName,
+        });
+
+        if (!doctorData.educationLevel && doctorData._id) {
+          console.log(
+            "[ChonThoiGian] Fetching full doctor details for:",
+            doctorData._id
+          );
+          try {
+            const response = await api.get(`/api/doctors/${doctorData._id}`);
+            console.log("[ChonThoiGian] Full doctor response:", response);
+            if (response.success && response.data?.doctor) {
+              const fullDoctor = response.data.doctor;
+              console.log("[ChonThoiGian] Full doctor data:", {
+                _id: fullDoctor._id,
+                educationLevel: fullDoctor.educationLevel,
+                hasEducationLevel: !!fullDoctor.educationLevel,
+              });
+              // Merge full doctor data with existing data
+              const mergedDoctor = normalizeDoctorData({
+                ...doctorData,
+                ...fullDoctor,
+              });
+              console.log("[ChonThoiGian] Merged doctor:", {
+                _id: mergedDoctor._id,
+                educationLevel: mergedDoctor.educationLevel,
+                hasEducationLevel: !!mergedDoctor.educationLevel,
+              });
+              setDoctor(mergedDoctor);
+              return;
+            }
+          } catch (error) {
+            console.error(
+              "[ChonThoiGian] Error fetching full doctor details:",
+              error
+            );
+          }
+        }
+
+        // If no need to fetch or fetch failed, use normalized data
+        const normalizedDoctor = normalizeDoctorData(doctorData);
+        console.log("[ChonThoiGian] Normalized doctor (no fetch):", {
+          _id: normalizedDoctor._id,
+          educationLevel: normalizedDoctor.educationLevel,
+          hasEducationLevel: !!normalizedDoctor.educationLevel,
+        });
+        setDoctor(normalizedDoctor);
+      };
+
+      fetchFullDoctorDetails();
+
       // Use specialization from state or from doctor's first specialization
-      const spec =
-        location.state?.specialization ||
-        location.state?.doctor?.specializationIds?.[0];
+      const spec = location.state?.specialization || specializationIds?.[0];
       setSpecialization(spec);
     } else {
       navigate("/dat-lich/chon-chuyen-khoa");
@@ -534,20 +618,6 @@ const ChonThoiGian = () => {
     try {
       setLoading(true);
 
-      // Debug log để kiểm tra form values
-      console.log("🔍 handleBookingSubmit - Form values:", values);
-      console.log("🔍 handleBookingSubmit - Reason from form:", values.reason);
-      console.log(
-        "🔍 handleBookingSubmit - Reason type:",
-        typeof values.reason
-      );
-      console.log(
-        "🔍 handleBookingSubmit - Reason length:",
-        values.reason?.length
-      );
-
-      let patientIdForBooking = null;
-
       // Validate profile if booking for "me"
       if (bookingFor === "me") {
         const validation = validateProfileComplete();
@@ -562,12 +632,9 @@ const ChonThoiGian = () => {
           setLoading(false);
           return;
         }
-
-        // IMPORTANT: Đảm bảo reset patientIdForBooking ngay khi booking for "me"
-        setPatientIdForBooking(null);
-        // IMPORTANT: patientIdForBooking local variable = null (đặt cho chính mình)
-        patientIdForBooking = null;
       }
+
+      let patientIdForBooking = null;
 
       // If booking for family, create family member first
       if (bookingFor === "family") {
@@ -593,8 +660,7 @@ const ChonThoiGian = () => {
           if (familyResponse.success) {
             message.success("Thêm người thân thành công!");
             const newPatientId = familyResponse.data.patient._id;
-            patientIdForBooking = newPatientId;
-            setPatientIdForBooking(newPatientId); // Store in state
+            setPatientIdForBooking(newPatientId);
             await fetchFamilyMembers();
           } else {
             message.error(familyResponse.message || "Thêm người thân thất bại");
@@ -609,14 +675,11 @@ const ChonThoiGian = () => {
       }
 
       // Prepare appointment data
-      // Trim reason to remove leading/trailing whitespace
-      const reasonValue = values.reason ? values.reason.trim() : "";
-
       const appointmentData = {
         doctorId: doctor._id,
         slotId: selectedTimeSlot._id,
         mode: selectedMode,
-        reason: reasonValue,
+        reason: values.reason || "",
         scheduledStart: selectedDate
           .clone()
           .hour(parseInt(selectedTimeSlot.startTime.split(":")[0]))
@@ -629,34 +692,20 @@ const ChonThoiGian = () => {
           .toISOString(),
       };
 
-      // Debug log để kiểm tra reason
-      console.log("🔍 Reason value:", reasonValue);
-      console.log("🔍 AppointmentData reason:", appointmentData.reason);
-
       // Add clinicId for offline appointments
       if (selectedMode === "offline" && defaultClinic) {
         appointmentData.clinicId = defaultClinic._id;
       }
 
-      // ONLY add patientId for family member booking
-      // IMPORTANT: Check bookingFor instead of just patientIdForBooking to be absolutely sure
+      // Add patientId for family member booking
       if (bookingFor === "family" && patientIdForBooking) {
         appointmentData.patientId = patientIdForBooking;
-      } else {
-        // IMPORTANT: Explicitly delete patientId if booking for "me" to prevent backend from adding it
-        delete appointmentData.patientId;
       }
 
-      // Debug log để kiểm tra
-      console.log("🔍 handleBookingSubmit - Debug Info:");
-      console.log("bookingFor:", bookingFor);
-      console.log("patientIdForBooking (local):", patientIdForBooking);
-      console.log(
-        "appointmentData BEFORE sending to API:",
-        JSON.parse(JSON.stringify(appointmentData))
-      );
-      console.log("appointmentData.patientId:", appointmentData.patientId);
-      console.log("Has patientId key:", "patientId" in appointmentData);
+      // Also store in state for later use in handleConfirmPayment
+      if (bookingFor === "family") {
+        appointmentData.patientId = patientIdForBooking;
+      }
 
       // NEW FLOW: Calculate payment summary (don't create appointment yet)
       try {
@@ -667,43 +716,6 @@ const ChonThoiGian = () => {
 
         if (summaryResponse.success || summaryResponse?.data?.success) {
           const summary = summaryResponse?.data || summaryResponse;
-
-          // Debug log để xem response từ backend
-          console.log("📥 Summary Response from backend:", summary);
-          console.log(
-            "📥 Reason in appointmentSummary:",
-            summary.appointmentSummary?.reason
-          );
-
-          // IMPORTANT: Lưu bookingFor vào paymentSummary để dùng trong handleConfirmPayment
-          summary.bookingFor = bookingFor;
-          summary.familyMemberPatientId =
-            bookingFor === "family" ? patientIdForBooking : null;
-
-          // IMPORTANT: Nếu booking for "me", xóa patientId khỏi appointmentSummary (nếu backend trả về)
-          if (
-            bookingFor === "me" &&
-            summary.appointmentSummary &&
-            summary.appointmentSummary.patientId
-          ) {
-            console.warn(
-              '⚠️ Backend returned patientId for "me" booking, removing it...'
-            );
-            delete summary.appointmentSummary.patientId;
-          }
-
-          // Debug log
-          console.log("💾 Payment Summary AFTER cleanup:");
-          console.log("summary.bookingFor:", summary.bookingFor);
-          console.log(
-            "summary.familyMemberPatientId:",
-            summary.familyMemberPatientId
-          );
-          console.log(
-            "summary.appointmentSummary.patientId:",
-            summary.appointmentSummary?.patientId
-          );
-
           setPaymentSummary(summary);
           setShowPaymentSummary(true);
           message.success("Vui lòng xem lại hóa đơn và xác nhận thanh toán");
@@ -713,7 +725,6 @@ const ChonThoiGian = () => {
           );
         }
       } catch (summaryError) {
-        console.error("❌ Summary Error:", summaryError);
         message.error(
           summaryError?.response?.data?.message ||
             summaryError?.message ||
@@ -721,7 +732,6 @@ const ChonThoiGian = () => {
         );
       }
     } catch (error) {
-      console.error("❌ Booking Submit Error:", error);
       message.error("Có lỗi xảy ra khi đặt lịch. Vui lòng thử lại!");
     } finally {
       setLoading(false);
@@ -739,14 +749,6 @@ const ChonThoiGian = () => {
       message.warning("Vui lòng chọn đầy đủ thông tin lịch hẹn");
       return;
     }
-
-    // Debug log
-    console.log("💳 handleConfirmPayment - Debug Info:");
-    console.log("paymentSummary.bookingFor:", paymentSummary.bookingFor);
-    console.log(
-      "paymentSummary.familyMemberPatientId:",
-      paymentSummary.familyMemberPatientId
-    );
 
     try {
       setProcessingPayment(true);
@@ -836,74 +838,20 @@ const ChonThoiGian = () => {
         return;
       }
 
-      // IMPORTANT: Sử dụng bookingFor và familyMemberPatientId từ paymentSummary (đã lưu khi submit)
-      // Thay vì dùng state patientIdForBooking (có thể đã bị thay đổi)
-      const isBookingForFamily = paymentSummary.bookingFor === "family";
-      const familyPatientId = paymentSummary.familyMemberPatientId;
-
-      // Debug log
-      console.log("isBookingForFamily:", isBookingForFamily);
-      console.log("familyPatientId:", familyPatientId);
-
-      // ONLY add patientId for family member booking
-      if (isBookingForFamily && familyPatientId) {
-        appointmentData.patientId = familyPatientId;
-        console.log("✅ Added patientId to appointmentData:", familyPatientId);
-      } else {
-        // IMPORTANT: Explicitly delete patientId if booking for "me"
-        delete appointmentData.patientId;
-        console.log(
-          "✅ No patientId added (booking for me) - deleted patientId key"
-        );
+      // Add patientId for family member booking
+      if (bookingFor === "family" && patientIdForBooking) {
+        appointmentData.patientId = patientIdForBooking;
       }
-
-      // IMPORTANT: Tạo clean request body - force remove patientId if booking for "me"
-      const requestBody = {
-        doctorId: appointmentData.doctorId,
-        slotId: appointmentData.slotId,
-        mode: appointmentData.mode,
-        reason: appointmentData.reason,
-        scheduledStart: appointmentData.scheduledStart,
-        scheduledEnd: appointmentData.scheduledEnd,
-        gateway: "payos",
-        method: "qr",
-        // IMPORTANT: Add explicit flag to tell backend this is for current user
-        bookForSelf: !isBookingForFamily, // true if booking for me, false if family
-      };
-
-      // Add clinicId if exists
-      if (appointmentData.clinicId) {
-        requestBody.clinicId = appointmentData.clinicId;
-      }
-
-      // ONLY add patientId if booking for family
-      if (isBookingForFamily && familyPatientId) {
-        requestBody.patientId = familyPatientId;
-        console.log("✅ Added patientId to request body:", familyPatientId);
-      } else {
-        // Explicitly ensure no patientId for "me" booking
-        // Add explicit null to override any backend default
-        requestBody.patientId = null;
-        console.log("✅ Explicitly set patientId = null (booking for me)");
-      }
-
-      console.log(
-        "📮 Clean request body SENT to create-payment API:",
-        JSON.parse(JSON.stringify(requestBody))
-      );
-      console.log(
-        "📮 Request body has patientId key:",
-        "patientId" in requestBody
-      );
-      console.log("📮 Request body.patientId:", requestBody.patientId);
 
       // Create payment and get PayOS link (tương tự logic nhiều lịch)
       const response = await api.post(
         "/api/patients/appointments/create-payment",
-        requestBody
+        {
+          ...appointmentData,
+          gateway: "payos",
+          method: "qr", // QR code payment
+        }
       );
-
-      console.log("📥 Response from create-payment API:", response);
 
       if (response?.success || response?.data?.success) {
         // Response structure: ok(res, { paymentId, payUrl, orderCode, ... })
@@ -915,13 +863,12 @@ const ChonThoiGian = () => {
           // Sau khi thanh toán thành công, webhook sẽ tạo appointment với status "pending_doctor"
           window.location.href = payUrl;
         } else {
-          message.error("Không thể tạo liên kết thanh toán ");
+          message.error("Không thể tạo liên kết thanh toán");
         }
       } else {
         message.error(response?.message || "Không thể tạo thanh toán");
       }
     } catch (error) {
-      console.error("❌ Payment Error:", error);
       message.error(
         error?.response?.data?.message ||
           error?.message ||
@@ -960,8 +907,9 @@ const ChonThoiGian = () => {
   };
 
   const getSpecializationNames = (specializationIds) => {
-    if (!specializationIds || specializationIds.length === 0) return [];
-    return specializationIds.map((spec) => spec.name).join(", ");
+    if (!specializationIds || specializationIds.length === 0)
+      return "Chưa xác định";
+    return specializationIds.map((spec) => spec.name || spec).join(", ");
   };
 
   if (!doctor || !specialization) {
@@ -1070,9 +1018,9 @@ const ChonThoiGian = () => {
                       {doctor.educationLevel && (
                         <Tag
                           style={{
-                            backgroundColor: "#e6fffb",
-                            borderColor: "#13c2c2",
-                            color: "#13c2c2",
+                            backgroundColor: "#e6f4ff",
+                            borderColor: "#1890ff",
+                            color: "#1890ff",
                             borderRadius: "6px",
                             padding: "4px 12px",
                             fontSize: "14px",
@@ -1272,17 +1220,14 @@ const ChonThoiGian = () => {
                           title: "Lý do",
                           dataIndex: "reason",
                           key: "reason",
-                          render: (text) => {
-                            const reasonText = text?.trim() || "";
-                            return (
-                              <Text
-                                ellipsis={{ tooltip: reasonText || "Không có" }}
-                                style={{ maxWidth: 200 }}
-                              >
-                                {reasonText || "Không có"}
-                              </Text>
-                            );
-                          },
+                          render: (text) => (
+                            <Text
+                              ellipsis={{ tooltip: text }}
+                              style={{ maxWidth: 200 }}
+                            >
+                              {text || "Không có"}
+                            </Text>
+                          ),
                         },
                         {
                           title: "Thời gian",
@@ -1389,8 +1334,6 @@ const ChonThoiGian = () => {
                         onClick={() => {
                           setShowPaymentSummary(false);
                           setPaymentSummary(null);
-                          // IMPORTANT: Reset patientIdForBooking khi quay lại để tránh lỗi
-                          setPatientIdForBooking(null);
                         }}
                         style={{ marginTop: 16 }}
                       >
@@ -1428,8 +1371,6 @@ const ChonThoiGian = () => {
                           onClick={() => {
                             setBookingFor("me");
                             setSelectedFamilyMember(null);
-                            setPatientIdForBooking(null); // Reset patientId khi chuyển về "me"
-                            form.resetFields(); // Reset toàn bộ form
                           }}
                           className="booking-button"
                         >
@@ -1439,9 +1380,7 @@ const ChonThoiGian = () => {
                           type={bookingFor === "family" ? "primary" : "default"}
                           onClick={() => {
                             setBookingFor("family");
-                            setSelectedFamilyMember(null);
-                            setPatientIdForBooking(null); // Reset patientId khi chuyển sang family
-                            form.resetFields(); // Reset toàn bộ form
+                            setSelectedFamilyMember(null); // Clear any previous selection
                           }}
                           className="booking-button"
                         >
@@ -1464,23 +1403,6 @@ const ChonThoiGian = () => {
                               required: true,
                               message: "Vui lòng nhập họ tên!",
                             },
-                            {
-                              min: 2,
-                              message: "Họ tên phải có ít nhất 2 ký tự!",
-                            },
-                            {
-                              max: 100,
-                              message: "Họ tên không được vượt quá 100 ký tự!",
-                            },
-                            {
-                              pattern: /^[a-zA-ZÀ-ỹ\s]+$/,
-                              message:
-                                "Họ tên chỉ được chứa chữ cái và khoảng trắng!",
-                            },
-                            {
-                              whitespace: true,
-                              message: "Họ tên không được chỉ có khoảng trắng!",
-                            },
                           ]}
                         >
                           <Input placeholder="Nhập họ và tên" />
@@ -1492,32 +1414,11 @@ const ChonThoiGian = () => {
                           rules={[
                             {
                               required: true,
-                              message: "Vui lòng nhập số CCCD/CMND!",
-                            },
-                            {
-                              pattern: /^[0-9]{12}$/,
-                              message: "Số CCCD/CMND phải có đúng 12 chữ số!",
-                            },
-                            {
-                              whitespace: true,
-                              message:
-                                "Số CCCD/CMND không được chứa khoảng trắng!",
+                              message: "Vui lòng nhập số CCCD!",
                             },
                           ]}
                         >
-                          <Input
-                            placeholder="Nhập số CCCD/CMND (12 số)"
-                            maxLength={12}
-                            onKeyPress={(e) => {
-                              if (
-                                !/[0-9]/.test(e.key) &&
-                                e.key !== "Backspace" &&
-                                e.key !== "Delete"
-                              ) {
-                                e.preventDefault();
-                              }
-                            }}
-                          />
+                          <Input placeholder="Nhập số CCCD/CMND" />
                         </Form.Item>
 
                         <Row gutter={16}>
@@ -1530,30 +1431,6 @@ const ChonThoiGian = () => {
                                   required: true,
                                   message: "Vui lòng chọn ngày sinh!",
                                 },
-                                {
-                                  validator: (_, value) => {
-                                    if (!value) {
-                                      return Promise.resolve();
-                                    }
-                                    const today = dayjs();
-                                    const birthDate = dayjs(value);
-                                    const age = today.diff(birthDate, "year");
-
-                                    if (age < 0) {
-                                      return Promise.reject(
-                                        new Error(
-                                          "Ngày sinh không được là tương lai!"
-                                        )
-                                      );
-                                    }
-                                    if (age > 150) {
-                                      return Promise.reject(
-                                        new Error("Ngày sinh không hợp lệ!")
-                                      );
-                                    }
-                                    return Promise.resolve();
-                                  },
-                                },
                               ]}
                             >
                               <DatePicker
@@ -1561,7 +1438,7 @@ const ChonThoiGian = () => {
                                 format="DD/MM/YYYY"
                                 placeholder="Chọn ngày sinh"
                                 disabledDate={(current) =>
-                                  current && current > dayjs().endOf("day")
+                                  current && current > new Date()
                                 }
                               />
                             </Form.Item>
@@ -1588,44 +1465,13 @@ const ChonThoiGian = () => {
 
                         <Row gutter={16}>
                           <Col span={12}>
-                            <Form.Item
-                              label="Dân tộc"
-                              name="ethnicity"
-                              rules={[
-                                {
-                                  max: 50,
-                                  message:
-                                    "Dân tộc không được vượt quá 50 ký tự!",
-                                },
-                                {
-                                  pattern: /^[a-zA-ZÀ-ỹ\s]*$/,
-                                  message:
-                                    "Dân tộc chỉ được chứa chữ cái và khoảng trắng!",
-                                },
-                              ]}
-                            >
-                              <Input
-                                placeholder="Nhập dân tộc (nếu có)"
-                                maxLength={50}
-                              />
+                            <Form.Item label="Dân tộc" name="ethnicity">
+                              <Input placeholder="Nhập dân tộc (nếu có)" />
                             </Form.Item>
                           </Col>
                           <Col span={12}>
-                            <Form.Item
-                              label="Nghề nghiệp"
-                              name="occupation"
-                              rules={[
-                                {
-                                  max: 100,
-                                  message:
-                                    "Nghề nghiệp không được vượt quá 100 ký tự!",
-                                },
-                              ]}
-                            >
-                              <Input
-                                placeholder="Nhập nghề nghiệp (nếu có)"
-                                maxLength={100}
-                              />
+                            <Form.Item label="Nghề nghiệp" name="occupation">
+                              <Input placeholder="Nhập nghề nghiệp (nếu có)" />
                             </Form.Item>
                           </Col>
                         </Row>
@@ -1676,30 +1522,12 @@ const ChonThoiGian = () => {
                               message: "Vui lòng nhập số điện thoại!",
                             },
                             {
-                              pattern: /^0[35789][0-9]{8}$/,
-                              message:
-                                "Số điện thoại phải bắt đầu bằng 0, số thứ 2 là 3/5/7/8/9 và có 10 chữ số (VD: 0912345678)!",
-                            },
-                            {
-                              whitespace: true,
-                              message:
-                                "Số điện thoại không được chứa khoảng trắng!",
+                              pattern: /^[0-9]{10}$/,
+                              message: "Số điện thoại không hợp lệ!",
                             },
                           ]}
                         >
-                          <Input
-                            placeholder="Nhập số điện thoại (VD: 0912345678)"
-                            maxLength={10}
-                            onKeyPress={(e) => {
-                              if (
-                                !/[0-9]/.test(e.key) &&
-                                e.key !== "Backspace" &&
-                                e.key !== "Delete"
-                              ) {
-                                e.preventDefault();
-                              }
-                            }}
-                          />
+                          <Input placeholder="Nhập số điện thoại" />
                         </Form.Item>
 
                         <Form.Item
@@ -1710,22 +1538,9 @@ const ChonThoiGian = () => {
                               required: true,
                               message: "Vui lòng nhập địa chỉ!",
                             },
-                            {
-                              min: 5,
-                              message: "Địa chỉ phải có ít nhất 5 ký tự!",
-                            },
-                            {
-                              max: 200,
-                              message: "Địa chỉ không được vượt quá 200 ký tự!",
-                            },
-                            {
-                              whitespace: true,
-                              message:
-                                "Địa chỉ không được chỉ có khoảng trắng!",
-                            },
                           ]}
                         >
-                          <Input placeholder="Nhập địa chỉ đầy đủ" />
+                          <Input placeholder="Nhập địa chỉ" />
                         </Form.Item>
 
                         <Form.Item
@@ -2026,7 +1841,6 @@ const ChonThoiGian = () => {
                             <>
                               <TextArea
                                 ref={reasonTextareaRef}
-                                value={reasonValue}
                                 rows={4}
                                 placeholder="Mô tả triệu chứng hoặc lý do khám (không bắt buộc)"
                                 maxLength={100}
@@ -2034,9 +1848,6 @@ const ChonThoiGian = () => {
                                 onChange={(e) => {
                                   const newValue = e.target.value;
                                   const newLength = newValue.length;
-
-                                  // IMPORTANT: Update form field value immediately
-                                  form.setFieldsValue({ reason: newValue });
 
                                   // Cắt bớt nếu vượt quá 100 ký tự
                                   if (newLength > 100) {
@@ -2303,6 +2114,13 @@ const ChonThoiGian = () => {
                       {getSpecializationNames(doctor.specializationIds)}
                     </Text>
                   </div>
+
+                  {doctor.educationLevel && (
+                    <div className="summary-item">
+                      <Text strong>Trình độ:</Text>
+                      <Text>{doctor.educationLevel}</Text>
+                    </div>
+                  )}
 
                   {selectedDate && (
                     <div className="summary-item">

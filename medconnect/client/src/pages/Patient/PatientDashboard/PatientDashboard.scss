@@ -20,14 +20,13 @@
   border: 2px solid #cbd5e1 !important;
 }
 
-/* Stat cards should have white background and black text for patient dashboard */
-/* Only apply teal background to doctor dashboard, not patient dashboard */
+/* Stat cards should have colored backgrounds based on type */
+/* Allow inline styles to set background colors */
 .patient-content .stat-card,
 .patient-content .stat-card.stat-card-white,
 .patient-content .stat-card[class*="stat-card"],
 .patient-content div.stat-card {
-  background: #ffffff !important;
-  background-color: #ffffff !important;
+  /* Background will be set inline based on stat type */
   border: 2px solid #cbd5e1 !important;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1) !important;
   transition: none !important;
@@ -61,10 +60,10 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06) !important;
   transform: translateY(0) !important;
 
-  /* Hover effects - allow transform and shadow */
+  /* Hover effects - keep background color but slightly darker */
   &:hover {
-    background: #ffffff !important;
-    background-color: #ffffff !important;
+    /* Keep background color from inline style, just darken it slightly */
+    filter: brightness(0.98);
     transform: translateY(-6px) !important;
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15), 0 4px 8px rgba(0, 0, 0, 0.1) !important;
   }

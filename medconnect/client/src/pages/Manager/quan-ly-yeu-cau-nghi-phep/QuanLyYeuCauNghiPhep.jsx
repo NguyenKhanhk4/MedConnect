@@ -10,7 +10,6 @@ import {
 import { Input } from "../../../components/ui/Input";
 import { Check, X, Clock, User, Calendar } from "lucide-react";
 import { CustomAlert } from "../../../components/ui/CustomAlert";
-import { RescheduleModal } from "../../../components/RescheduleModal/RescheduleModal";
 import "./QuanLyYeuCauNghiPhep.scss";
 
 export default function QuanLyYeuCauNghiPhep() {
@@ -22,9 +21,6 @@ export default function QuanLyYeuCauNghiPhep() {
   const [filterStatus, setFilterStatus] = useState("pending");
   const [alertMessage, setAlertMessage] = useState(null);
   const [confirmConfig, setConfirmConfig] = useState(null);
-  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
-  const [appointmentToReschedule, setAppointmentToReschedule] = useState(null);
-  const [pendingLeaveRequestId, setPendingLeaveRequestId] = useState(null);
 
   // Helper function to show custom alert
   const showAlert = (message) => {
@@ -68,103 +64,28 @@ export default function QuanLyYeuCauNghiPhep() {
   };
 
   const handleApprove = async (leaveRequestId) => {
-    try {
-      const response = await api.post(
-        `/api/managers/leave-requests/${leaveRequestId}/approve`
-      );
-
-      if (response.success) {
-        showAlert("✅ Đã chấp nhận yêu cầu nghỉ phép");
-        await loadLeaveRequests();
-      } else {
-        showAlert(
-          "❌ Không thể chấp nhận: " + (response.message || "Unknown error")
-        );
-      }
-    } catch (error) {
-      console.error("Error approving leave request:", error);
-      // Try to parse error response
-      try {
-        // api.post throws error with message as JSON string
-        const errorText = error.message || error.toString();
-        let errorData;
-
-        // Try to parse as JSON
+    showConfirm(
+      "Bạn có chắc chắn muốn chấp nhận yêu cầu nghỉ phép này?",
+      async () => {
         try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          // If not JSON, try to get error from response property
-          errorData = error.response || { message: errorText };
-        }
+          const response = await api.post(
+            `/api/managers/leave-requests/${leaveRequestId}/approve`
+          );
 
-        // Check if error requires rescheduling an appointment
-        if (
-          errorData.error?.data?.requiresReschedule &&
-          errorData.error?.data?.appointment
-        ) {
-          const appointment = errorData.error.data.appointment;
-          // Show reschedule modal for the appointment
-          setAppointmentToReschedule({
-            _id: appointment._id,
-            patientId: { fullName: appointment.patientName },
-            doctorId: { _id: appointment.doctorId },
-            scheduledStart: appointment.scheduledStart,
-            scheduledEnd: appointment.scheduledEnd,
-            mode: appointment.mode,
-            clinicId: appointment.clinicId,
-            status: "accepted",
-          });
-          setPendingLeaveRequestId(leaveRequestId);
-          setShowRescheduleModal(true);
-          showAlert(
-            "⚠️ Slot này có lịch hẹn đang hoạt động. Vui lòng dời lịch trước khi chấp nhận yêu cầu nghỉ phép."
-          );
-        } else {
-          showAlert(
-            "❌ Không thể chấp nhận: " +
-              (errorData.message ||
-                errorData.error?.message ||
-                "Có lỗi xảy ra khi chấp nhận yêu cầu nghỉ phép")
-          );
+          if (response.success) {
+            showAlert("✅ Đã chấp nhận yêu cầu nghỉ phép");
+            await loadLeaveRequests();
+          } else {
+            showAlert(
+              "❌ Không thể chấp nhận: " + (response.message || "Unknown error")
+            );
+          }
+        } catch (error) {
+          console.error("Error approving leave request:", error);
+          showAlert("Có lỗi xảy ra khi chấp nhận yêu cầu nghỉ phép");
         }
-      } catch (parseError) {
-        console.error("Error parsing error response:", parseError);
-        // If error is not JSON, show generic message
-        showAlert(
-          "Có lỗi xảy ra khi chấp nhận yêu cầu nghỉ phép: " +
-            (error.message || "Unknown error")
-        );
       }
-    }
-  };
-
-  const handleRescheduleSuccess = async () => {
-    // After successful reschedule, try to approve leave request again
-    if (pendingLeaveRequestId) {
-      try {
-        const response = await api.post(
-          `/api/managers/leave-requests/${pendingLeaveRequestId}/approve`
-        );
-
-        if (response.success) {
-          showAlert("✅ Đã dời lịch và chấp nhận yêu cầu nghỉ phép");
-          await loadLeaveRequests();
-        } else {
-          showAlert(
-            "✅ Đã dời lịch nhưng không thể chấp nhận yêu cầu nghỉ phép: " +
-              (response.message || "Unknown error")
-          );
-        }
-      } catch (error) {
-        console.error("Error approving leave request after reschedule:", error);
-        showAlert(
-          "✅ Đã dời lịch nhưng có lỗi khi chấp nhận yêu cầu nghỉ phép"
-        );
-      }
-    }
-    setShowRescheduleModal(false);
-    setAppointmentToReschedule(null);
-    setPendingLeaveRequestId(null);
+    );
   };
 
   const handleReject = async () => {
@@ -190,9 +111,7 @@ export default function QuanLyYeuCauNghiPhep() {
         setRejectionReason("");
         await loadLeaveRequests();
       } else {
-        showAlert(
-          "❌ Không thể từ chối: " + (response.message || "Unknown error")
-        );
+        showAlert("❌ Không thể từ chối: " + (response.message || "Unknown error"));
       }
     } catch (error) {
       console.error("Error rejecting leave request:", error);
@@ -413,54 +332,6 @@ export default function QuanLyYeuCauNghiPhep() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Reschedule Modal - Show when appointment needs to be rescheduled before approving leave request */}
-      {appointmentToReschedule && (
-        <RescheduleModal
-          visible={showRescheduleModal}
-          appointment={appointmentToReschedule}
-          onClose={() => {
-            setShowRescheduleModal(false);
-            setAppointmentToReschedule(null);
-            setPendingLeaveRequestId(null);
-          }}
-          customSubmitHandler={async (requestBody) => {
-            // Use manager reschedule function
-            const { rescheduleAppointmentByManager } = await import(
-              "../../../lib/api"
-            );
-            const response = await rescheduleAppointmentByManager(
-              requestBody.appointmentId,
-              requestBody.newDateTime,
-              requestBody.reason,
-              requestBody.mode,
-              requestBody.clinicId,
-              requestBody.newDoctorId,
-              "doctor_leave" // Always use "doctor_leave" when rescheduling for leave request
-            );
-            return response;
-          }}
-          onSuccess={handleRescheduleSuccess}
-        />
-      )}
-
-      {/* Custom Alert */}
-      <CustomAlert
-        message={alertMessage}
-        onClose={() => setAlertMessage(null)}
-        title="Hệ thống MedConnect"
-      />
-
-      {/* Custom Confirm */}
-      {confirmConfig && (
-        <CustomAlert
-          message={confirmConfig.message}
-          onConfirm={confirmConfig.onConfirm}
-          onClose={confirmConfig.onCancel}
-          title="Hệ thống MedConnect"
-          type="confirm"
-        />
-      )}
     </div>
   );
 }

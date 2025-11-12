@@ -233,7 +233,9 @@ export async function getDoctorTimeSlotsForManager(req, res) {
         mode: appointment.mode || "offline",
         rescheduledFromId: appointment.rescheduledFromId
           ? appointment.rescheduledFromId.toString()
-          : null, // Include rescheduledFromId to identify rescheduled appointments
+          : null, // Include rescheduledFromId to identify rescheduled appointments (for old appointments)
+        rescheduleReason: appointment.rescheduleReason || null, // Include rescheduleReason to identify rescheduled appointments (for updated appointments)
+        rescheduledAt: appointment.rescheduledAt || null, // Include rescheduledAt to identify rescheduled appointments
       };
     });
 
@@ -259,13 +261,8 @@ export async function getDoctorTimeSlotsForManager(req, res) {
       const pendingLeaveRequest = leaveRequestMap[slotIdStr];
 
       // Map appointment status to display status (same logic as Doctor)
-      // IMPORTANT: If slot is blocked (doctor on leave), always keep it as "blocked"
-      // regardless of appointment status
       let displayStatus = slot.status;
-      if (slot.status === "blocked") {
-        // Slot is blocked (doctor on leave), keep it as blocked
-        displayStatus = "blocked";
-      } else if (appointment) {
+      if (appointment) {
         const statusMap = {
           pending_doctor: "pending",
           accepted: "confirmed",
@@ -296,7 +293,9 @@ export async function getDoctorTimeSlotsForManager(req, res) {
         appointmentStatus: appointment?.appointmentStatus || null,
         reason: appointment?.reason || null,
         mode: appointment?.mode || null,
-        rescheduledFromId: appointment?.rescheduledFromId || null, // Flag to identify rescheduled appointments
+        rescheduledFromId: appointment?.rescheduledFromId || null, // Flag to identify rescheduled appointments (for old appointments)
+        rescheduleReason: appointment?.rescheduleReason || null, // Flag to identify rescheduled appointments (for updated appointments)
+        rescheduledAt: appointment?.rescheduledAt || null, // Flag to identify rescheduled appointments
         leaveReason: slot.leaveReason || null, // Lý do nghỉ
         hasPendingLeaveRequest: !!pendingLeaveRequest, // Flag để biết có leave request đang pending
         leaveRequestId: pendingLeaveRequest?._id?.toString() || null,
@@ -1454,16 +1453,6 @@ export async function rescheduleAppointmentByManager(req, res) {
     } = req.body;
     const userId = req.user.app_user_id;
 
-    console.log("🔄 [Reschedule] Request body:", {
-      appointmentId,
-      newDateTime,
-      reason,
-      mode,
-      clinicId,
-      newDoctorId,
-      rescheduleReasonType,
-    });
-
     if (!appointmentId || !newDateTime || !reason || !mode) {
       return fail(
         res,
@@ -1497,7 +1486,6 @@ export async function rescheduleAppointmentByManager(req, res) {
     const originalAppointment = await Appointment.findById(appointmentId)
       .populate("patientId", "userId fullName")
       .populate("doctorId", "userId fullName")
-      .populate("slotId", "doctorId startAt endAt status")
       .populate({
         path: "patientId",
         populate: {
@@ -1540,24 +1528,32 @@ export async function rescheduleAppointmentByManager(req, res) {
       );
     }
 
+    // Determine which doctor to use (newDoctorId if provided, otherwise original doctor)
+    let targetDoctorId =
+      originalAppointment.doctorId._id || originalAppointment.doctorId;
+
+    // If newDoctorId is provided, validate it exists and is verified
+    if (newDoctorId) {
+      const newDoctor = await Doctor.findById(newDoctorId).lean();
+      if (!newDoctor) {
+        return fail(res, 404, ERROR_CODES.NOT_FOUND, "New doctor not found");
+      }
+      if (!newDoctor.isVerified) {
+        return fail(
+          res,
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          "New doctor is not verified"
+        );
+      }
+      targetDoctorId = newDoctorId;
+    }
+
     // Start transaction
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-      // Update original appointment status
-      await Appointment.findByIdAndUpdate(
-        originalAppointment._id,
-        {
-          status: "rescheduled",
-          rescheduledToId: null, // Will be set after creating new appointment
-          rescheduledBy: userId,
-          rescheduledAt: new Date(),
-          rescheduleReason: reason.trim(),
-        },
-        { session }
-      );
-
       // Calculate appointment duration
       const appointmentDuration =
         originalAppointment.scheduledEnd.getTime() -
@@ -1566,25 +1562,7 @@ export async function rescheduleAppointmentByManager(req, res) {
       const newScheduledStart = newDate;
       const newScheduledEnd = new Date(newDate.getTime() + appointmentDuration);
 
-      // Use newDoctorId if provided, otherwise use original doctor
-      let doctorId;
-      if (newDoctorId) {
-        // Validate new doctor exists and is verified
-        const newDoctor = await Doctor.findById(newDoctorId).session(session);
-        if (!newDoctor) {
-          throw new Error("New doctor not found");
-        }
-        if (!newDoctor.isVerified) {
-          throw new Error("New doctor is not verified");
-        }
-        doctorId = newDoctorId;
-        console.log(
-          `🔄 Rescheduling to different doctor: ${newDoctor.fullName}`
-        );
-      } else {
-        doctorId =
-          originalAppointment.doctorId._id || originalAppointment.doctorId;
-      }
+      const doctorId = targetDoctorId;
 
       // Find or create a time slot for the new datetime
       let newTimeSlot = await DoctorTimeSlot.findOne({
@@ -1599,7 +1577,7 @@ export async function rescheduleAppointmentByManager(req, res) {
           doctorId: doctorId,
           startAt: newScheduledStart,
           endAt: newScheduledEnd,
-          status: "available", // Will be set to "booked" after appointment creation
+          status: "available", // Will be set to "booked" after appointment update
         });
         await newTimeSlot.save({ session });
         console.log(
@@ -1618,73 +1596,83 @@ export async function rescheduleAppointmentByManager(req, res) {
         );
       }
 
-      // Create new appointment with the NEW time slot
-      // Copy payment information from original appointment to maintain payment status
-      // If original appointment was paid, the rescheduled appointment should also be marked as paid
-      const newAppointmentData = {
-        patientId:
-          originalAppointment.patientId._id || originalAppointment.patientId,
+      // If doctor was changed, we need to get clinic from new doctor if offline mode
+      let targetClinicId = undefined;
+      if (mode === "offline") {
+        if (clinicId) {
+          targetClinicId = clinicId;
+        } else if (newDoctorId) {
+          // If doctor changed, try to get default clinic from new doctor
+          const newDoctor = await Doctor.findById(newDoctorId)
+            .populate("clinicDefaultId")
+            .lean();
+          if (newDoctor?.clinicDefaultId) {
+            targetClinicId =
+              newDoctor.clinicDefaultId._id || newDoctor.clinicDefaultId;
+          }
+        } else {
+          // Use original appointment clinic
+          targetClinicId =
+            originalAppointment.clinicId?._id || originalAppointment.clinicId;
+        }
+      }
+
+      // If doctor was changed, set paymentStatus to "paid" since patient already paid for the original appointment
+      const paymentStatus = newDoctorId
+        ? "paid"
+        : originalAppointment.paymentStatus || "unpaid";
+
+      // Handle old slot based on reschedule reason type (before updating appointment)
+      const oldSlotId =
+        originalAppointment.slotId?._id || originalAppointment.slotId;
+      if (oldSlotId && oldSlotId.toString() !== newTimeSlot._id.toString()) {
+        if (rescheduleReasonType === "doctor_leave") {
+          // If doctor is on leave, block the old slot so no one can book it
+          await DoctorTimeSlot.findByIdAndUpdate(
+            oldSlotId,
+            { status: "blocked" },
+            { session }
+          );
+          console.log(`✅ Blocked old slot ${oldSlotId} - doctor is on leave`);
+        } else {
+          // Default: patient requested reschedule, free the old slot
+          await DoctorTimeSlot.findByIdAndUpdate(
+            oldSlotId,
+            { status: "available" },
+            { session }
+          );
+          console.log(
+            `✅ Freed old slot ${oldSlotId} - set to available after reschedule`
+          );
+        }
+      }
+
+      // Update the existing appointment instead of creating a new one
+      const updateData = {
         doctorId: doctorId,
-        clinicId:
-          mode === "offline"
-            ? clinicId ||
-              originalAppointment.clinicId?._id ||
-              originalAppointment.clinicId
-            : undefined,
+        clinicId: targetClinicId,
         slotId: newTimeSlot._id,
         scheduledStart: newScheduledStart,
         scheduledEnd: newScheduledEnd,
         mode: mode,
         status: "accepted",
-        reason:
-          originalAppointment.reason || originalAppointment.reasonForVisit,
-        rescheduledFromId: originalAppointment._id,
-        // Copy payment information from original appointment
-        // Since manager can only reschedule paid appointments (they appear in schedule),
-        // we preserve the payment status
-        // IMPORTANT: When rescheduling, the patient has already paid for the original appointment,
-        // so the new appointment should also be marked as "paid" - no additional payment needed
-        amountPaid: originalAppointment.amountPaid || 0,
-        totalPay: originalAppointment.totalPay || 0,
-        services: Array.isArray(originalAppointment.services)
-          ? originalAppointment.services.map((s) => ({ ...s })) // Deep copy array
-          : [],
-        // Do NOT copy paymentId - it has unique index and belongs to original appointment
-        // Each appointment can only link to one payment, so rescheduled appointment
-        // should not have paymentId (payment was already made for original appointment)
-        // paymentId: null (default, not copied)
-        // Always set paymentStatus to "paid" if original was paid
-        // The pre-save hook might override this, so we'll force it after save
-        paymentStatus:
-          originalAppointment.paymentStatus === "paid" ? "paid" : "unpaid",
-        createdAt: new Date(),
+        rescheduledBy: userId,
+        rescheduledAt: new Date(),
+        rescheduleReason: reason.trim(),
+        paymentStatus: paymentStatus,
         updatedAt: new Date(),
       };
 
-      const newAppointment = new Appointment(newAppointmentData);
-      await newAppointment.save({ session });
-
-      // CRITICAL: Always ensure paymentStatus is "paid" if original appointment was paid
-      // When rescheduling, the patient has already paid for the original appointment,
-      // so no additional payment is needed - the new appointment should remain "paid"
-      // The pre-save hook might override paymentStatus based on amountPaid/totalPay,
-      // so we must explicitly force it to "paid" after save
-      if (originalAppointment.paymentStatus === "paid") {
-        await Appointment.findByIdAndUpdate(
-          newAppointment._id,
-          { paymentStatus: "paid" },
-          { session }
-        );
-        // Update the in-memory object to reflect the change
-        newAppointment.paymentStatus = "paid";
-        console.log(
-          `✅ Preserved paymentStatus as "paid" for rescheduled appointment ${newAppointment._id} (original was paid, no additional payment needed)`
-        );
-      } else {
-        console.log(
-          `⚠️ Original appointment was not paid (paymentStatus: ${originalAppointment.paymentStatus}), new appointment will be unpaid`
-        );
+      // Copy payment information from original appointment if doctor was changed
+      if (newDoctorId && originalAppointment.amountPaid) {
+        updateData.amountPaid = originalAppointment.amountPaid;
+        updateData.totalPay =
+          originalAppointment.totalPay || originalAppointment.amountPaid;
       }
+
+      await Appointment.findByIdAndUpdate(originalAppointment._id, updateData, {
+        session,
+      });
 
       // Mark the new time slot as booked
       await DoctorTimeSlot.findByIdAndUpdate(
@@ -1693,110 +1681,20 @@ export async function rescheduleAppointmentByManager(req, res) {
         { session }
       );
 
-      // Handle old slot based on rescheduleReasonType
-      // If "doctor_leave": block the slot (bác sĩ nghỉ)
-      // If "patient_request": free the slot (bệnh nhân yêu cầu, slot có thể dùng lại)
-      const oldSlotId =
-        originalAppointment.slotId?._id || originalAppointment.slotId;
-
-      console.log("🔍 [Reschedule] Old slot info:", {
-        oldSlotId,
-        slotIdType: typeof oldSlotId,
-        slotIdValue: oldSlotId,
-        originalSlotId: originalAppointment.slotId,
-        rescheduleReasonType,
-        originalDoctorId:
-          originalAppointment.doctorId?._id || originalAppointment.doctorId,
-        newDoctorId: doctorId,
-      });
-
-      if (oldSlotId) {
-        // Verify the old slot exists and belongs to the original doctor
-        const oldSlot = await DoctorTimeSlot.findById(oldSlotId).session(
-          session
-        );
-        if (!oldSlot) {
-          console.error(`❌ Old slot ${oldSlotId} not found!`);
-        } else {
-          const originalDoctorId =
-            originalAppointment.doctorId?._id || originalAppointment.doctorId;
-          if (oldSlot.doctorId.toString() !== originalDoctorId.toString()) {
-            console.error(
-              `❌ Old slot ${oldSlotId} does not belong to original doctor!`,
-              {
-                oldSlotDoctorId: oldSlot.doctorId.toString(),
-                originalDoctorId: originalDoctorId.toString(),
-              }
-            );
-          } else {
-            console.log("🔍 [Reschedule] Processing old slot:", {
-              oldSlotId,
-              rescheduleReasonType,
-              reason: reason.trim(),
-              oldSlotStatus: oldSlot.status,
-              oldSlotDoctorId: oldSlot.doctorId.toString(),
-              originalDoctorId: originalDoctorId.toString(),
-            });
-
-            if (rescheduleReasonType === "doctor_leave") {
-              // Block the slot because doctor is on leave
-              // The appointment has already been set to "rescheduled" above,
-              // so it won't appear in appointment queries for this slot
-              const blockedSlot = await DoctorTimeSlot.findByIdAndUpdate(
-                oldSlotId,
-                {
-                  status: "blocked",
-                  leaveReason: reason.trim() || "Bác sĩ nghỉ",
-                },
-                { session, new: true }
-              );
-              console.log(
-                `✅ Blocked old slot ${oldSlotId} - doctor on leave after reschedule`,
-                {
-                  slotId: oldSlotId,
-                  status: blockedSlot?.status,
-                  leaveReason: blockedSlot?.leaveReason,
-                  rescheduleReasonType,
-                  doctorId: oldSlot.doctorId.toString(),
-                }
-              );
-            } else {
-              // Default: "patient_request" - free the slot for others to book
-              await DoctorTimeSlot.findByIdAndUpdate(
-                oldSlotId,
-                { status: "available" },
-                { session }
-              );
-              console.log(
-                `✅ Freed old slot ${oldSlotId} - set to available after reschedule (patient request)`,
-                {
-                  rescheduleReasonType,
-                }
-              );
-            }
-          }
-        }
-      } else {
-        console.error("❌ No old slot ID found in original appointment!");
-      }
-
-      // Update original appointment status to "rescheduled" BEFORE handling old slot
-      // This ensures the appointment won't appear in queries for the old slot
-      await Appointment.findByIdAndUpdate(
-        originalAppointment._id,
-        {
-          status: "rescheduled",
-          rescheduledToId: newAppointment._id,
-        },
-        { session }
-      );
+      // Get updated appointment for response (before committing transaction)
+      const updatedAppointment = await Appointment.findById(
+        originalAppointment._id
+      )
+        .populate("patientId", "userId fullName")
+        .populate("doctorId", "userId fullName")
+        .session(session);
 
       // Commit transaction
       await session.commitTransaction();
 
       // Send notifications to both doctor and patient
       try {
-        // Notification for both patient and doctor (using original appointment to get both users)
+        // Notification for both patient and doctor
         await createAppointmentNotification(
           originalAppointment._id,
           "rescheduled",
@@ -1806,7 +1704,6 @@ export async function rescheduleAppointmentByManager(req, res) {
             rescheduledBy: userId,
             rescheduledByType: "manager",
             notifyDoctor: true, // Flag to notify doctor
-            newAppointmentId: newAppointment._id, // Include new appointment ID for reference
           }
         );
 
@@ -1820,20 +1717,31 @@ export async function rescheduleAppointmentByManager(req, res) {
         );
       }
 
-      // Send email notification to patient (reuse function from rescheduleController)
+      // Send email notification to patient
       try {
         const { sendAppointmentRescheduledEmail } = await import(
           "../controllers/rescheduleController.js"
         );
 
-        // Get doctor object for email (populate userId if needed)
+        // Get doctor object for email (use new doctor if doctor was changed)
         const doctor = await Doctor.findById(doctorId)
           .populate("userId", "email fullName")
           .lean();
 
+        // For email, we need to pass both old and new appointment info
+        // Since we updated the same appointment, create a snapshot of old data for email
+        const oldAppointmentData = {
+          _id: originalAppointment._id,
+          scheduledStart: originalAppointment.scheduledStart,
+          scheduledEnd: originalAppointment.scheduledEnd,
+          doctorId: originalAppointment.doctorId,
+          mode: originalAppointment.mode,
+          clinicId: originalAppointment.clinicId,
+        };
+
         await sendAppointmentRescheduledEmail(
-          originalAppointment,
-          newAppointment,
+          oldAppointmentData,
+          updatedAppointment.toObject(),
           reason.trim(),
           doctor
         );
@@ -1846,18 +1754,9 @@ export async function rescheduleAppointmentByManager(req, res) {
         // Don't block reschedule if email fails
       }
 
-      // Populate newAppointment with doctorId before returning
-      const populatedNewAppointment = await Appointment.findById(
-        newAppointment._id
-      )
-        .populate("doctorId", "_id fullName")
-        .populate("patientId", "_id fullName")
-        .lean();
-
       return ok(res, {
         message: "Appointment rescheduled successfully",
-        newAppointment: populatedNewAppointment,
-        originalAppointment: originalAppointment._id,
+        appointment: updatedAppointment,
       });
     } catch (error) {
       await session.abortTransaction();
@@ -2833,58 +2732,6 @@ export async function processCashPayment(req, res) {
             } catch (notificationError) {
               console.error(
                 "❌ Error sending booking notification to doctor:",
-                notificationError
-              );
-            }
-
-            // Gửi notification cho patient về đặt lịch thành công
-            try {
-              const Notification = (
-                await import("../models/notification.model.js")
-              ).default;
-              const patient = await Patient.findById(
-                appointment.patientId
-              ).populate("userId");
-              const doctor = await Doctor.findById(appointment.doctorId);
-
-              if (patient && patient.userId) {
-                const appointmentTime = new Date(
-                  appointment.scheduledStart
-                ).toLocaleString("vi-VN", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
-                const doctorName = doctor?.fullName || "Bác sĩ";
-                const patientUserId = patient.userId._id || patient.userId;
-
-                await Notification.create({
-                  userId: patientUserId,
-                  type: "appointment",
-                  title: "Đặt lịch khám thành công!",
-                  message: `Bạn đã đặt lịch khám với BS. ${doctorName} vào ${appointmentTime} thành công. Lịch hẹn đang chờ bác sĩ xác nhận.`,
-                  priority: "high",
-                  relatedId: appointment._id,
-                  relatedType: "appointment",
-                  metadata: {
-                    appointmentId: appointment._id,
-                    doctorName,
-                    appointmentTime,
-                    status: "pending_confirmation",
-                    paymentCompleted: true,
-                    createdByManager: true,
-                  },
-                });
-                console.log(
-                  `✅ Booking success notification sent to patient for appointment ${appointment._id}`
-                );
-              }
-            } catch (notificationError) {
-              console.error(
-                "❌ Error sending booking success notification to patient:",
                 notificationError
               );
             }

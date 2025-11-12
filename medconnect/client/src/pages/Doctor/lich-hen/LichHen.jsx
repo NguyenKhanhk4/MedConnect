@@ -262,38 +262,38 @@ export default function LichHen() {
 
   const getStatusIcon = (status) => {
     const icons = {
-      accepted: <CheckCircle className="w-4 h-4 text-white" />, // Xanh lá đậm
-      pending_doctor: <Clock className="w-4 h-4 text-white" />, // Vàng
-      rejected: <XCircle className="w-4 h-4 text-white" />, // Đỏ - Bác sĩ từ chối
-      cancelled: <XCircle className="w-4 h-4 text-white" />, // Cam - Bệnh nhân hủy
-      in_progress: <Clock className="w-4 h-4 text-white" />, // Xanh dương - Đang khám
-      done: <CheckCircle className="w-4 h-4 text-white" />, // Xanh lá - Hoàn thành
-      no_show: <XCircle className="w-4 h-4 text-white" />, // Xám - Không đến khám
-      rescheduled: <Clock className="w-4 h-4 text-white" />, // Xanh dương - Đã dời lịch
+      accepted: <CheckCircle className="w-4 h-4" />, // Icon sẽ lấy màu từ text
+      pending_doctor: <Clock className="w-4 h-4" />,
+      rejected: <XCircle className="w-4 h-4" />,
+      cancelled: <XCircle className="w-4 h-4" />,
+      in_progress: <Clock className="w-4 h-4" />,
+      done: <CheckCircle className="w-4 h-4" />,
+      no_show: <XCircle className="w-4 h-4" />,
+      rescheduled: <Clock className="w-4 h-4" />,
       // Fallback for old status names
-      confirmed: <CheckCircle className="w-4 h-4 text-white" />,
-      pending: <Clock className="w-4 h-4 text-white" />,
-      completed: <CheckCircle className="w-4 h-4 text-white" />,
+      confirmed: <CheckCircle className="w-4 h-4" />,
+      pending: <Clock className="w-4 h-4" />,
+      completed: <CheckCircle className="w-4 h-4" />,
     };
     return icons[status] || null;
   };
 
   const getStatusColor = (status) => {
     const colors = {
-      accepted: "!bg-green-500 !text-white", // Xanh lá đậm - Đã chấp nhận
-      pending_doctor: "!bg-purple-500 !text-white", // Tím - Chờ bác sĩ xác nhận
-      rejected: "!bg-red-500 !text-white", // Đỏ - Bác sĩ từ chối
-      cancelled: "!bg-orange-500 !text-white", // Cam - Bệnh nhân hủy
-      in_progress: "!bg-blue-500 !text-white", // Xanh dương - Đang khám
-      done: "!bg-emerald-500 !text-white", // Xanh lá - Hoàn thành
-      no_show: "!bg-gray-500 !text-white", // Xám - Không đến khám
-      rescheduled: "!bg-indigo-500 !text-white", // Xanh dương đậm - Đã dời lịch
+      accepted: "!bg-green-100 !text-green-800", // Nền xanh lá nhạt - Chữ xanh lá đậm
+      pending_doctor: "!bg-purple-100 !text-purple-800", // Nền tím nhạt - Chữ tím đậm
+      rejected: "!bg-red-100 !text-red-800", // Nền đỏ nhạt - Chữ đỏ đậm
+      cancelled: "!bg-orange-100 !text-orange-800", // Nền cam nhạt - Chữ cam đậm
+      in_progress: "!bg-blue-100 !text-blue-800", // Nền xanh dương nhạt - Chữ xanh dương đậm
+      done: "!bg-emerald-100 !text-emerald-800", // Nền xanh lá nhạt - Chữ xanh lá đậm
+      no_show: "!bg-gray-100 !text-gray-800", // Nền xám nhạt - Chữ xám đậm
+      rescheduled: "!bg-indigo-100 !text-indigo-800", // Nền indigo nhạt - Chữ indigo đậm
       // Fallback for old status names
-      confirmed: "!bg-green-500 !text-white",
-      pending: "!bg-purple-500 !text-white",
-      completed: "!bg-emerald-500 !text-white",
+      confirmed: "!bg-green-100 !text-green-800",
+      pending: "!bg-purple-100 !text-purple-800",
+      completed: "!bg-emerald-100 !text-emerald-800",
     };
-    return colors[status] || "!bg-gray-500 !text-white";
+    return colors[status] || "!bg-gray-100 !text-gray-800";
   };
 
   const getStatusText = (status) => {
@@ -994,20 +994,35 @@ export default function LichHen() {
                       </Badge>
                     </td>
                     <td className="appointment-list-td appointment-list-reason">
-                      <div className="appointment-reason-container">
-                        {apt.rescheduledFromId && (
-                          <div className="appointment-reschedule-badge-wrapper">
-                            <Badge
-                              className="appointment-reschedule-badge cursor-pointer"
-                              onClick={() => handleViewRescheduleInfo(apt)}
-                            >
-                              📅 Đã dời lịch
-                            </Badge>
-                          </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                        }}
+                      >
+                        {(apt.rescheduledFromId ||
+                          apt.rescheduleReason ||
+                          apt.rescheduledAt) && (
+                          <Badge
+                            className="cursor-pointer"
+                            style={{
+                              backgroundColor: "#6366f1",
+                              color: "#ffffff",
+                              borderColor: "#4f46e5",
+                              fontWeight: 600,
+                              fontSize: "12px",
+                              padding: "4px 8px",
+                              borderRadius: "6px",
+                              width: "fit-content",
+                              marginBottom: "4px",
+                            }}
+                            onClick={() => handleViewRescheduleInfo(apt)}
+                          >
+                            📅 Đã dời lịch
+                          </Badge>
                         )}
-                        <div className="appointment-reason-text">
-                          {apt.notes || apt.reason || "Không có"}
-                        </div>
+                        <span>{apt.notes || apt.reason || "Không có"}</span>
                       </div>
                     </td>
                     <td className="appointment-list-td appointment-list-status">
@@ -1223,7 +1238,6 @@ export default function LichHen() {
                     <div className="appointment-detail-status-badge">
                       <Badge
                         className={getStatusColor(selectedAppointment.status)}
-                        data-status={selectedAppointment.status}
                       >
                         {getStatusIcon(selectedAppointment.status)}
                         <span className="appointment-detail-status-text">

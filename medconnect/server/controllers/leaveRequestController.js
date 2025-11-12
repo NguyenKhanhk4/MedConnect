@@ -237,40 +237,19 @@ export async function approveLeaveRequest(req, res) {
     }
 
     // Kiểm tra slot có appointment active không
-    // Nếu có, trả về thông tin appointment để manager có thể dời lịch trước
     const existingAppointment = await Appointment.findOne({
       slotId: leaveRequest.slotId._id,
       status: {
         $in: ["pending_doctor", "accepted", "in_progress"],
       },
-    })
-      .populate("patientId", "fullName phone")
-      .populate("doctorId", "fullName")
-      .lean();
+    });
 
     if (existingAppointment) {
       return fail(
         res,
         400,
-        {
-          code: ERROR_CODES.INVALID_INPUT,
-          data: {
-            requiresReschedule: true,
-            appointment: {
-              _id: existingAppointment._id,
-              patientName:
-                existingAppointment.patientId?.fullName || "Bệnh nhân",
-              scheduledStart: existingAppointment.scheduledStart,
-              scheduledEnd: existingAppointment.scheduledEnd,
-              mode: existingAppointment.mode,
-              clinicId: existingAppointment.clinicId,
-              doctorId:
-                existingAppointment.doctorId?._id ||
-                existingAppointment.doctorId,
-            },
-          },
-        },
-        "Slot này có lịch hẹn đang hoạt động. Vui lòng dời lịch trước khi chấp nhận yêu cầu nghỉ phép."
+        ERROR_CODES.INVALID_INPUT,
+        "Cannot approve leave request for a slot with an active appointment"
       );
     }
 

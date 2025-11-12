@@ -11,10 +11,13 @@ import {
   Empty,
   Spin,
   Popconfirm,
-  Rate,
-  Space,
 } from "antd";
-import { UserOutlined, CalendarOutlined, HeartFilled } from "@ant-design/icons";
+import {
+  UserOutlined,
+  CalendarOutlined,
+  HeartFilled,
+  StarFilled,
+} from "@ant-design/icons";
 import { useFavoriteDoctors } from "../../../hooks/useFavoriteDoctors";
 import {
   getSpecializationNames,
@@ -31,18 +34,9 @@ const BacSiUaThich = () => {
     useFavoriteDoctors();
 
   const handleBookAppointment = (doctor) => {
-    // Ensure doctor object has the correct structure for ChonThoiGian page
-    const doctorForBooking = {
-      ...doctor,
-      // Map specializations to specializationIds for compatibility
-      specializationIds: doctor.specializations || [],
-      // Keep specializations for backward compatibility
-      specializations: doctor.specializations || [],
-    };
-
     navigate("/dat-lich/chon-thoi-gian", {
       state: {
-        doctor: doctorForBooking,
+        doctor: doctor,
         specialization: doctor.specializations?.[0] || null,
       },
     });
@@ -159,21 +153,15 @@ const BacSiUaThich = () => {
                       )}
 
                       <div className="doctor-rating">
-                        <Space>
-                          <Rate
-                            disabled
-                            value={parseFloat(doctor.ratingAvg) || 0}
-                            allowClear={false}
-                            count={5}
-                            style={{ fontSize: 14 }}
-                          />
-                          <Text type="secondary" style={{ fontSize: "14px" }}>
-                            {formatDoctorRating(
-                              doctor.ratingAvg,
-                              doctor.ratingCount
-                            )}
-                          </Text>
-                        </Space>
+                        <StarFilled
+                          style={{ color: "#faad14", marginRight: 4 }}
+                        />
+                        <Text>
+                          {formatDoctorRating(
+                            doctor.ratingAvg,
+                            doctor.ratingCount
+                          )}
+                        </Text>
                       </div>
 
                       {doctor.bio && (

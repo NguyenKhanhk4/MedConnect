@@ -266,11 +266,8 @@ export async function getCurrentPatientProfile(req, res) {
     let patient = null;
 
     if (user.role === "patient") {
-      // Find patient profile with relationshipToOwner: "self" (user's own profile, not family members)
-      patient = await Patient.findOne({
-        userId: appUserId,
-        relationshipToOwner: "self",
-      }).lean();
+      // Find patient profile, create if not exists (only for patients)
+      patient = await Patient.findOne({ userId: appUserId }).lean();
 
       if (!patient) {
         // Create a basic patient profile if it doesn't exist
@@ -279,7 +276,6 @@ export async function getCurrentPatientProfile(req, res) {
           userId: appUserId,
           fullName: user.fullName || "Chưa cập nhật",
           phone: user.phone || "",
-          relationshipToOwner: "self", // IMPORTANT: Mark as self profile
           isComplete: false,
         });
 
@@ -504,7 +500,7 @@ export async function updatePatientProfile(req, res) {
       await User.findByIdAndUpdate(appUserId, userUpdate);
     }
 
-    // Update or create patient profile (only for user's own profile, not family members)
+    // Update or create patient profile
     const patientUpdate = {
       userId: appUserId,
       fullName: updateData.fullName,
@@ -540,13 +536,10 @@ export async function updatePatientProfile(req, res) {
       }),
       // Ghi chú
       notes: updateData.notes,
-      // IMPORTANT: Ensure relationshipToOwner is "self" for user's own profile
-      relationshipToOwner: "self",
     };
 
-    // Only update patient profile with relationshipToOwner: "self" (user's own profile)
     const patient = await Patient.findOneAndUpdate(
-      { userId: appUserId, relationshipToOwner: "self" },
+      { userId: appUserId },
       patientUpdate,
       { upsert: true, new: true }
     );
@@ -851,11 +844,8 @@ export async function bookAppointment(req, res) {
         );
       }
     } else {
-      // Otherwise, get or create the user's own patient profile (with relationshipToOwner: "self")
-      patient = await Patient.findOne({
-        userId: appUserId,
-        relationshipToOwner: "self",
-      });
+      // Otherwise, get or create the user's own patient profile
+      patient = await Patient.findOne({ userId: appUserId });
       if (!patient) {
         // Create a basic patient profile if it doesn't exist
         console.log("Creating new patient profile for user:", appUserId);
@@ -868,7 +858,6 @@ export async function bookAppointment(req, res) {
           userId: appUserId,
           fullName: user.fullName || "Chưa cập nhật",
           phone: user.phone || "",
-          relationshipToOwner: "self", // IMPORTANT: Mark as self profile
           isComplete: false,
         });
 
@@ -2388,6 +2377,8 @@ export async function getFavoriteDoctors(req, res) {
     const favorites = await PatientFavorite.find({ patientId: patient._id })
       .populate({
         path: "doctorId",
+        select:
+          "fullName avatarUrl yearsExperience educationLevel bio specializationIds userId", // Explicitly select fields including educationLevel
         populate: [
           {
             path: "userId",
@@ -2402,12 +2393,12 @@ export async function getFavoriteDoctors(req, res) {
       .sort({ favoritedAt: -1 })
       .lean();
 
-    // Get all doctor IDs
+    // Get doctor IDs
     const doctorIds = favorites
       .map((fav) => fav.doctorId?._id)
       .filter((id) => id);
 
-    // Calculate rating statistics from Review model
+    // Calculate ratings from Review collection
     const ratingStats = await Review.aggregate([
       {
         $match: {
@@ -2433,26 +2424,32 @@ export async function getFavoriteDoctors(req, res) {
     });
 
     // Format doctors data with calculated ratings
-    const favoriteDoctors = favorites
-      .filter((fav) => fav.doctorId) // Filter out any null doctors
-      .map((fav) => {
-        const doctorId = fav.doctorId._id.toString();
-        const ratingData = ratingMap.get(doctorId);
+    const favoriteDoctors = favorites.map((fav) => {
+      const doctorId = fav.doctorId?._id?.toString();
+      const ratingData = ratingMap.get(doctorId);
 
-        return {
-          _id: fav.doctorId._id,
-          fullName: fav.doctorId.userId?.fullName || fav.doctorId.fullName,
-          avatarUrl: fav.doctorId.avatarUrl || fav.doctorId.userId?.photoURL,
-          specializations: fav.doctorId.specializationIds || [],
-          specializationIds: fav.doctorId.specializationIds || [], // Add for compatibility
-          yearsExperience: fav.doctorId.yearsExperience,
-          educationLevel: fav.doctorId.educationLevel, // Add education level
-          ratingAvg: ratingData?.ratingAvg || 0,
-          ratingCount: ratingData?.ratingCount || 0,
-          bio: fav.doctorId.bio,
-          favoritedAt: fav.favoritedAt,
-        };
-      });
+      // Debug log to check educationLevel
+      if (fav.doctorId) {
+        console.log(`[getFavoriteDoctors] Doctor ${doctorId}:`, {
+          fullName: fav.doctorId.fullName,
+          educationLevel: fav.doctorId.educationLevel,
+          hasEducationLevel: !!fav.doctorId.educationLevel,
+        });
+      }
+
+      return {
+        _id: fav.doctorId._id,
+        fullName: fav.doctorId.userId?.fullName || fav.doctorId.fullName,
+        avatarUrl: fav.doctorId.avatarUrl || fav.doctorId.userId?.photoURL,
+        specializations: fav.doctorId.specializationIds || [],
+        yearsExperience: fav.doctorId.yearsExperience,
+        educationLevel: fav.doctorId.educationLevel || null, // Explicitly set to null if missing
+        ratingAvg: ratingData?.ratingAvg || 0,
+        ratingCount: ratingData?.ratingCount || 0,
+        bio: fav.doctorId.bio,
+        favoritedAt: fav.favoritedAt,
+      };
+    });
 
     return ok(res, { favoriteDoctors });
   } catch (error) {
@@ -2948,11 +2945,14 @@ export async function getPatientPayments(req, res) {
       );
     }
 
-    // Find patient by user ID
-    const patient = await Patient.findOne({ userId: appUserId });
-    if (!patient) {
+    // Find all patients belonging to this user (including family members)
+    const patients = await Patient.find({ userId: appUserId });
+    if (!patients || patients.length === 0) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient not found");
     }
+
+    // Get all patient IDs (including family members)
+    const patientIds = patients.map((p) => p._id);
 
     const {
       invoiceType,
@@ -2964,9 +2964,10 @@ export async function getPatientPayments(req, res) {
     } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Build query - only get payments for this patient
+    // Build query - get payments for all patients belonging to this user
+    // This includes payments for the user themselves and payments for family members they booked for
     const query = {
-      "billTo.patientId": patient._id,
+      "billTo.patientId": { $in: patientIds },
     };
 
     // Filter by invoiceType (booking or service)
@@ -3088,23 +3089,6 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
       patientId,
     } = req.body;
 
-    // Debug log để kiểm tra reason
-    console.log(
-      "🔍 calculatePaymentSummaryForSingleAppointment - Reason from request:",
-      reason
-    );
-    console.log(
-      "🔍 calculatePaymentSummaryForSingleAppointment - Request body:",
-      {
-        doctorId,
-        slotId,
-        mode,
-        reason,
-        hasReason: !!reason,
-        reasonType: typeof reason,
-      }
-    );
-
     // Validate required fields
     if (!doctorId || !slotId || !mode || !scheduledStart || !scheduledEnd) {
       return fail(
@@ -3138,7 +3122,6 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
     // Get patient profile
     let patient;
     if (patientId) {
-      // If patientId is provided, use that patient (for family member booking)
       patient = await Patient.findOne({
         _id: patientId,
         userId: appUserId,
@@ -3153,11 +3136,7 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
         );
       }
     } else {
-      // Otherwise, get or create the user's own patient profile (with relationshipToOwner: "self")
-      patient = await Patient.findOne({
-        userId: appUserId,
-        relationshipToOwner: "self",
-      });
+      patient = await Patient.findOne({ userId: appUserId });
       if (!patient) {
         const user = await User.findById(appUserId);
         if (!user) {
@@ -3168,7 +3147,6 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
           userId: appUserId,
           fullName: user.fullName || "Chưa cập nhật",
           phone: user.phone || "",
-          relationshipToOwner: "self", // IMPORTANT: Mark as self profile
           isComplete: false,
         });
 
@@ -3251,14 +3229,6 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
       minute: "2-digit",
     });
 
-    // Ensure reason is properly handled
-    const reasonValue = reason ? String(reason).trim() : "";
-
-    console.log(
-      "🔍 calculatePaymentSummaryForSingleAppointment - Final reason value:",
-      reasonValue
-    );
-
     return ok(res, {
       totalAmount: price,
       appointmentSummary: {
@@ -3270,7 +3240,7 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
         scheduledEnd: scheduledEnd,
         clinicId: clinicId || null,
         clinicName: clinic?.name || null,
-        reason: reasonValue,
+        reason: reason || "",
         price: price,
         bookingFee: price,
         timeText: timeText,
@@ -3374,7 +3344,6 @@ export async function createPaymentForSingleAppointment(req, res) {
     // Get patient profile
     let patient;
     if (patientId) {
-      // If patientId is provided, use that patient (for family member booking)
       patient = await Patient.findOne({
         _id: patientId,
         userId: appUserId,
@@ -3389,11 +3358,7 @@ export async function createPaymentForSingleAppointment(req, res) {
         );
       }
     } else {
-      // Otherwise, get or create the user's own patient profile (with relationshipToOwner: "self")
-      patient = await Patient.findOne({
-        userId: appUserId,
-        relationshipToOwner: "self",
-      }).populate("userId");
+      patient = await Patient.findOne({ userId: appUserId }).populate("userId");
       if (!patient) {
         const user = await User.findById(appUserId);
         if (!user) {
@@ -3404,7 +3369,6 @@ export async function createPaymentForSingleAppointment(req, res) {
           userId: appUserId,
           fullName: user.fullName || "Chưa cập nhật",
           phone: user.phone || "",
-          relationshipToOwner: "self", // IMPORTANT: Mark as self profile
           isComplete: false,
         });
 

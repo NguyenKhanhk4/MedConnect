@@ -12,11 +12,7 @@ import {
   Select,
   Typography,
 } from "antd";
-import {
-  CalendarOutlined,
-  EnvironmentOutlined,
-  SearchOutlined,
-} from "@ant-design/icons";
+import { CalendarOutlined, EnvironmentOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { api } from "../../lib/api";
 import "./RescheduleModal.scss";
@@ -31,6 +27,7 @@ export function RescheduleModal({
   onClose,
   onSuccess,
   customSubmitHandler, // Optional: custom handler for manager/admin reschedule
+  allowDoctorChange = false, // Allow manager to change doctor when rescheduling
 }) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -41,38 +38,81 @@ export function RescheduleModal({
   const [selectedMode, setSelectedMode] = useState(null); // No default - user must choose
   const [clinics, setClinics] = useState([]);
   const [clinicLoading, setClinicLoading] = useState(false);
-
-  // New states for doctor selection
-  const [changeDoctor, setChangeDoctor] = useState(false);
+  const [doctors, setDoctors] = useState([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(false);
+  const [selectedDoctorId, setSelectedDoctorId] = useState(null);
   const [specializations, setSpecializations] = useState([]);
   const [selectedSpecializationId, setSelectedSpecializationId] =
     useState(null);
-  const [doctors, setDoctors] = useState([]);
-  const [selectedDoctorId, setSelectedDoctorId] = useState(null);
-  const [loadingSpecializations, setLoadingSpecializations] = useState(false);
-  const [loadingDoctors, setLoadingDoctors] = useState(false);
-  const [doctorSearchTerm, setDoctorSearchTerm] = useState("");
-  const [searchMode, setSearchMode] = useState("specialization"); // "specialization" or "name"
-  const [rescheduleReasonType, setRescheduleReasonType] =
-    useState("patient_request"); // "doctor_leave" or "patient_request"
 
-  // Fetch clinics function (defined before useEffects)
-  const fetchClinics = async () => {
-    const doctorId =
-      changeDoctor && selectedDoctorId
-        ? selectedDoctorId
-        : appointment?.doctorId?._id || appointment?.doctorId;
-
-    if (!doctorId) return;
-    await fetchClinicsForDoctor(doctorId);
+  // Fetch specializations
+  const fetchSpecializations = async () => {
+    try {
+      const response = await api.getAllSpecializations({ limit: 100 });
+      if (response.success && response.data) {
+        setSpecializations(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching specializations:", error);
+    }
   };
 
-  const fetchClinicsForDoctor = async (doctorId) => {
-    if (!doctorId) return;
+  // Fetch doctors for manager (when allowDoctorChange is true)
+  const fetchDoctors = async (specializationId = null) => {
+    if (!allowDoctorChange) return;
+
+    try {
+      setDoctorsLoading(true);
+      let url = "/api/managers/doctors";
+      const params = [];
+      if (specializationId) {
+        params.push(`specializationId=${specializationId}`);
+      }
+      if (params.length > 0) {
+        url += `?${params.join("&")}`;
+      }
+      const response = await api.get(url);
+
+      if (response.success && response.data?.doctors) {
+        setDoctors(response.data.doctors);
+        // Set current doctor as default if it's still in the filtered list
+        if (appointment?.doctorId?._id) {
+          const currentDoctorId =
+            appointment.doctorId._id || appointment.doctorId;
+          const doctorExists = response.data.doctors.some(
+            (d) => (d._id || d.id) === currentDoctorId
+          );
+          if (doctorExists) {
+            setSelectedDoctorId(currentDoctorId);
+            form.setFieldsValue({ doctorId: currentDoctorId });
+          } else {
+            // If current doctor is not in filtered list, clear selection
+            setSelectedDoctorId(null);
+            form.setFieldsValue({ doctorId: undefined });
+          }
+        }
+      } else {
+        setDoctors([]);
+        message.warning("Không tìm thấy danh sách bác sĩ");
+      }
+    } catch (error) {
+      console.error("Error fetching doctors:", error);
+      message.error("Không thể tải danh sách bác sĩ");
+      setDoctors([]);
+    } finally {
+      setDoctorsLoading(false);
+    }
+  };
+
+  // Fetch clinics function (defined before useEffects)
+  const fetchClinics = async (doctorId) => {
+    const targetDoctorId =
+      doctorId || appointment?.doctorId?._id || selectedDoctorId;
+    if (!targetDoctorId) return;
 
     try {
       setClinicLoading(true);
-      const response = await api.get(`/api/doctors/${doctorId}/clinics`);
+      const response = await api.get(`/api/doctors/${targetDoctorId}/clinics`);
 
       if (response.success && response.data.clinics) {
         setClinics(response.data.clinics);
@@ -80,8 +120,8 @@ export function RescheduleModal({
         if (response.data.clinics.length === 1) {
           form.setFieldsValue({ clinicId: response.data.clinics[0]._id });
         }
-        // If appointment has a clinicId and not changing doctor, try to set it
-        else if (appointment.clinicId && !changeDoctor) {
+        // If appointment has a clinicId, try to set it
+        else if (appointment.clinicId) {
           const clinicId = appointment.clinicId._id || appointment.clinicId;
           const clinicExists = response.data.clinics.some(
             (c) => (c._id || c.id) === clinicId
@@ -89,9 +129,6 @@ export function RescheduleModal({
           if (clinicExists) {
             form.setFieldsValue({ clinicId: clinicId });
           }
-        } else {
-          // Reset clinicId when changing doctor
-          form.setFieldsValue({ clinicId: undefined });
         }
       } else {
         setClinics([]);
@@ -106,93 +143,6 @@ export function RescheduleModal({
     }
   };
 
-  // Fetch specializations
-  const fetchSpecializations = async () => {
-    try {
-      setLoadingSpecializations(true);
-      // Use patient endpoint for getting specializations
-      const response = await api.get("/api/patients/specializations");
-      if (response.success && response.data?.specializations) {
-        setSpecializations(response.data.specializations);
-      }
-    } catch (error) {
-      console.error("Error fetching specializations:", error);
-      message.error("Không thể tải danh sách chuyên khoa");
-    } finally {
-      setLoadingSpecializations(false);
-    }
-  };
-
-  // Fetch doctors by specialization
-  const fetchDoctorsBySpecialization = async (specializationId) => {
-    if (!specializationId) {
-      setDoctors([]);
-      return;
-    }
-    try {
-      setLoadingDoctors(true);
-      // Use patient endpoint for getting doctors by specialization
-      const response = await api.get(
-        `/api/patients/specializations/${specializationId}/doctors`
-      );
-      if (response.success && response.data?.doctors) {
-        // Filter out current doctor
-        const currentDoctorId =
-          appointment?.doctorId?._id || appointment?.doctorId;
-        const filteredDoctors = response.data.doctors.filter(
-          (doc) => (doc._id || doc.id) !== currentDoctorId
-        );
-        setDoctors(filteredDoctors);
-      }
-    } catch (error) {
-      console.error("Error fetching doctors:", error);
-      message.error("Không thể tải danh sách bác sĩ");
-      setDoctors([]);
-    } finally {
-      setLoadingDoctors(false);
-    }
-  };
-
-  // Fetch doctors by name search
-  const fetchDoctorsByName = async (searchTerm, specializationId = null) => {
-    if (!searchTerm || searchTerm.trim().length < 2) {
-      setDoctors([]);
-      return;
-    }
-    try {
-      setLoadingDoctors(true);
-      // Use getAllDoctors endpoint with search parameter
-      const queryParams = new URLSearchParams();
-      queryParams.append("search", searchTerm.trim());
-      queryParams.append("limit", "50"); // Get more results for search
-
-      // If specialization is selected, also filter by it
-      if (specializationId) {
-        queryParams.append("specialization", specializationId);
-      }
-
-      const response = await api.get(`/api/doctors?${queryParams.toString()}`);
-
-      if (response.success && response.data?.doctors) {
-        // Filter out current doctor
-        const currentDoctorId =
-          appointment?.doctorId?._id || appointment?.doctorId;
-        const filteredDoctors = response.data.doctors.filter(
-          (doc) => (doc._id || doc.id) !== currentDoctorId
-        );
-        setDoctors(filteredDoctors);
-      } else {
-        setDoctors([]);
-      }
-    } catch (error) {
-      console.error("Error searching doctors:", error);
-      message.error("Không thể tìm kiếm bác sĩ");
-      setDoctors([]);
-    } finally {
-      setLoadingDoctors(false);
-    }
-  };
-
   // Reset form and date when modal opens/closes
   useEffect(() => {
     if (visible) {
@@ -201,21 +151,16 @@ export function RescheduleModal({
       setSelectedTimeSlot(null);
       setAvailableTimeSlots([]);
       setClinics([]);
-      setChangeDoctor(false);
-      setSelectedSpecializationId(null);
-      setSelectedDoctorId(null);
-      setDoctors([]);
-      setDoctorSearchTerm("");
-      setSearchMode("specialization");
-      setRescheduleReasonType("patient_request"); // Reset to default
-
-      // Fetch specializations when modal opens
-      fetchSpecializations();
-
       // Set tomorrow as default date
       const tomorrow = dayjs().add(1, "day");
       setSelectedDate(tomorrow);
       form.setFieldsValue({ selectedDate: tomorrow });
+
+      // If allowDoctorChange, fetch specializations and doctors list
+      if (allowDoctorChange) {
+        fetchSpecializations();
+        fetchDoctors();
+      }
 
       // Set mode from current appointment (default to current mode)
       if (appointment?.mode) {
@@ -224,8 +169,11 @@ export function RescheduleModal({
         form.setFieldsValue({ mode: currentMode });
 
         // If current mode is offline, fetch clinics and set current clinicId
-        if (currentMode === "offline" && appointment.doctorId?._id) {
-          fetchClinics();
+        if (currentMode === "offline") {
+          const doctorId = appointment.doctorId?._id || appointment.doctorId;
+          if (doctorId) {
+            fetchClinics(doctorId);
+          }
         }
       } else {
         setSelectedMode(null);
@@ -233,86 +181,61 @@ export function RescheduleModal({
     } else {
       // Reset when modal closes
       setSelectedMode(null);
-      setChangeDoctor(false);
-      setSelectedSpecializationId(null);
       setSelectedDoctorId(null);
       setDoctors([]);
-      setDoctorSearchTerm("");
-      setSearchMode("specialization");
-      setRescheduleReasonType("patient_request"); // Reset to default
+      setSpecializations([]);
+      setSelectedSpecializationId(null);
     }
-  }, [visible, form, appointment]);
-
-  // Fetch doctors when specialization changes (only in specialization mode)
-  useEffect(() => {
-    if (
-      changeDoctor &&
-      searchMode === "specialization" &&
-      selectedSpecializationId
-    ) {
-      fetchDoctorsBySpecialization(selectedSpecializationId);
-    }
-  }, [selectedSpecializationId, changeDoctor, searchMode]);
-
-  // Debounced search for doctors by name
-  useEffect(() => {
-    if (!changeDoctor || searchMode !== "name") {
-      return;
-    }
-
-    const timeoutId = setTimeout(() => {
-      if (doctorSearchTerm.trim().length >= 2) {
-        fetchDoctorsByName(doctorSearchTerm, selectedSpecializationId);
-      } else if (doctorSearchTerm.trim().length === 0) {
-        setDoctors([]);
-        setSelectedDoctorId(null);
-      }
-    }, 500); // Debounce 500ms
-
-    return () => clearTimeout(timeoutId);
-  }, [doctorSearchTerm, changeDoctor, searchMode, selectedSpecializationId]);
+  }, [visible, form, appointment, allowDoctorChange]);
 
   // Fetch clinics when mode is changed to offline manually
   useEffect(() => {
     if (
       visible &&
       selectedMode === "offline" &&
-      appointment?.doctorId?._id &&
       clinics.length === 0 &&
       appointment.mode !== "offline" // Only fetch if user changed from online to offline
     ) {
-      fetchClinics();
+      const doctorId =
+        selectedDoctorId || appointment?.doctorId?._id || appointment?.doctorId;
+      if (doctorId) {
+        fetchClinics(doctorId);
+      }
     }
-  }, [visible, selectedMode, appointment, clinics.length]);
+  }, [visible, selectedMode, appointment, clinics.length, selectedDoctorId]);
 
-  // Fetch time slots when date changes or doctor changes
+  // Fetch time slots when date or doctor changes
   useEffect(() => {
     if (visible && selectedDate) {
       const doctorId =
-        changeDoctor && selectedDoctorId
-          ? selectedDoctorId
-          : appointment?.doctorId?._id || appointment?.doctorId;
-
+        selectedDoctorId || appointment?.doctorId?._id || appointment?.doctorId;
       if (doctorId) {
         fetchTimeSlots(doctorId);
       }
     }
-  }, [visible, selectedDate, changeDoctor, selectedDoctorId, appointment]);
+  }, [visible, selectedDate, selectedDoctorId, appointment]);
 
   const fetchTimeSlots = async (doctorId) => {
-    if (!selectedDate || !doctorId) return;
+    if (!selectedDate) return;
+
+    const targetDoctorId =
+      doctorId ||
+      selectedDoctorId ||
+      appointment?.doctorId?._id ||
+      appointment?.doctorId;
+    if (!targetDoctorId) return;
 
     try {
       setTimeSlotsLoading(true);
       const dateStr = selectedDate.format("YYYY-MM-DD");
 
       console.log("🔍 Fetching time slots for reschedule:", {
-        doctorId,
+        doctorId: targetDoctorId,
         date: dateStr,
       });
 
       const response = await api.get(
-        `/api/patients/doctors/${doctorId}/time-slots?date=${dateStr}`
+        `/api/patients/doctors/${targetDoctorId}/time-slots?date=${dateStr}`
       );
 
       if (response.success && response.data?.timeSlots) {
@@ -392,8 +315,6 @@ export function RescheduleModal({
         newDateTime: newDateTime,
         reason: values.reason,
         mode: selectedMode,
-        // Only include rescheduleReasonType if customSubmitHandler is provided (manager reschedule)
-        ...(customSubmitHandler && { rescheduleReasonType }),
       };
 
       // Only include clinicId if mode is offline
@@ -401,9 +322,19 @@ export function RescheduleModal({
         requestBody.clinicId = values.clinicId;
       }
 
-      // Include new doctorId if changing doctor
-      if (changeDoctor && selectedDoctorId) {
-        requestBody.newDoctorId = selectedDoctorId;
+      // Include newDoctorId if doctor was changed (for manager)
+      if (
+        allowDoctorChange &&
+        values.doctorId &&
+        values.doctorId !==
+          (appointment?.doctorId?._id || appointment?.doctorId)
+      ) {
+        requestBody.newDoctorId = values.doctorId;
+      }
+
+      // Include rescheduleReasonType if provided (for manager)
+      if (allowDoctorChange && values.rescheduleReasonType) {
+        requestBody.rescheduleReasonType = values.rescheduleReasonType;
       }
 
       // Use custom submit handler if provided (for manager/admin), otherwise use default patient request
@@ -416,8 +347,15 @@ export function RescheduleModal({
           mode: selectedMode,
           clinicId: selectedMode === "offline" ? values.clinicId : undefined,
           newDoctorId:
-            changeDoctor && selectedDoctorId ? selectedDoctorId : undefined,
-          rescheduleReasonType: rescheduleReasonType, // Include rescheduleReasonType for manager reschedule
+            allowDoctorChange &&
+            values.doctorId &&
+            values.doctorId !==
+              (appointment?.doctorId?._id || appointment?.doctorId)
+              ? values.doctorId
+              : undefined,
+          rescheduleReasonType: allowDoctorChange
+            ? values.rescheduleReasonType
+            : undefined,
         });
       } else {
         response = await api.post("/api/reschedule/request", requestBody);
@@ -543,147 +481,35 @@ export function RescheduleModal({
           layout="vertical"
           className="reschedule-form"
         >
-          {/* Option to change doctor */}
-          <Form.Item label="Tùy chọn">
-            <Radio.Group
-              value={changeDoctor}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                setChangeDoctor(newValue);
-                if (!newValue) {
-                  // Reset doctor selection when unchecking
-                  setSelectedSpecializationId(null);
-                  setSelectedDoctorId(null);
-                  setDoctors([]);
-                  form.setFieldsValue({
-                    specializationId: null,
-                    doctorId: null,
-                  });
-                  // Refetch time slots for original doctor
-                  if (selectedDate && appointment?.doctorId?._id) {
-                    fetchTimeSlots(
-                      appointment.doctorId._id || appointment.doctorId
-                    );
-                  }
-                }
-              }}
-            >
-              <Radio value={false}>Giữ nguyên bác sĩ</Radio>
-              <Radio value={true}>Dời sang bác sĩ khác</Radio>
-            </Radio.Group>
-          </Form.Item>
-
-          {/* Doctor Selection - Only show when changeDoctor is true */}
-          {changeDoctor && (
+          {/* Doctor Selection - Only show when allowDoctorChange is true */}
+          {allowDoctorChange && (
             <>
-              {/* Search Mode Selection */}
-              <Form.Item label="Cách tìm bác sĩ">
-                <Radio.Group
-                  value={searchMode}
-                  onChange={(e) => {
-                    const newMode = e.target.value;
-                    setSearchMode(newMode);
-                    setSelectedDoctorId(null);
-                    setDoctors([]);
-                    setDoctorSearchTerm("");
-                    setSelectedSpecializationId(null);
-                    form.setFieldsValue({
-                      doctorId: null,
-                      specializationId: null,
-                    });
-                  }}
-                >
-                  <Radio value="specialization">Tìm theo chuyên khoa</Radio>
-                  <Radio value="name">Tìm theo tên</Radio>
-                </Radio.Group>
-              </Form.Item>
-
-              {/* Name Search - Show when searchMode is "name" */}
-              {searchMode === "name" && (
-                <Form.Item
-                  label="Tìm kiếm bác sĩ"
-                  help="Nhập ít nhất 2 ký tự để tìm kiếm"
-                >
-                  <Input
-                    placeholder="Nhập tên bác sĩ để tìm kiếm"
-                    value={doctorSearchTerm}
-                    onChange={(e) => {
-                      setDoctorSearchTerm(e.target.value);
-                      setSelectedDoctorId(null);
-                      form.setFieldsValue({ doctorId: null });
-                    }}
-                    allowClear
-                    prefix={<SearchOutlined style={{ color: "#bfbfbf" }} />}
-                  />
-                </Form.Item>
-              )}
-
-              {/* Specialization Filter - Always show, required in specialization mode, optional in name mode */}
-              <Form.Item
-                name="specializationId"
-                label={
-                  searchMode === "specialization"
-                    ? "Chuyên khoa"
-                    : "Lọc theo chuyên khoa (tùy chọn)"
-                }
-                rules={
-                  searchMode === "specialization"
-                    ? [
-                        {
-                          required: true,
-                          message: "Vui lòng chọn chuyên khoa",
-                        },
-                      ]
-                    : []
-                }
-              >
+              {/* Specialization Filter */}
+              <Form.Item label="Lọc theo chuyên khoa">
                 <Select
-                  placeholder={
-                    searchMode === "specialization"
-                      ? "Chọn chuyên khoa"
-                      : "Chọn chuyên khoa để lọc (tùy chọn)"
-                  }
-                  style={{ width: "100%" }}
-                  loading={loadingSpecializations}
+                  placeholder="Tất cả chuyên khoa"
+                  style={{ width: "100%", fontFamily: "inherit" }}
+                  allowClear
                   value={selectedSpecializationId}
                   onChange={(value) => {
                     setSelectedSpecializationId(value);
+                    // Reset doctor selection when specialization changes
                     setSelectedDoctorId(null);
-                    form.setFieldsValue({ doctorId: null });
-
-                    if (searchMode === "specialization") {
-                      setDoctors([]);
-                      fetchDoctorsBySpecialization(value);
-                    } else if (
-                      searchMode === "name" &&
-                      doctorSearchTerm.trim().length >= 2
-                    ) {
-                      // Re-search with new specialization filter
-                      fetchDoctorsByName(doctorSearchTerm, value);
-                    }
+                    form.setFieldsValue({ doctorId: undefined });
+                    setSelectedTimeSlot(null);
+                    setAvailableTimeSlots([]);
+                    setClinics([]);
+                    form.setFieldsValue({ selectedTimeSlot: null });
+                    form.setFieldsValue({ clinicId: undefined });
+                    // Fetch doctors with new specialization filter
+                    fetchDoctors(value);
                   }}
-                  onClear={() => {
-                    setSelectedSpecializationId(null);
-                    form.setFieldsValue({ specializationId: null });
-                    // Re-search without specialization filter if in name mode
-                    if (
-                      searchMode === "name" &&
-                      doctorSearchTerm.trim().length >= 2
-                    ) {
-                      fetchDoctorsByName(doctorSearchTerm, null);
-                    }
-                  }}
-                  allowClear={searchMode === "name"}
-                  showSearch
-                  optionFilterProp="children"
-                  filterOption={(input, option) =>
-                    (option?.children ?? "")
-                      .toLowerCase()
-                      .includes(input.toLowerCase())
-                  }
                 >
                   {specializations.map((spec) => (
-                    <Option key={spec._id} value={spec._id}>
+                    <Option
+                      key={spec.id || spec._id}
+                      value={spec.id || spec._id}
+                    >
                       {spec.name}
                     </Option>
                   ))}
@@ -693,83 +519,62 @@ export function RescheduleModal({
               {/* Doctor Selection */}
               <Form.Item
                 name="doctorId"
-                label="Bác sĩ"
-                rules={[
-                  {
-                    required: true,
-                    message: "Vui lòng chọn bác sĩ",
-                  },
-                ]}
+                label="Chọn bác sĩ"
+                rules={[{ required: true, message: "Vui lòng chọn bác sĩ" }]}
               >
-                <Select
-                  placeholder={
-                    searchMode === "specialization"
-                      ? "Chọn bác sĩ"
-                      : "Chọn bác sĩ từ kết quả tìm kiếm"
-                  }
-                  style={{ width: "100%" }}
-                  loading={loadingDoctors}
-                  disabled={
-                    (searchMode === "specialization" &&
-                      !selectedSpecializationId) ||
-                    (searchMode === "name" &&
-                      doctorSearchTerm.trim().length < 2) ||
-                    doctors.length === 0
-                  }
-                  value={selectedDoctorId}
-                  onChange={(value) => {
-                    setSelectedDoctorId(value);
-                    form.setFieldsValue({ doctorId: value });
-                    // Reset time slots and fetch new ones for selected doctor
-                    setSelectedTimeSlot(null);
-                    setAvailableTimeSlots([]);
-                    if (selectedDate) {
-                      fetchTimeSlots(value);
-                    }
-                    // Fetch clinics for new doctor if mode is offline
-                    if (selectedMode === "offline") {
-                      fetchClinicsForDoctor(value);
-                    }
-                  }}
-                  showSearch
-                  optionFilterProp="children"
-                  filterOption={(input, option) =>
-                    (option?.children ?? "")
-                      .toLowerCase()
-                      .includes(input.toLowerCase())
-                  }
-                  notFoundContent={
-                    searchMode === "name" && doctorSearchTerm.trim().length < 2
-                      ? "Nhập ít nhất 2 ký tự để tìm kiếm"
-                      : loadingDoctors
-                      ? "Đang tải..."
-                      : "Không tìm thấy bác sĩ"
-                  }
-                >
-                  {doctors.map((doctor) => (
-                    <Option
-                      key={doctor._id || doctor.id}
-                      value={doctor._id || doctor.id}
-                    >
-                      {doctor.fullName ||
-                        doctor.userId?.fullName ||
-                        "Chưa có tên"}
-                      {doctor.yearsExperience &&
-                        ` - ${doctor.yearsExperience} năm kinh nghiệm`}
-                      {doctor.specializationIds &&
-                        doctor.specializationIds.length > 0 && (
-                          <span style={{ color: "#999", fontSize: "12px" }}>
-                            {" "}
-                            (
-                            {doctor.specializationIds
-                              .map((s) => s.name || s)
-                              .join(", ")}
-                            )
-                          </span>
-                        )}
-                    </Option>
-                  ))}
-                </Select>
+                {doctorsLoading ? (
+                  <div style={{ padding: "8px 0" }}>
+                    <Spin size="small" /> Đang tải danh sách bác sĩ...
+                  </div>
+                ) : doctors.length === 0 ? (
+                  <Text type="secondary">Không có bác sĩ nào khả dụng</Text>
+                ) : (
+                  <Select
+                    placeholder="Chọn bác sĩ"
+                    style={{ width: "100%", fontFamily: "inherit" }}
+                    showSearch
+                    optionFilterProp="label"
+                    value={selectedDoctorId}
+                    onChange={(value) => {
+                      setSelectedDoctorId(value);
+                      form.setFieldsValue({ doctorId: value });
+                      // Reset time slots and clinics when doctor changes
+                      setSelectedTimeSlot(null);
+                      setAvailableTimeSlots([]);
+                      setClinics([]);
+                      form.setFieldsValue({ selectedTimeSlot: null });
+                      form.setFieldsValue({ clinicId: undefined });
+                      // Fetch time slots for new doctor if date is selected
+                      if (selectedDate) {
+                        fetchTimeSlots(value);
+                      }
+                      // Fetch clinics if mode is offline
+                      if (selectedMode === "offline") {
+                        fetchClinics(value);
+                      }
+                    }}
+                    filterOption={(input, option) => {
+                      const label = option?.label || "";
+                      return label.toLowerCase().includes(input.toLowerCase());
+                    }}
+                  >
+                    {doctors.map((doctor) => {
+                      return (
+                        <Option
+                          key={doctor._id}
+                          value={doctor._id}
+                          label={doctor.fullName}
+                        >
+                          <div style={{ fontFamily: "inherit" }}>
+                            <div style={{ fontWeight: 500 }}>
+                              {doctor.fullName}
+                            </div>
+                          </div>
+                        </Option>
+                      );
+                    })}
+                  </Select>
+                )}
               </Form.Item>
             </>
           )}
@@ -1016,43 +821,33 @@ export function RescheduleModal({
             </Form.Item>
           )}
 
-          {/* Reschedule Reason Type - Only show for manager/admin */}
-          {customSubmitHandler && (
+          {/* Reschedule Reason Type - Only show when allowDoctorChange (manager) */}
+          {allowDoctorChange && (
             <Form.Item
-              label="Loại lý do dời lịch"
+              name="rescheduleReasonType"
+              label="Lý do dời lịch"
               rules={[
                 {
                   required: true,
-                  message: "Vui lòng chọn loại lý do dời lịch",
+                  message: "Vui lòng chọn lý do dời lịch",
                 },
               ]}
             >
-              <Radio.Group
-                value={rescheduleReasonType}
-                onChange={(e) => setRescheduleReasonType(e.target.value)}
+              <Select
+                placeholder="Chọn lý do dời lịch"
+                style={{ width: "100%", fontFamily: "inherit" }}
               >
-                <Radio value="patient_request">
+                <Option value="patient_request">
                   Bệnh nhân yêu cầu dời lịch
-                </Radio>
-                <Radio value="doctor_leave">Bác sĩ nghỉ</Radio>
-              </Radio.Group>
-              <div style={{ marginTop: 8, fontSize: 12, color: "#999" }}>
-                {rescheduleReasonType === "patient_request" ? (
-                  <span>
-                    Slot cũ sẽ được giải phóng để người khác có thể đăng ký
-                  </span>
-                ) : (
-                  <span>
-                    Slot cũ sẽ bị khóa (bác sĩ nghỉ) và không thể đăng ký
-                  </span>
-                )}
-              </div>
+                </Option>
+                <Option value="doctor_leave">Bác sĩ nghỉ</Option>
+              </Select>
             </Form.Item>
           )}
 
           <Form.Item
             name="reason"
-            label="Lý do dời lịch"
+            label={allowDoctorChange ? "Chi tiết lý do" : "Lý do dời lịch"}
             rules={[
               { required: true, message: "Vui lòng nhập lý do dời lịch" },
               { min: 10, message: "Lý do phải có ít nhất 10 ký tự" },
