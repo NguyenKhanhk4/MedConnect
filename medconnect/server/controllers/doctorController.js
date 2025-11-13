@@ -291,6 +291,9 @@ export async function getDoctorAppointments(req, res) {
         },
       })
       .populate("slotId")
+      .populate("originalSlotId", "startAt endAt") // Populate original slot for in-place rescheduled appointments
+      .populate("originalDoctorId", "fullName") // Populate original doctor for in-place rescheduled appointments
+      .populate("originalClinicId", "name address") // Populate original clinic for in-place rescheduled appointments
       .populate("rescheduledToId", "scheduledStart scheduledEnd status")
       .populate({
         path: "rescheduledFromId",
@@ -2701,7 +2704,9 @@ export async function getDoctorClinics(req, res) {
 
     // Add default clinic if exists
     if (doctor.clinicDefaultId) {
-      const defaultClinic = await Clinic.findById(doctor.clinicDefaultId).lean();
+      const defaultClinic = await Clinic.findById(
+        doctor.clinicDefaultId
+      ).lean();
       if (defaultClinic) {
         // Format clinic data to include all necessary fields
         const formattedClinic = {
@@ -3353,7 +3358,7 @@ export async function getDoctorTimeSlots(req, res) {
 
       // Fetch leave requests that overlap with the date range of these slots
       // Get date range from slots
-      const slotDates = timeSlots.map(slot => new Date(slot.startAt));
+      const slotDates = timeSlots.map((slot) => new Date(slot.startAt));
       const minDate = new Date(Math.min(...slotDates));
       const maxDate = new Date(Math.max(...slotDates));
       minDate.setHours(0, 0, 0, 0);
@@ -3373,7 +3378,7 @@ export async function getDoctorTimeSlots(req, res) {
       timeSlots.forEach((slot) => {
         const slotDate = new Date(slot.startAt);
         slotDate.setHours(0, 0, 0, 0);
-        
+
         // Check if this slot date falls within any pending leave request
         const matchingRequest = leaveRequests.find((lr) => {
           const lrStart = new Date(lr.startDate);
@@ -3382,7 +3387,7 @@ export async function getDoctorTimeSlots(req, res) {
           lrEnd.setHours(23, 59, 59, 999);
           return slotDate >= lrStart && slotDate <= lrEnd;
         });
-        
+
         if (matchingRequest) {
           const slotIdKey = slot._id.toString();
           leaveRequestMap[slotIdKey] = matchingRequest;
@@ -3404,7 +3409,9 @@ export async function getDoctorTimeSlots(req, res) {
         // Only show paid appointments
         paymentStatus: "paid",
       })
-        .select("reason status mode rescheduledFromId slotId patientId paymentStatus") // Explicitly select fields needed
+        .select(
+          "reason status mode rescheduledFromId slotId patientId paymentStatus"
+        ) // Explicitly select fields needed
         .populate({
           path: "patientId",
           select: "fullName",

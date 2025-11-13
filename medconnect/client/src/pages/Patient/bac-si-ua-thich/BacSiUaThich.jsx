@@ -16,7 +16,7 @@ import {
   UserOutlined,
   CalendarOutlined,
   HeartFilled,
-  StarOutlined,
+  StarFilled,
 } from "@ant-design/icons";
 import { useFavoriteDoctors } from "../../../hooks/useFavoriteDoctors";
 import {
@@ -153,7 +153,7 @@ const BacSiUaThich = () => {
                       )}
 
                       <div className="doctor-rating">
-                        <StarOutlined
+                        <StarFilled
                           style={{ color: "#faad14", marginRight: 4 }}
                         />
                         <Text>

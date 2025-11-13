@@ -891,11 +891,11 @@
         margin-top: 4px;
         max-height: 300px;
         overflow-y: auto;
-        
+
         // Ẩn thanh trượt
         scrollbar-width: none;
         -ms-overflow-style: none;
-        
+
         &::-webkit-scrollbar {
           display: none;
         }
@@ -1065,34 +1065,52 @@
 
             &.status-badge {
               display: inline-block;
-              padding: 4px 12px;
+              padding: 6px 14px;
               border-radius: 12px;
-              font-size: 12px;
+              font-size: 13px;
               font-weight: 600;
+              border: 1px solid transparent;
 
               &.pending,
               &.pending_doctor {
                 background: #fef3c7;
                 color: #92400e;
+                border-color: #fbbf24;
               }
 
               &.confirmed,
               &.booked,
               &.accepted {
-                background: #d1fae5;
-                color: #065f46;
+                background: #10b981;
+                color: #ffffff;
+                border-color: #059669;
               }
 
               &.completed,
-              &.done,
-              &.in_progress {
-                background: #dbeafe;
-                color: #1e40af;
+              &.done {
+                background: #3b82f6;
+                color: #ffffff;
+                border-color: #2563eb;
               }
 
-              &.cancelled {
-                background: #fee2e2;
-                color: #991b1b;
+              &.in_progress {
+                background: #6366f1;
+                color: #ffffff;
+                border-color: #4f46e5;
+              }
+
+              &.cancelled,
+              &.rejected,
+              &.no_show {
+                background: #ef4444;
+                color: #ffffff;
+                border-color: #dc2626;
+              }
+
+              &.rescheduled {
+                background: #6366f1;
+                color: #ffffff;
+                border-color: #4f46e5;
               }
             }
           }
@@ -1431,11 +1449,11 @@
 
     .schedule-content {
       overflow-x: auto;
-      
+
       // Ẩn thanh trượt
       scrollbar-width: none;
       -ms-overflow-style: none;
-      
+
       &::-webkit-scrollbar {
         display: none;
       }

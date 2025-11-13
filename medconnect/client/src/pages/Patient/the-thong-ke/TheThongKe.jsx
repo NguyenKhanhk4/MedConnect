@@ -69,27 +69,90 @@ const StatCard = ({ stat }) => {
   const trendColor = valueNum === 0 ? "#dc2626" : "#374151";
   const iconColor = stat.iconColor || "#2563eb"; // Default blue if not specified
 
+  // Get border color based on stat type (for visual distinction)
+  const getBorderColor = () => {
+    switch (stat.key) {
+      case "confirmed":
+        return "#bfdbfe"; // Blue border
+      case "pending":
+        return "#fed7aa"; // Orange border
+      case "completed":
+        return "#bbf7d0"; // Green border
+      case "cancelled":
+        return "#fecaca"; // Red border
+      default:
+        return "#cbd5e1"; // Gray border
+    }
+  };
+
   return (
     <div
       className="stat-card stat-card-white"
+      data-stat-type={stat.key}
       style={{
+        // Force white background and remove gradients/images from any CSS
         backgroundColor: "#ffffff",
         background: "#ffffff",
-        border: "2px solid #cbd5e1",
+        // subtle colored border per type
+        border: `2px solid ${getBorderColor()}`,
+        // ensure text is dark for readability on white
+        color: "#0f172a",
       }}
     >
-      <div className="stat-card-header">
-        <div className="stat-card-content">
-          <p className="stat-card-title">{stat.title}</p>
-          <p className="stat-card-value">{stat.value}</p>
-          <p className="stat-card-description">{stat.description}</p>
+      <div
+        className="stat-card-header"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div className="stat-card-content" style={{ paddingRight: 12 }}>
+          <p
+            className="stat-card-title"
+            style={{ color: "#0f172a", fontWeight: 600, margin: 0 }}
+          >
+            {stat.title}
+          </p>
+          <p
+            className="stat-card-value"
+            style={{
+              color: "#0b1220",
+              fontSize: "1.75rem",
+              fontWeight: 700,
+              margin: "6px 0",
+            }}
+          >
+            {stat.value}
+          </p>
+          <p
+            className="stat-card-description"
+            style={{ color: "#4b5563", margin: 0 }}
+          >
+            {stat.description}
+          </p>
         </div>
-        <div className="stat-card-icon">
-          <Icon className="stat-icon" style={{ color: iconColor }} />
+        <div
+          className="stat-card-icon"
+          style={{
+            // remove any colored circle behind icon from existing styles
+            background: "transparent",
+            boxShadow: "none",
+            padding: 4,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 6,
+          }}
+        >
+          <Icon
+            className="stat-icon"
+            style={{ color: iconColor, width: 28, height: 28 }}
+          />
         </div>
       </div>
-      <div className="stat-card-trend">
-        <span style={{ color: trendColor }}>{stat.trend}</span>
+      <div className="stat-card-trend" style={{ marginTop: 8 }}>
+        <span style={{ color: trendColor, fontSize: 13 }}>{stat.trend}</span>
       </div>
     </div>
   );
@@ -97,7 +160,7 @@ const StatCard = ({ stat }) => {
 
 // Loading Skeleton Component
 const LoadingSkeleton = () => (
-  <div className="stats-grid">
+  <div className="stats-grid" style={{ gap: 16 }}>
     {[1, 2, 3, 4].map((i) => (
       <div
         key={i}
@@ -105,7 +168,12 @@ const LoadingSkeleton = () => (
         style={{
           backgroundColor: "#ffffff",
           background: "#ffffff",
-          border: "2px solid #cbd5e1",
+          border: "2px solid #e2e8f0",
+          color: "#0f172a",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: 120,
         }}
       >
         <Spin size="large" />

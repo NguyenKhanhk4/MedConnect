@@ -117,6 +117,7 @@ export default function QuanLyLichBacSi() {
 
   // Reschedule modal states
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleWithNewDoctor, setRescheduleWithNewDoctor] = useState(false);
 
   // Education level prices state
   const [educationLevelPrices, setEducationLevelPrices] = useState({});
@@ -419,7 +420,9 @@ export default function QuanLyLichBacSi() {
         }
         await loadTimeSlots();
       } else {
-        showAlert("❌ Lỗi khi tạo slots: " + (response.message || "Unknown error"));
+        showAlert(
+          "❌ Lỗi khi tạo slots: " + (response.message || "Unknown error")
+        );
       }
     } catch (error) {
       console.error("❌ Error generating slots:", error);
@@ -484,14 +487,16 @@ export default function QuanLyLichBacSi() {
         id: slot._id,
         startAt: slot.startAt,
         endAt: slot.endAt,
-        status: slot.status === "cancelled" ? "available" : slot.status,
-        patientName: slot.status === "cancelled" ? null : (slot.patientName || null),
-        reason: slot.status === "cancelled" ? null : (slot.reason || null),
-        mode: slot.status === "cancelled" ? null : (slot.mode || null),
-        appointmentId: slot.status === "cancelled" ? null : (slot.appointmentId || null),
-        rescheduledFromId: slot.status === "cancelled" ? null : (slot.rescheduledFromId || null), // Flag to identify rescheduled appointments
-        leaveReason: slot.status === "cancelled" ? null : (slot.leaveReason || null), // Lý do nghỉ
-        hasPendingLeaveRequest: slot.status === "cancelled" ? false : (slot.hasPendingLeaveRequest || false), // Flag leave request đang pending
+        status: slot.status,
+        patientName: slot.patientName || null,
+        reason: slot.reason || null,
+        mode: slot.mode || null,
+        appointmentId: slot.appointmentId || null,
+        rescheduledFromId: slot.rescheduledFromId || null, // Flag to identify rescheduled appointments (for old appointments)
+        rescheduleReason: slot.rescheduleReason || null, // Flag to identify rescheduled appointments (for updated appointments)
+        rescheduledAt: slot.rescheduledAt || null, // Flag to identify rescheduled appointments
+        leaveReason: slot.leaveReason || null, // Lý do nghỉ
+        hasPendingLeaveRequest: slot.hasPendingLeaveRequest || false, // Flag leave request đang pending
         isEmpty: false,
       };
 
@@ -560,12 +565,15 @@ export default function QuanLyLichBacSi() {
   const getStatusText = (
     status,
     hasPendingLeaveRequest = false,
-    rescheduledFromId = null
+    rescheduledFromId = null,
+    rescheduleReason = null,
+    rescheduledAt = null
   ) => {
     if (!status) return "Không xác định";
 
     // Nếu slot này từ appointment đã dời lịch, hiển thị "Đã dời lịch" (ưu tiên cao nhất)
-    if (rescheduledFromId) {
+    // Kiểm tra cả rescheduledFromId (cho appointments cũ) và rescheduleReason/rescheduledAt (cho appointments mới được cập nhật)
+    if (rescheduledFromId || rescheduleReason || rescheduledAt) {
       return "Đã dời lịch";
     }
 
@@ -603,16 +611,16 @@ export default function QuanLyLichBacSi() {
       case "pending":
         return "Chờ duyệt";
       case "confirmed":
-        // Nếu có rescheduledFromId, hiển thị "Đã dời lịch" thay vì "Đã xác nhận"
-        if (rescheduledFromId) {
+        // Nếu có rescheduledFromId, rescheduleReason hoặc rescheduledAt, hiển thị "Đã dời lịch" thay vì "Đã xác nhận"
+        if (rescheduledFromId || rescheduleReason || rescheduledAt) {
           return "Đã dời lịch";
         }
         return "Đã xác nhận";
       case "completed":
         return "Hoàn thành";
       case "booked":
-        // Nếu có rescheduledFromId, hiển thị "Đã dời lịch" thay vì "Đã đặt"
-        if (rescheduledFromId) {
+        // Nếu có rescheduledFromId, rescheduleReason hoặc rescheduledAt, hiển thị "Đã dời lịch" thay vì "Đã đặt"
+        if (rescheduledFromId || rescheduleReason || rescheduledAt) {
           return "Đã dời lịch";
         }
         return "Đã đặt";
@@ -1137,7 +1145,9 @@ export default function QuanLyLichBacSi() {
             showAlert("Xóa slot thành công!");
             await loadTimeSlots(); // Reload time slots
           } else {
-            showAlert("Không thể xóa slot: " + (response.message || "Unknown error"));
+            showAlert(
+              "Không thể xóa slot: " + (response.message || "Unknown error")
+            );
           }
         } catch (error) {
           console.error("❌ Error deleting slot:", error);
@@ -1586,7 +1596,9 @@ export default function QuanLyLichBacSi() {
                                         {getStatusText(
                                           slot.status,
                                           slot.hasPendingLeaveRequest,
-                                          slot.rescheduledFromId
+                                          slot.rescheduledFromId,
+                                          slot.rescheduleReason,
+                                          slot.rescheduledAt
                                         )}
                                       </div>
                                       <button
@@ -1609,12 +1621,16 @@ export default function QuanLyLichBacSi() {
                                           ? getStatusText(
                                               slot.status,
                                               false,
+                                              null,
+                                              null,
                                               null
                                             )
                                           : getStatusText(
                                               slot.status,
                                               slot.hasPendingLeaveRequest,
-                                              slot.rescheduledFromId
+                                              slot.rescheduledFromId,
+                                              slot.rescheduleReason,
+                                              slot.rescheduledAt
                                             )}
                                       </div>
                                     </div>
@@ -1629,7 +1645,9 @@ export default function QuanLyLichBacSi() {
                                         {getStatusText(
                                           slot.status,
                                           slot.hasPendingLeaveRequest,
-                                          slot.rescheduledFromId
+                                          slot.rescheduledFromId,
+                                          slot.rescheduleReason,
+                                          slot.rescheduledAt
                                         )}
                                       </div>
                                     </div>
@@ -2727,19 +2745,33 @@ export default function QuanLyLichBacSi() {
                 </div>
               )}
 
-              {/* Reschedule button - only show for pending_doctor or accepted status */}
+              {/* Reschedule buttons - only show for pending_doctor or accepted status */}
               {(selectedAppointmentDetail.status === "pending_doctor" ||
                 selectedAppointmentDetail.status === "accepted") && (
                 <div className="detail-actions">
                   <Button
                     className="reschedule-button"
                     onClick={() => {
+                      setRescheduleWithNewDoctor(false);
+                      setShowRescheduleModal(true);
+                      setShowAppointmentDetail(false);
+                    }}
+                    style={{ marginRight: 8 }}
+                  >
+                    <Calendar size={16} style={{ marginRight: 8 }} />
+                    Dời lịch
+                  </Button>
+                  <Button
+                    className="reschedule-button"
+                    variant="outline"
+                    onClick={() => {
+                      setRescheduleWithNewDoctor(true);
                       setShowRescheduleModal(true);
                       setShowAppointmentDetail(false);
                     }}
                   >
                     <Calendar size={16} style={{ marginRight: 8 }} />
-                    Dời lịch
+                    Dời lịch sang bác sĩ khác
                   </Button>
                 </div>
               )}
@@ -2764,7 +2796,9 @@ export default function QuanLyLichBacSi() {
                           status: selectedAppointmentDetail.status,
                         };
                         // Manager không có quyền gọi video
-                        showAlert("Chỉ bác sĩ mới có thể bắt đầu cuộc gọi video");
+                        showAlert(
+                          "Chỉ bác sĩ mới có thể bắt đầu cuộc gọi video"
+                        );
                         setShowAppointmentDetail(false);
                       }}
                     >
@@ -2797,8 +2831,10 @@ export default function QuanLyLichBacSi() {
           appointment={selectedAppointmentDetail}
           onClose={() => {
             setShowRescheduleModal(false);
+            setRescheduleWithNewDoctor(false);
             setSelectedAppointmentDetail(null);
           }}
+          allowDoctorChange={rescheduleWithNewDoctor}
           customSubmitHandler={async (requestBody) => {
             // Custom handler for manager to directly reschedule (no approval needed)
             const response = await rescheduleAppointmentByManager(
@@ -2806,7 +2842,9 @@ export default function QuanLyLichBacSi() {
               requestBody.newDateTime,
               requestBody.reason,
               requestBody.mode,
-              requestBody.clinicId
+              requestBody.clinicId,
+              requestBody.newDoctorId,
+              requestBody.rescheduleReasonType
             );
             return response;
           }}

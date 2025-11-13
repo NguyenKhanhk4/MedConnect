@@ -8,7 +8,16 @@ import {
   DialogTitle,
 } from "../../../components/ui/Dialog";
 import { Input } from "../../../components/ui/Input";
-import { Check, X, Clock, User, Calendar, Users, Phone, Mail } from "lucide-react";
+import {
+  Check,
+  X,
+  Clock,
+  User,
+  Calendar,
+  Users,
+  Phone,
+  Mail,
+} from "lucide-react";
 import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./QuanLyYeuCauNghiPhep.scss";
 
@@ -111,7 +120,9 @@ export default function QuanLyYeuCauNghiPhep() {
         setRejectionReason("");
         await loadLeaveRequests();
       } else {
-        showAlert("❌ Không thể từ chối: " + (response.message || "Unknown error"));
+        showAlert(
+          "❌ Không thể từ chối: " + (response.message || "Unknown error")
+        );
       }
     } catch (error) {
       console.error("Error rejecting leave request:", error);
@@ -220,15 +231,21 @@ export default function QuanLyYeuCauNghiPhep() {
                   <Calendar size={16} />
                   <span>
                     {request.startDate && request.endDate
-                      ? `${new Date(request.startDate).toLocaleDateString("vi-VN", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })} - ${new Date(request.endDate).toLocaleDateString("vi-VN", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })}`
+                      ? `${new Date(request.startDate).toLocaleDateString(
+                          "vi-VN",
+                          {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                          }
+                        )} - ${new Date(request.endDate).toLocaleDateString(
+                          "vi-VN",
+                          {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                          }
+                        )}`
                       : "N/A"}
                   </span>
                 </div>
@@ -242,17 +259,26 @@ export default function QuanLyYeuCauNghiPhep() {
                 {request.appointmentsCount > 0 && (
                   <div className="appointments-section">
                     <strong>
-                      <Users size={16} style={{ marginRight: 8, verticalAlign: "middle" }} />
-                      Lịch hẹn trong khoảng thời gian ({request.appointmentsCount}):
+                      <Users
+                        size={16}
+                        style={{ marginRight: 8, verticalAlign: "middle" }}
+                      />
+                      Lịch hẹn trong khoảng thời gian (
+                      {request.appointmentsCount}):
                     </strong>
                     <div className="appointments-list">
                       {request.appointments?.map((appointment, index) => (
-                        <div key={appointment._id || index} className="appointment-item">
+                        <div
+                          key={appointment._id || index}
+                          className="appointment-item"
+                        >
                           <div className="appointment-header">
                             <span className="appointment-time">
                               <Clock size={14} />
                               {appointment.slotId?.startAt
-                                ? new Date(appointment.slotId.startAt).toLocaleString("vi-VN", {
+                                ? new Date(
+                                    appointment.slotId.startAt
+                                  ).toLocaleString("vi-VN", {
                                     day: "2-digit",
                                     month: "2-digit",
                                     year: "numeric",
@@ -260,7 +286,9 @@ export default function QuanLyYeuCauNghiPhep() {
                                     minute: "2-digit",
                                   })
                                 : appointment.scheduledStart
-                                ? new Date(appointment.scheduledStart).toLocaleString("vi-VN", {
+                                ? new Date(
+                                    appointment.scheduledStart
+                                  ).toLocaleString("vi-VN", {
                                     day: "2-digit",
                                     month: "2-digit",
                                     year: "numeric",
@@ -315,19 +343,24 @@ export default function QuanLyYeuCauNghiPhep() {
                               )}
                               {appointment.patientId?.dob && (
                                 <span className="patient-detail">
-                                  {new Date(appointment.patientId.dob).toLocaleDateString("vi-VN")}
+                                  {new Date(
+                                    appointment.patientId.dob
+                                  ).toLocaleDateString("vi-VN")}
                                 </span>
                               )}
                             </div>
                             {appointment.reason && (
                               <div className="appointment-reason">
-                                <strong>Lý do khám:</strong> {appointment.reason}
+                                <strong>Lý do khám:</strong>{" "}
+                                {appointment.reason}
                               </div>
                             )}
                             {appointment.mode && (
                               <div className="appointment-mode">
                                 <strong>Hình thức:</strong>{" "}
-                                {appointment.mode === "online" ? "Online" : "Offline"}
+                                {appointment.mode === "online"
+                                  ? "Online"
+                                  : "Offline"}
                               </div>
                             )}
                           </div>
@@ -429,6 +462,24 @@ export default function QuanLyYeuCauNghiPhep() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Custom Alert */}
+      {alertMessage && (
+        <CustomAlert
+          message={alertMessage}
+          onClose={() => setAlertMessage(null)}
+        />
+      )}
+
+      {/* Custom Confirm */}
+      {confirmConfig && (
+        <CustomAlert
+          message={confirmConfig.message}
+          type="confirm"
+          onClose={() => setConfirmConfig(null)}
+          onConfirm={confirmConfig.onConfirm}
+        />
+      )}
     </div>
   );
 }

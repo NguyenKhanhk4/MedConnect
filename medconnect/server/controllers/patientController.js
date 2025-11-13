@@ -11,6 +11,7 @@ import PatientFavorite from "../models/patientFavorite.model.js";
 import EducationLevelPrice from "../models/educationLevelPrice.model.js";
 import Payment from "../models/payment.model.js";
 import Clinic from "../models/clinic.model.js";
+import Review from "../models/review.model.js";
 import {
   createBookingNotification,
   createAppointmentNotification,
@@ -263,7 +264,7 @@ export async function getCurrentPatientProfile(req, res) {
     // IMPORTANT: Only find/create patient profile if user role is "patient"
     // Doctors, admins, and managers should NOT have patient profiles
     let patient = null;
-    
+
     if (user.role === "patient") {
       // 1) Ưu tiên lấy đúng hồ sơ "self" (chính chủ)
       patient = await Patient.findOne({
@@ -311,11 +312,15 @@ export async function getCurrentPatientProfile(req, res) {
       // For non-patient users (doctor, admin, manager), check if Patient exists and remove it
       const existingPatient = await Patient.findOne({ userId: appUserId });
       if (existingPatient) {
-        console.warn(`⚠️ Patient record found for ${user.role} user ${appUserId}, removing it...`);
+        console.warn(
+          `⚠️ Patient record found for ${user.role} user ${appUserId}, removing it...`
+        );
         await Patient.findByIdAndDelete(existingPatient._id);
         console.log(`✅ Removed Patient record: ${existingPatient._id}`);
       }
-      console.log(`ℹ️ User ${appUserId} is a ${user.role}, no patient profile needed`);
+      console.log(
+        `ℹ️ User ${appUserId} is a ${user.role}, no patient profile needed`
+      );
     }
 
     // Combine user and patient data
@@ -2403,6 +2408,8 @@ export async function getFavoriteDoctors(req, res) {
     const favorites = await PatientFavorite.find({ patientId: patient._id })
       .populate({
         path: "doctorId",
+        select:
+          "fullName avatarUrl yearsExperience educationLevel bio specializationIds userId", // Explicitly select fields including educationLevel
         populate: [
           {
             path: "userId",
@@ -2417,18 +2424,63 @@ export async function getFavoriteDoctors(req, res) {
       .sort({ favoritedAt: -1 })
       .lean();
 
-    // Format doctors data
-    const favoriteDoctors = favorites.map((fav) => ({
-      _id: fav.doctorId._id,
-      fullName: fav.doctorId.userId?.fullName || fav.doctorId.fullName,
-      avatarUrl: fav.doctorId.avatarUrl || fav.doctorId.userId?.photoURL,
-      specializations: fav.doctorId.specializationIds || [],
-      yearsExperience: fav.doctorId.yearsExperience,
-      ratingAvg: fav.doctorId.ratingAvg || 0,
-      ratingCount: fav.doctorId.ratingCount || 0,
-      bio: fav.doctorId.bio,
-      favoritedAt: fav.favoritedAt,
-    }));
+    // Get doctor IDs
+    const doctorIds = favorites
+      .map((fav) => fav.doctorId?._id)
+      .filter((id) => id);
+
+    // Calculate ratings from Review collection
+    const ratingStats = await Review.aggregate([
+      {
+        $match: {
+          doctorId: { $in: doctorIds },
+        },
+      },
+      {
+        $group: {
+          _id: "$doctorId",
+          averageRating: { $avg: "$rating" },
+          totalReviews: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Create a map for quick lookup
+    const ratingMap = new Map();
+    ratingStats.forEach((stat) => {
+      ratingMap.set(stat._id.toString(), {
+        ratingAvg: parseFloat(stat.averageRating.toFixed(2)),
+        ratingCount: stat.totalReviews,
+      });
+    });
+
+    // Format doctors data with calculated ratings
+    const favoriteDoctors = favorites.map((fav) => {
+      const doctorId = fav.doctorId?._id?.toString();
+      const ratingData = ratingMap.get(doctorId);
+
+      // Debug log to check educationLevel
+      if (fav.doctorId) {
+        console.log(`[getFavoriteDoctors] Doctor ${doctorId}:`, {
+          fullName: fav.doctorId.fullName,
+          educationLevel: fav.doctorId.educationLevel,
+          hasEducationLevel: !!fav.doctorId.educationLevel,
+        });
+      }
+
+      return {
+        _id: fav.doctorId._id,
+        fullName: fav.doctorId.userId?.fullName || fav.doctorId.fullName,
+        avatarUrl: fav.doctorId.avatarUrl || fav.doctorId.userId?.photoURL,
+        specializations: fav.doctorId.specializationIds || [],
+        yearsExperience: fav.doctorId.yearsExperience,
+        educationLevel: fav.doctorId.educationLevel || null, // Explicitly set to null if missing
+        ratingAvg: ratingData?.ratingAvg || 0,
+        ratingCount: ratingData?.ratingCount || 0,
+        bio: fav.doctorId.bio,
+        favoritedAt: fav.favoritedAt,
+      };
+    });
 
     return ok(res, { favoriteDoctors });
   } catch (error) {
@@ -2854,7 +2906,9 @@ async function calculateAppointmentBookingFee(appointment) {
     }
 
     if (!doctor.educationLevel) {
-      console.warn(`Doctor ${doctorId} không có education level, sử dụng giá mặc định 0`);
+      console.warn(
+        `Doctor ${doctorId} không có education level, sử dụng giá mặc định 0`
+      );
       return 0;
     }
 
@@ -2873,7 +2927,9 @@ async function calculateAppointmentBookingFee(appointment) {
     }).lean();
 
     if (!priceRecord) {
-      console.warn(`Không tìm thấy giá cho educationLevel=${doctor.educationLevel}, mode=${mode}`);
+      console.warn(
+        `Không tìm thấy giá cho educationLevel=${doctor.educationLevel}, mode=${mode}`
+      );
       return 0;
     }
 
@@ -2885,7 +2941,9 @@ async function calculateAppointmentBookingFee(appointment) {
 
     const scheduledDate = new Date(appointment.scheduledStart);
     if (isNaN(scheduledDate.getTime())) {
-      console.warn(`Appointment có scheduledStart không hợp lệ: ${appointment.scheduledStart}`);
+      console.warn(
+        `Appointment có scheduledStart không hợp lệ: ${appointment.scheduledStart}`
+      );
       return priceRecord.weekdayPrice; // Default to weekday price
     }
 
@@ -3033,7 +3091,7 @@ export async function getPatientPayments(req, res) {
 /**
  * Calculate payment summary for single appointment (pre-payment flow)
  * POST /api/patients/appointments/calculate-payment-summary
- * 
+ *
  * Tính toán payment summary cho single appointment mà chưa tạo appointment trong DB
  * Tương tự calculatePaymentSummary cho nhiều lịch nhưng chỉ có 1 appointment
  */
@@ -3051,7 +3109,16 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
       );
     }
 
-    const { doctorId, slotId, mode, clinicId, reason, scheduledStart, scheduledEnd, patientId } = req.body;
+    const {
+      doctorId,
+      slotId,
+      mode,
+      clinicId,
+      reason,
+      scheduledStart,
+      scheduledEnd,
+      patientId,
+    } = req.body;
 
     // Validate required fields
     if (!doctorId || !slotId || !mode || !scheduledStart || !scheduledEnd) {
@@ -3181,9 +3248,10 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
     const price = await calculateAppointmentBookingFee(appointmentData);
 
     // Get specialization names
-    const specializationNames = doctor.specializationIds
-      ?.map((s) => (typeof s === "object" ? s.name : s))
-      .join(", ") || "";
+    const specializationNames =
+      doctor.specializationIds
+        ?.map((s) => (typeof s === "object" ? s.name : s))
+        .join(", ") || "";
 
     // Format scheduled time
     const scheduledDate = new Date(scheduledStart);
@@ -3211,15 +3279,23 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
       appointmentsCount: 1,
     });
   } catch (error) {
-    console.error("❌ Error in calculatePaymentSummaryForSingleAppointment:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    console.error(
+      "❌ Error in calculatePaymentSummaryForSingleAppointment:",
+      error
+    );
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
 /**
  * Create payment for single appointment (pre-payment flow)
  * POST /api/patients/appointments/create-payment
- * 
+ *
  * Flow mới:
  * 1. Nhận appointment data từ request body (chưa tạo appointment trong DB)
  * 2. Validate appointment data
@@ -3243,7 +3319,18 @@ export async function createPaymentForSingleAppointment(req, res) {
       );
     }
 
-    const { doctorId, slotId, mode, clinicId, reason, scheduledStart, scheduledEnd, patientId, gateway = "payos", method = "qr" } = req.body;
+    const {
+      doctorId,
+      slotId,
+      mode,
+      clinicId,
+      reason,
+      scheduledStart,
+      scheduledEnd,
+      patientId,
+      gateway = "payos",
+      method = "qr",
+    } = req.body;
 
     // Validate gateway
     if (!["payos", "vnpay", "momo"].includes(gateway)) {
@@ -3434,9 +3521,10 @@ export async function createPaymentForSingleAppointment(req, res) {
     }
 
     // Get specialization names
-    const specializationNames = doctor.specializationIds
-      ?.map((s) => (typeof s === "object" ? s.name : s))
-      .join(", ") || "";
+    const specializationNames =
+      doctor.specializationIds
+        ?.map((s) => (typeof s === "object" ? s.name : s))
+        .join(", ") || "";
 
     // Create payment items
     const modeText = mode === "online" ? "Trực tuyến" : "Tại phòng khám";
@@ -3448,12 +3536,16 @@ export async function createPaymentForSingleAppointment(req, res) {
         })})`
       : "";
 
-    const appointmentItems = [{
-      description: `${doctor.fullName}${specializationNames ? ` - ${specializationNames}` : ""} (${modeText}${clinicText})${timeText}`,
-      quantity: 1,
-      unitPrice: price,
-      lineTotal: price,
-    }];
+    const appointmentItems = [
+      {
+        description: `${doctor.fullName}${
+          specializationNames ? ` - ${specializationNames}` : ""
+        } (${modeText}${clinicText})${timeText}`,
+        quantity: 1,
+        unitPrice: price,
+        lineTotal: price,
+      },
+    ];
 
     // Create payment record với appointmentData (chưa tạo appointment)
     const orderCode = Number(String(Date.now()).slice(-10));
@@ -3517,11 +3609,11 @@ export async function createPaymentForSingleAppointment(req, res) {
     }
 
     const payment = new Payment(paymentData);
-    
+
     // Đảm bảo payment object không có appointmentId
     if (payment.appointmentId !== undefined) {
       payment.appointmentId = undefined;
-      payment.unmarkModified('appointmentId');
+      payment.unmarkModified("appointmentId");
       console.log("⚠️ Cleared appointmentId from payment object");
     }
 
@@ -3531,11 +3623,14 @@ export async function createPaymentForSingleAppointment(req, res) {
       if (!payment.appointmentData || payment.appointmentData.length === 0) {
         throw new Error("appointmentData is required for pre-payment flow");
       }
-      
+
       await payment.validate();
       console.log("✅ Payment validation passed (single appointment)");
     } catch (validationError) {
-      console.error("❌ Payment validation failed (single appointment):", validationError);
+      console.error(
+        "❌ Payment validation failed (single appointment):",
+        validationError
+      );
       console.error("Validation error details:", {
         name: validationError.name,
         message: validationError.message,
@@ -3551,24 +3646,31 @@ export async function createPaymentForSingleAppointment(req, res) {
         appointmentData: payment.appointmentData,
         isNew: payment.isNew,
       });
-      
+
       // Format error message better
       if (validationError.errors) {
-        const errorMessages = Object.keys(validationError.errors).map(key => {
+        const errorMessages = Object.keys(validationError.errors).map((key) => {
           return `${key}: ${validationError.errors[key].message}`;
         });
-        throw new Error(`Payment validation failed: ${errorMessages.join(', ')}`);
+        throw new Error(
+          `Payment validation failed: ${errorMessages.join(", ")}`
+        );
       }
       throw validationError;
     }
 
     await payment.save();
-    console.log("✅ Payment saved successfully (single appointment):", payment._id);
+    console.log(
+      "✅ Payment saved successfully (single appointment):",
+      payment._id
+    );
 
     // Create PayOS payment link (if gateway is payos)
     if (gateway === "payos") {
       try {
-        const { createPayosPaymentLink } = await import("../services/payos.service.js");
+        const { createPayosPaymentLink } = await import(
+          "../services/payos.service.js"
+        );
         const payosResult = await createPayosPaymentLink(appUserId, {
           paymentId: payment._id.toString(), // Pass paymentId for pre-payment flow
           amount: price,
@@ -3631,6 +3733,11 @@ export async function createPaymentForSingleAppointment(req, res) {
     }
   } catch (error) {
     console.error("❌ Error in createPaymentForSingleAppointment:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }

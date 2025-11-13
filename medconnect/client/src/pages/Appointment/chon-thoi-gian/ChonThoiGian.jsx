@@ -173,11 +173,95 @@ const ChonThoiGian = () => {
 
   useEffect(() => {
     if (location.state?.doctor) {
-      setDoctor(location.state.doctor);
+      // Normalize doctor data to ensure consistent structure
+      const doctorData = location.state.doctor;
+
+      // Convert specializations to specializationIds if needed (from favorite doctors page)
+      let specializationIds = doctorData.specializationIds;
+      if (!specializationIds && doctorData.specializations) {
+        specializationIds = doctorData.specializations;
+      }
+
+      // Always normalize doctor data first
+      const normalizeDoctorData = (data) => {
+        return {
+          ...data,
+          specializationIds: specializationIds || data.specializationIds || [],
+          ratingAvg:
+            data.ratingAvg !== undefined && data.ratingAvg !== null
+              ? Number(data.ratingAvg)
+              : 0,
+          ratingCount:
+            data.ratingCount !== undefined && data.ratingCount !== null
+              ? Number(data.ratingCount)
+              : 0,
+          // Preserve all fields
+          educationLevel: data.educationLevel,
+          yearsExperience: data.yearsExperience,
+          bio: data.bio,
+          avatarUrl: data.avatarUrl,
+        };
+      };
+
+      // If educationLevel is missing, fetch full doctor details from API
+      const fetchFullDoctorDetails = async () => {
+        console.log("[ChonThoiGian] Doctor data from state:", {
+          _id: doctorData._id,
+          educationLevel: doctorData.educationLevel,
+          hasEducationLevel: !!doctorData.educationLevel,
+          fullName: doctorData.fullName,
+        });
+
+        if (!doctorData.educationLevel && doctorData._id) {
+          console.log(
+            "[ChonThoiGian] Fetching full doctor details for:",
+            doctorData._id
+          );
+          try {
+            const response = await api.get(`/api/doctors/${doctorData._id}`);
+            console.log("[ChonThoiGian] Full doctor response:", response);
+            if (response.success && response.data?.doctor) {
+              const fullDoctor = response.data.doctor;
+              console.log("[ChonThoiGian] Full doctor data:", {
+                _id: fullDoctor._id,
+                educationLevel: fullDoctor.educationLevel,
+                hasEducationLevel: !!fullDoctor.educationLevel,
+              });
+              // Merge full doctor data with existing data
+              const mergedDoctor = normalizeDoctorData({
+                ...doctorData,
+                ...fullDoctor,
+              });
+              console.log("[ChonThoiGian] Merged doctor:", {
+                _id: mergedDoctor._id,
+                educationLevel: mergedDoctor.educationLevel,
+                hasEducationLevel: !!mergedDoctor.educationLevel,
+              });
+              setDoctor(mergedDoctor);
+              return;
+            }
+          } catch (error) {
+            console.error(
+              "[ChonThoiGian] Error fetching full doctor details:",
+              error
+            );
+          }
+        }
+
+        // If no need to fetch or fetch failed, use normalized data
+        const normalizedDoctor = normalizeDoctorData(doctorData);
+        console.log("[ChonThoiGian] Normalized doctor (no fetch):", {
+          _id: normalizedDoctor._id,
+          educationLevel: normalizedDoctor.educationLevel,
+          hasEducationLevel: !!normalizedDoctor.educationLevel,
+        });
+        setDoctor(normalizedDoctor);
+      };
+
+      fetchFullDoctorDetails();
+
       // Use specialization from state or from doctor's first specialization
-      const spec =
-        location.state?.specialization ||
-        location.state?.doctor?.specializationIds?.[0];
+      const spec = location.state?.specialization || specializationIds?.[0];
       setSpecialization(spec);
     } else {
       navigate("/dat-lich/chon-chuyen-khoa");
@@ -834,53 +918,15 @@ const ChonThoiGian = () => {
         );
       }
 
-      // IMPORTANT: Tạo clean request body - force remove patientId if booking for "me"
-      const requestBody = {
-        doctorId: appointmentData.doctorId,
-        slotId: appointmentData.slotId,
-        mode: appointmentData.mode,
-        reason: appointmentData.reason,
-        scheduledStart: appointmentData.scheduledStart,
-        scheduledEnd: appointmentData.scheduledEnd,
-        gateway: "payos",
-        method: "qr",
-        // IMPORTANT: Add explicit flag to tell backend this is for current user
-        bookForSelf: !isBookingForFamily, // true if booking for me, false if family
-      };
-
-      // Add clinicId if exists
-      if (appointmentData.clinicId) {
-        requestBody.clinicId = appointmentData.clinicId;
-      }
-
-      // ONLY add patientId if booking for family
-      if (isBookingForFamily && familyPatientId) {
-        requestBody.patientId = familyPatientId;
-        console.log("✅ Added patientId to request body:", familyPatientId);
-      } else {
-        // Explicitly ensure no patientId for "me" booking
-        // Add explicit null to override any backend default
-        requestBody.patientId = null;
-        console.log("✅ Explicitly set patientId = null (booking for me)");
-      }
-
-      console.log(
-        "📮 Clean request body SENT to create-payment API:",
-        JSON.parse(JSON.stringify(requestBody))
-      );
-      console.log(
-        "📮 Request body has patientId key:",
-        "patientId" in requestBody
-      );
-      console.log("📮 Request body.patientId:", requestBody.patientId);
-
       // Create payment and get PayOS link (tương tự logic nhiều lịch)
       const response = await api.post(
         "/api/patients/appointments/create-payment",
-        requestBody
+        {
+          ...appointmentData,
+          gateway: "payos",
+          method: "qr", // QR code payment
+        }
       );
-
-      console.log("📥 Response from create-payment API:", response);
 
       if (response?.success || response?.data?.success) {
         // Response structure: ok(res, { paymentId, payUrl, orderCode, ... })
@@ -937,8 +983,9 @@ const ChonThoiGian = () => {
   };
 
   const getSpecializationNames = (specializationIds) => {
-    if (!specializationIds || specializationIds.length === 0) return [];
-    return specializationIds.map((spec) => spec.name).join(", ");
+    if (!specializationIds || specializationIds.length === 0)
+      return "Chưa xác định";
+    return specializationIds.map((spec) => spec.name || spec).join(", ");
   };
 
   if (!doctor || !specialization) {
@@ -1047,9 +1094,9 @@ const ChonThoiGian = () => {
                       {doctor.educationLevel && (
                         <Tag
                           style={{
-                            backgroundColor: "#e6fffb",
-                            borderColor: "#13c2c2",
-                            color: "#13c2c2",
+                            backgroundColor: "#e6f4ff",
+                            borderColor: "#1890ff",
+                            color: "#1890ff",
                             borderRadius: "6px",
                             padding: "4px 12px",
                             fontSize: "14px",
@@ -1877,6 +1924,7 @@ const ChonThoiGian = () => {
                               <TextArea
                                 ref={reasonTextareaRef}
                                 rows={4}
+                                value={reasonValue}
                                 placeholder="Mô tả triệu chứng hoặc lý do khám (không bắt buộc)"
                                 maxLength={100}
                                 showCount
@@ -1890,9 +1938,13 @@ const ChonThoiGian = () => {
                                       0,
                                       100
                                     );
-                                    e.target.value = truncatedValue;
                                     form.setFieldsValue({
                                       reason: truncatedValue,
+                                    });
+                                  } else {
+                                    // Cập nhật form với giá trị mới
+                                    form.setFieldsValue({
+                                      reason: newValue,
                                     });
                                   }
                                 }}
@@ -2149,6 +2201,13 @@ const ChonThoiGian = () => {
                       {getSpecializationNames(doctor.specializationIds)}
                     </Text>
                   </div>
+
+                  {doctor.educationLevel && (
+                    <div className="summary-item">
+                      <Text strong>Trình độ:</Text>
+                      <Text>{doctor.educationLevel}</Text>
+                    </div>
+                  )}
 
                   {selectedDate && (
                     <div className="summary-item">
