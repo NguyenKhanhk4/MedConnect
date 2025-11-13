@@ -684,16 +684,29 @@ export const handlePayosWebhook = async (
               return { already: true, orderCode };
             }
 
+            // Get self patient (the logged-in user's own profile) for fallback
+            let selfPatient = null;
+            if (patient.userId && patient.userId._id) {
+              selfPatient = await Patient.findOne({
+                userId: patient.userId._id,
+                relationshipToOwner: "self"
+              });
+              if (!selfPatient) {
+                selfPatient = patient;
+              }
+            } else {
+              selfPatient = patient;
+            }
+
             // Check if this is a single appointment (length === 1) or multiple appointments (length > 1)
             const isSingleAppointment = payment.appointmentData.length === 1;
 
             if (isSingleAppointment) {
               // Single appointment: Create appointment directly (no MedicalVisit)
-              console.log(`🔔 Single appointment pre-payment flow`);
-              
               const aptData = payment.appointmentData[0];
+              const targetPatientId = aptData.patientId || selfPatient._id;
               const newAppointment = new Appointment({
-                patientId: patientId,
+                patientId: targetPatientId,
                 doctorId: aptData.doctorId,
                 slotId: aptData.slotId,
                 mode: aptData.mode,
@@ -760,8 +773,9 @@ export const handlePayosWebhook = async (
                 : new Date().toISOString().split('T')[0];
 
               // Create MedicalVisit
+              const visitPatientId = firstAppointmentData.patientId || selfPatient._id;
               const visit = new MedicalVisit({
-                patientId: patientId,
+                patientId: visitPatientId,
                 visitDate: visitDate,
                 status: "pending_doctor",
                 appointmentIds: [],
@@ -777,9 +791,10 @@ export const handlePayosWebhook = async (
               // Create all appointments from appointmentData
               const createdAppointments = [];
               for (const aptData of payment.appointmentData) {
+                const targetPatientId = aptData.patientId || selfPatient._id;
                 const newAppointment = new Appointment({
                   visitId: visit._id,
-                  patientId: patientId,
+                  patientId: targetPatientId,
                   doctorId: aptData.doctorId,
                   slotId: aptData.slotId,
                   mode: aptData.mode,

@@ -1452,4 +1452,51 @@ export async function getFamilyMembers() {
   return r.json();
 }
 
+// AI Chat functions
+export async function createAiConversation() {
+  const r = await fetch(`${BASE}/api/ai/conversations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function sendAiMessage(conversationId, text, isAuthenticated = false) {
+  const r = await fetch(`${BASE}/api/ai/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ conversationId, text, isAuthenticated }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getAiConversationMessages(conversationId) {
+  const r = await fetch(`${BASE}/api/ai/conversations/${conversationId}/messages`, {
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getAiConversations() {
+  const r = await fetch(`${BASE}/api/ai/conversations`, {
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function deleteAiConversation(conversationId) {
+  const r = await fetch(`${BASE}/api/ai/conversations/${conversationId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export const api = apiObject;

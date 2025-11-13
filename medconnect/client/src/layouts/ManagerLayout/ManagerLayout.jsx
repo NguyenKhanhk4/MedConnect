@@ -98,10 +98,11 @@ const ManagerLayout = () => {
     try {
       console.log("Manager logout clicked - clearing all user data...");
       await clearUserData();
+      // clearUserData already redirects to homepage, but ensure it happens
     } catch (error) {
       console.error("Error during manager logout:", error);
-      // Fallback: just reload the page
-      window.location.reload();
+      // Fallback: redirect to homepage
+      window.location.href = "/";
     }
   };
 

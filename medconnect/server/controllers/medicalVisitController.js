@@ -20,6 +20,68 @@ import {
 } from "../services/notificationService.js";
 
 /**
+ * Helper: Find or create the "self" patient profile for a user
+ */
+async function getSelfPatient(appUserId, { createIfMissing = false, populateUser = false } = {}) {
+  if (!appUserId) return null;
+
+  const applyPopulate = (query) =>
+    populateUser ? query.populate("userId") : query;
+
+  // 1) Try to find existing "self" profile
+  let patient = await applyPopulate(
+    Patient.findOne({ userId: appUserId, relationshipToOwner: "self" })
+  );
+
+  if (patient) {
+    return patient;
+  }
+
+  // 2) Legacy data: missing relationshipToOwner -> upgrade to "self"
+  let legacyPatient = await applyPopulate(
+    Patient.findOne({
+      userId: appUserId,
+      $or: [
+        { relationshipToOwner: { $exists: false } },
+        { relationshipToOwner: null },
+        { relationshipToOwner: "" },
+      ],
+    })
+  );
+
+  if (legacyPatient) {
+    legacyPatient.relationshipToOwner = "self";
+    await legacyPatient.save();
+    return populateUser
+      ? await applyPopulate(Patient.findById(legacyPatient._id))
+      : legacyPatient;
+  }
+
+  if (!createIfMissing) {
+    return null;
+  }
+
+  // 3) Create new "self" profile if allowed
+  const user = await User.findById(appUserId).lean();
+  if (!user) {
+    return null;
+  }
+
+  const newPatient = new Patient({
+    userId: appUserId,
+    fullName: user.fullName || "Chưa cập nhật",
+    phone: user.phone || "",
+    relationshipToOwner: "self",
+    isComplete: false,
+  });
+  await newPatient.save();
+
+  return populateUser
+    ? await applyPopulate(Patient.findById(newPatient._id))
+    : newPatient;
+}
+
+/**
  * Tạo hoặc lấy phiên khám trong ngày cho bệnh nhân
  * GET /api/medical-visits/get-or-create
  */
@@ -59,10 +121,15 @@ export async function getOrCreateVisit(req, res) {
       );
     }
 
-    // Get patient profile
-    const patient = await Patient.findOne({ userId: appUserId });
+    // Get patient profile (self) or create if missing
+    const patient = await getSelfPatient(appUserId, { createIfMissing: true });
     if (!patient) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
+      return fail(
+        res,
+        404,
+        ERROR_CODES.NOT_FOUND,
+        "Patient profile not found"
+      );
     }
 
     // Return temporary visit data (not saved to DB yet)
@@ -307,10 +374,15 @@ export async function calculatePaymentSummary(req, res) {
       );
     }
 
-    // Get patient profile
-    const patient = await Patient.findOne({ userId: appUserId });
+    // Get patient profile (self)
+    const patient = await getSelfPatient(appUserId, { createIfMissing: true });
     if (!patient) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
+      return fail(
+        res,
+        404,
+        ERROR_CODES.NOT_FOUND,
+        "Patient profile not found"
+      );
     }
 
     // Validate all appointments
@@ -566,9 +638,14 @@ export async function addAppointmentToVisit(req, res) {
     }
 
     // Get patient profile
-    const patient = await Patient.findOne({ userId: appUserId });
+    const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
+      return fail(
+        res,
+        404,
+        ERROR_CODES.NOT_FOUND,
+        "Patient profile not found"
+      );
     }
 
     // Get visit
@@ -946,9 +1023,14 @@ export async function checkTimeConflicts(req, res) {
     }
 
     // Get patient profile
-    const patient = await Patient.findOne({ userId: appUserId });
+    const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
+      return fail(
+        res,
+        404,
+        ERROR_CODES.NOT_FOUND,
+        "Patient profile not found"
+      );
     }
 
     // Get visit with appointments
@@ -1141,9 +1223,14 @@ export async function replaceRejectedAppointment(req, res) {
     }
 
     // Get patient profile
-    const patient = await Patient.findOne({ userId: appUserId });
+    const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
+      return fail(
+        res,
+        404,
+        ERROR_CODES.NOT_FOUND,
+        "Patient profile not found"
+      );
     }
 
     // Get original appointment
@@ -1385,9 +1472,14 @@ export async function cancelAppointmentInVisit(req, res) {
     }
 
     // Get patient profile
-    const patient = await Patient.findOne({ userId: appUserId });
+    const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
+      return fail(
+        res,
+        404,
+        ERROR_CODES.NOT_FOUND,
+        "Patient profile not found"
+      );
     }
 
     // Get appointment
@@ -1463,9 +1555,14 @@ export async function getPatientVisits(req, res) {
     const skip = (page - 1) * limit;
 
     // Get patient profile
-    const patient = await Patient.findOne({ userId: appUserId });
+    const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
+      return fail(
+        res,
+        404,
+        ERROR_CODES.NOT_FOUND,
+        "Patient profile not found"
+      );
     }
 
     // Build query
@@ -1539,9 +1636,14 @@ export async function getVisitDetails(req, res) {
     const { visitId } = req.params;
 
     // Get patient profile
-    const patient = await Patient.findOne({ userId: appUserId });
+    const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
+      return fail(
+        res,
+        404,
+        ERROR_CODES.NOT_FOUND,
+        "Patient profile not found"
+      );
     }
 
     // Get visit
@@ -1722,9 +1824,14 @@ export async function getPaymentSummary(req, res) {
     }
 
     // Get patient profile
-    const patient = await Patient.findOne({ userId: appUserId });
+    const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
+      return fail(
+        res,
+        404,
+        ERROR_CODES.NOT_FOUND,
+        "Patient profile not found"
+      );
     }
 
     // Get visit
@@ -2123,7 +2230,7 @@ export async function createPaymentForVisit(req, res) {
     // Validate all appointments and prepare appointmentData
     const appointmentData = [];
     for (const aptData of appointments) {
-      const { doctorId, slotId, mode, clinicId, reason } = aptData;
+      const { doctorId, slotId, mode, clinicId, reason, patientId } = aptData;
 
       if (!doctorId || !slotId || !mode) {
         return fail(
@@ -2203,6 +2310,25 @@ export async function createPaymentForVisit(req, res) {
         scheduledEnd = new Date(scheduledEnd.getTime());
       }
 
+      // If patientId is provided (booking for family), verify ownership
+      let validatedPatientId = undefined;
+      if (patientId) {
+        const familyPatient = await Patient.findOne({
+          _id: patientId,
+          userId: appUserId,
+          relationshipToOwner: { $ne: "self" },
+        }).lean();
+        if (!familyPatient) {
+          return fail(
+            res,
+            403,
+            ERROR_CODES.UNAUTHORIZED,
+            "Provided patientId does not belong to current user"
+          );
+        }
+        validatedPatientId = familyPatient._id;
+      }
+
       appointmentData.push({
         doctorId,
         slotId,
@@ -2211,6 +2337,8 @@ export async function createPaymentForVisit(req, res) {
         scheduledStart: scheduledStart,
         scheduledEnd: scheduledEnd,
         reason: reason || "",
+        // Persist patientId per appointment (optional)
+        patientId: validatedPatientId,
       });
     }
 
@@ -2311,6 +2439,13 @@ export async function createPaymentForVisit(req, res) {
       invoiceNumber,
     });
 
+    // Determine billTo patient (use selected family member if provided, else owner's patient)
+    let billToPatientId = patient._id;
+    const firstAptWithPatient = appointmentData.find(a => !!a.patientId);
+    if (firstAptWithPatient?.patientId) {
+      billToPatientId = firstAptWithPatient.patientId;
+    }
+
     // Tạo payment object - Đảm bảo appointmentId KHÔNG được set (không phải undefined, mà là không có field)
     const paymentData = {
       // KHÔNG có appointmentId - chỉ có appointmentData (pre-payment flow)
@@ -2321,7 +2456,7 @@ export async function createPaymentForVisit(req, res) {
       currency: "VND",
       issueDate: new Date(),
       billTo: {
-        patientId: patient._id,
+        patientId: billToPatientId,
         name: patient.fullName || patient.userId?.fullName || "Unknown",
         email: patient.userId?.email,
         phone: patient.userId?.phoneNumber || patient.phone,

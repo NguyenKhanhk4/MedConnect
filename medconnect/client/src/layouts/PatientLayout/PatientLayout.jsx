@@ -96,14 +96,13 @@ const PatientLayout = () => {
 
   const handleLogout = async () => {
     try {
-      // Navigate to homepage first, then sign out
-      // This prevents the brief login page flash
-      navigate("/", { replace: true });
-      // Sign out from Firebase (non-blocking)
-      auth.signOut().catch(console.error);
+      // Sign out from Firebase first
+      await auth.signOut();
+      // Use window.location.href for hard redirect to homepage to avoid middleware redirects
+      window.location.href = "/";
     } catch (error) {
       console.error("Logout error:", error);
-      // Fallback to hard redirect
+      // Fallback: hard redirect to homepage
       window.location.href = "/";
     }
   };

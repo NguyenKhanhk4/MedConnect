@@ -212,14 +212,14 @@ const ChiTietLichHen = ({ visible, onClose, appointmentId }) => {
                   </Text>
                 </div>
               )}
-              {appointment.reason && (
-                <div>
-                  <Text type="secondary">
-                    <Text strong>Lý do khám: </Text>
-                    {appointment.reason}
-                  </Text>
-                </div>
-              )}
+              <div>
+                <Text type="secondary">
+                  <Text strong>Lý do khám: </Text>
+                  {appointment.reason && appointment.reason.trim()
+                    ? appointment.reason
+                    : "Không có"}
+                </Text>
+              </div>
             </Space>
           </Card>
 

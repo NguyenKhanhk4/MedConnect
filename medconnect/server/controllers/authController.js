@@ -514,6 +514,15 @@ export async function registerDoctor(req, res) {
       fullName: verifyDoctor.fullName,
     });
 
+    // IMPORTANT: Ensure no Patient record is created for doctors
+    // Check if Patient was accidentally created and remove it
+    const existingPatient = await Patient.findOne({ userId: userDoc._id });
+    if (existingPatient) {
+      console.warn(`⚠️ Patient record found for doctor user ${userDoc._id}, removing it...`);
+      await Patient.findByIdAndDelete(existingPatient._id);
+      console.log(`✅ Removed accidental Patient record: ${existingPatient._id}`);
+    }
+
     // Create AuthProvider record for local login
     try {
       await AuthProvider.create({
