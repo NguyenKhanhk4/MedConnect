@@ -440,16 +440,7 @@ export default function LichHen() {
       `Bạn có chắc chắn muốn bắt đầu khám cho ${patientName}?`,
       async () => {
     try {
-      // Đối với appointments ở trạng thái pending_doctor (cả online và offline), tự động accept trước khi bắt đầu khám
-      if (appointment.status === "pending_doctor") {
-        await updateAppointmentStatus(appointment._id, "accepted");
-        // Cập nhật trạng thái trong UI
-        setAppointments((prevAppointments) =>
-          prevAppointments.map((apt) =>
-            apt._id === appointment._id ? { ...apt, status: "accepted" } : apt
-          )
-        );
-      }
+      // Note: pending_doctor status has been removed - all appointments are auto-accepted
 
       await updateAppointmentStatus(appointment._id, "in_progress");
 
@@ -774,17 +765,6 @@ export default function LichHen() {
                 <Filter className="w-4 h-4" />
                 Bộ lọc
               </Button>
-              <Button
-                onClick={handleAcceptAll}
-                className="appointment-list-accept-all-btn"
-                disabled={
-                  appointments.filter((apt) => apt.status === "pending_doctor")
-                    .length === 0
-                }
-              >
-                <CheckSquare className="w-4 h-4" />
-                Chấp nhận toàn bộ
-              </Button>
             </div>
           </div>
         </div>
@@ -803,7 +783,6 @@ export default function LichHen() {
                   className="appointment-list-filter-select"
                 >
                   <option value="all">Tất cả</option>
-                  <option value="pending_doctor">Chờ xác nhận</option>
                   <option value="accepted">Đã chấp nhận</option>
                   <option value="in_progress">Đang khám</option>
                   <option value="done">Hoàn thành</option>
@@ -1033,30 +1012,7 @@ export default function LichHen() {
                     <td className="appointment-list-td appointment-list-actions">
                       <div className="appointment-list-action-buttons">
                         {/* Cả online và offline: Bỏ qua bước xác nhận, vào thẳng bắt đầu khám/không đến khám */}
-                        {apt.status === "pending_doctor" && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => handleStart(apt)}
-                              disabled={updatingAppointments.has(apt._id)}
-                            >
-                              {updatingAppointments.has(apt._id)
-                                ? "Đang xử lý..."
-                                : "Bắt đầu khám"}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleNoShow(apt)}
-                              disabled={updatingAppointments.has(apt._id)}
-                            >
-                              {updatingAppointments.has(apt._id)
-                                ? "Đang xử lý..."
-                                : "Không đến khám"}
-                            </Button>
-                          </>
-                        )}
+                        {/* Note: pending_doctor status has been removed - all appointments are auto-accepted */}
                         {apt.status === "accepted" && (
                           <>
                             <Button
@@ -1252,45 +1208,23 @@ export default function LichHen() {
                     <p className="appointment-detail-label">
                       Trạng thái hiện tại
                     </p>
-                    <Badge
-                      className={getStatusColor(selectedAppointment.status)}
-                    >
-                      <span className="appointment-list-status">
+                    <div className="appointment-detail-status-badge">
+                      <Badge
+                        className={getStatusColor(selectedAppointment.status)}
+                      >
                         {getStatusIcon(selectedAppointment.status)}
-                        {getStatusText(selectedAppointment.status)}
-                      </span>
-                    </Badge>
+                        <span className="appointment-detail-status-text">
+                          {getStatusText(selectedAppointment.status)}
+                        </span>
+                      </Badge>
+                    </div>
                   </div>
 
                   {/* Thay đổi trạng thái */}
                   <div className="appointment-detail-actions">
                     <h4>Thay đổi trạng thái</h4>
                     <div className="appointment-status-buttons">
-                      {/* Cả online và offline: Bỏ qua bước xác nhận, vào thẳng bắt đầu khám/không đến khám */}
-                      {selectedAppointment.status === "pending_doctor" && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => {
-                              handleStart(selectedAppointment);
-                              setIsDetailDialogOpen(false);
-                            }}
-                          >
-                            Bắt đầu khám
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              handleNoShow(selectedAppointment);
-                              setIsDetailDialogOpen(false);
-                            }}
-                          >
-                            Không đến khám
-                          </Button>
-                        </>
-                      )}
+                      {/* Note: pending_doctor status has been removed - all appointments are auto-accepted */}
                       {selectedAppointment.status === "accepted" && (
                         <>
                           <Button

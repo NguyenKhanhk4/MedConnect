@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "../../../components/ui/Dialog";
 import { Input } from "../../../components/ui/Input";
-import { Check, X, Clock, User, Calendar } from "lucide-react";
+import { Check, X, Clock, User, Calendar, Users, Phone, Mail } from "lucide-react";
 import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./QuanLyYeuCauNghiPhep.scss";
 
@@ -219,18 +219,16 @@ export default function QuanLyYeuCauNghiPhep() {
                 <div className="time-info">
                   <Calendar size={16} />
                   <span>
-                    {request.slotId?.startAt
-                      ? new Date(request.slotId.startAt).toLocaleString(
-                          "vi-VN",
-                          {
-                            weekday: "long",
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )
+                    {request.startDate && request.endDate
+                      ? `${new Date(request.startDate).toLocaleDateString("vi-VN", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })} - ${new Date(request.endDate).toLocaleDateString("vi-VN", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}`
                       : "N/A"}
                   </span>
                 </div>
@@ -239,6 +237,105 @@ export default function QuanLyYeuCauNghiPhep() {
                   <strong>Lý do nghỉ:</strong>
                   <p>{request.reason}</p>
                 </div>
+
+                {/* Hiển thị danh sách lịch hẹn trong khoảng thời gian */}
+                {request.appointmentsCount > 0 && (
+                  <div className="appointments-section">
+                    <strong>
+                      <Users size={16} style={{ marginRight: 8, verticalAlign: "middle" }} />
+                      Lịch hẹn trong khoảng thời gian ({request.appointmentsCount}):
+                    </strong>
+                    <div className="appointments-list">
+                      {request.appointments?.map((appointment, index) => (
+                        <div key={appointment._id || index} className="appointment-item">
+                          <div className="appointment-header">
+                            <span className="appointment-time">
+                              <Clock size={14} />
+                              {appointment.slotId?.startAt
+                                ? new Date(appointment.slotId.startAt).toLocaleString("vi-VN", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : appointment.scheduledStart
+                                ? new Date(appointment.scheduledStart).toLocaleString("vi-VN", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "N/A"}
+                            </span>
+                            <span
+                              className="appointment-status"
+                              style={{
+                                backgroundColor:
+                                  appointment.status === "accepted"
+                                    ? "#52c41a"
+                                    : appointment.status === "in_progress"
+                                    ? "#1890ff"
+                                    : "#faad14",
+                                color: "white",
+                                padding: "2px 8px",
+                                borderRadius: "4px",
+                                fontSize: "12px",
+                              }}
+                            >
+                              {appointment.status === "accepted"
+                                ? "Đã xác nhận"
+                                : appointment.status === "in_progress"
+                                ? "Đang diễn ra"
+                                : "Chờ duyệt"}
+                            </span>
+                          </div>
+                          <div className="appointment-patient-info">
+                            <div className="patient-name">
+                              <User size={14} />
+                              <strong>
+                                {appointment.patientId?.fullName ||
+                                  appointment.patientId?.userId?.fullName ||
+                                  "Bệnh nhân"}
+                              </strong>
+                            </div>
+                            <div className="patient-details">
+                              {appointment.patientId?.phone && (
+                                <span className="patient-detail">
+                                  <Phone size={12} />
+                                  {appointment.patientId.phone}
+                                </span>
+                              )}
+                              {appointment.patientId?.email && (
+                                <span className="patient-detail">
+                                  <Mail size={12} />
+                                  {appointment.patientId.email}
+                                </span>
+                              )}
+                              {appointment.patientId?.dob && (
+                                <span className="patient-detail">
+                                  {new Date(appointment.patientId.dob).toLocaleDateString("vi-VN")}
+                                </span>
+                              )}
+                            </div>
+                            {appointment.reason && (
+                              <div className="appointment-reason">
+                                <strong>Lý do khám:</strong> {appointment.reason}
+                              </div>
+                            )}
+                            {appointment.mode && (
+                              <div className="appointment-mode">
+                                <strong>Hình thức:</strong>{" "}
+                                {appointment.mode === "online" ? "Online" : "Offline"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {request.rejectionReason && (
                   <div className="rejection-reason">

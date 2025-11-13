@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, List, Button, Spin, Badge, Empty, message } from "antd";
 import {
   Bell,
@@ -9,11 +10,14 @@ import {
   XCircle,
   AlertCircle,
   FileText,
+  DollarSign,
+  ArrowRight,
 } from "lucide-react";
 import { api } from "../../../lib/api";
 import "./ThongBao.scss";
 
 export function ThongBao() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -100,7 +104,7 @@ export function ThongBao() {
       case "leave_request":
         return <FileText {...iconProps} />;
       case "payment":
-        return <FileText {...iconProps} />;
+        return <DollarSign {...iconProps} />;
       case "system":
         return <Bell {...iconProps} />;
       default:
@@ -183,7 +187,7 @@ export function ThongBao() {
               <List.Item
                 className={`notification-item ${
                   !notification.isRead ? "unread" : ""
-                }`}
+                } ${notification.type === "payment" ? "payment-notification" : ""}`}
                 onClick={() =>
                   !notification.isRead && markAsRead(notification._id)
                 }
@@ -223,15 +227,15 @@ export function ThongBao() {
                         </span>
                       )}
                       {notification.metadata.invoiceNumber && (
-                        <span className="metadata-item">
-                          <FileText size={14} />
+                        <span className="metadata-item highlight">
+                          <DollarSign size={14} />
                           Mã hóa đơn: {notification.metadata.invoiceNumber}
                         </span>
                       )}
                       {notification.metadata.doctorName && (
                         <span className="metadata-item">
                           <User size={14} />
-                          {notification.metadata.doctorName}
+                          BS. {notification.metadata.doctorName}
                         </span>
                       )}
                       {notification.metadata.patientName && (
@@ -241,8 +245,8 @@ export function ThongBao() {
                         </span>
                       )}
                       {notification.metadata.total && (
-                        <span className="metadata-item">
-                          <FileText size={14} />
+                        <span className="metadata-item highlight">
+                          <DollarSign size={14} />
                           Tổng tiền: {new Intl.NumberFormat("vi-VN", {
                             style: "currency",
                             currency: "VND",
@@ -261,6 +265,24 @@ export function ThongBao() {
                           Lý do: {notification.metadata.reason}
                         </span>
                       )}
+                    </div>
+                  )}
+
+                  {/* Action button for payment notifications */}
+                  {notification.type === "payment" && (
+                    <div className="notification-actions">
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<ArrowRight size={14} />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markAsRead(notification._id);
+                          navigate("/manager/thanh-toan-dich-vu");
+                        }}
+                      >
+                        Xem chi tiết
+                      </Button>
                     </div>
                   )}
                 </div>

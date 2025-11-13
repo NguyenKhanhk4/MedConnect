@@ -739,7 +739,7 @@ export async function addAppointmentToVisit(req, res) {
       clinicId: mode === "offline" ? clinicId : undefined,
       scheduledStart: slot.startAt,
       scheduledEnd: slot.endAt,
-      status: "pending_doctor",
+      status: "accepted",
       reason: reason,
     });
 
@@ -938,21 +938,32 @@ export async function doctorApproveAppointment(req, res) {
       );
     }
 
-    // Check if appointment is pending
-    if (appointment.status !== "pending_doctor") {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.BAD_REQUEST,
-        `Appointment is not pending. Current status: ${appointment.status}`
-      );
-    }
-
-    // Update appointment status
+    // Check if appointment can be accepted/rejected
+    // Note: pending_doctor status has been removed - all new appointments are auto-accepted
+    // For backward compatibility, allow accepting pending_doctor appointments
+    // For reject action, allow rejecting both pending_doctor and accepted appointments
     if (action === "accept") {
+      // Accept action: only allow if status is pending_doctor (for backward compatibility with old data)
+      if (appointment.status !== "pending_doctor") {
+        return fail(
+          res,
+          400,
+          ERROR_CODES.BAD_REQUEST,
+          `Appointment is not pending. Current status: ${appointment.status}. New appointments are automatically accepted.`
+        );
+      }
       appointment.status = "accepted";
       appointment.acceptedBy = doctor._id;
     } else {
+      // Reject action: allow rejecting pending_doctor or accepted appointments
+      if (!["pending_doctor", "accepted"].includes(appointment.status)) {
+        return fail(
+          res,
+          400,
+          ERROR_CODES.BAD_REQUEST,
+          `Appointment cannot be rejected. Current status: ${appointment.status}`
+        );
+      }
       appointment.status = "rejected";
       appointment.rejectedBy = doctor._id;
       appointment.rejectReason = rejectReason;
@@ -1298,7 +1309,7 @@ export async function replaceRejectedAppointment(req, res) {
       clinicId: mode === "offline" ? clinicId : undefined,
       scheduledStart: newSlot.startAt,
       scheduledEnd: newSlot.endAt,
-      status: "pending_doctor",
+      status: "accepted",
       reason: originalAppointment.reason,
     });
 

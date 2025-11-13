@@ -905,10 +905,11 @@ export async function bookAppointment(req, res) {
     // Check if slot is really available by checking for active appointments
     // A slot is available if it has no active appointments using it
     // This handles the case where slot status is "booked" but the appointment was cancelled
+    // Note: pending_doctor status has been removed - all appointments are auto-accepted
     const activeAppointments = await Appointment.find({
       slotId: slotId,
       status: {
-        $in: ["pending_doctor", "accepted", "in_progress", "done"],
+        $in: ["accepted", "in_progress", "done"],
       },
     })
       .select("slotId status")
@@ -2917,11 +2918,14 @@ export async function getPatientPayments(req, res) {
       );
     }
 
-    // Find patient by user ID
-    const patient = await Patient.findOne({ userId: appUserId });
-    if (!patient) {
+    // Find all patients belonging to this user (including family members)
+    const patients = await Patient.find({ userId: appUserId });
+    if (!patients || patients.length === 0) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient not found");
     }
+
+    // Get all patient IDs (including family members)
+    const patientIds = patients.map((p) => p._id);
 
     const {
       invoiceType,
@@ -2933,9 +2937,10 @@ export async function getPatientPayments(req, res) {
     } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Build query - only get payments for this patient
+    // Build query - get payments for all patients belonging to this user
+    // This includes payments for the user themselves and payments for family members they booked for
     const query = {
-      "billTo.patientId": patient._id,
+      "billTo.patientId": { $in: patientIds },
     };
 
     // Filter by invoiceType (booking or service)
@@ -3133,7 +3138,7 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
     const activeAppointments = await Appointment.find({
       slotId: slotId,
       status: {
-        $in: ["pending_doctor", "accepted", "in_progress", "done"],
+        $in: ["accepted", "in_progress", "done"],
       },
     })
       .select("slotId status")
@@ -3336,7 +3341,7 @@ export async function createPaymentForSingleAppointment(req, res) {
     const activeAppointments = await Appointment.find({
       slotId: slotId,
       status: {
-        $in: ["pending_doctor", "accepted", "in_progress", "done"],
+        $in: ["accepted", "in_progress", "done"],
       },
     })
       .select("slotId status")

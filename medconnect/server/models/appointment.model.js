@@ -63,7 +63,7 @@ const AppointmentSchema = new Schema(
         "no_show",
         "rescheduled",
       ],
-      default: "pending_doctor",
+      default: "accepted",
     },
 
     reason: { 
