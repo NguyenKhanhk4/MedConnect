@@ -1099,6 +1099,10 @@ export async function getPatientAppointments(req, res) {
       .limit(parseInt(limit))
       .lean();
 
+    // Find self patient to help identify appointments booked for others
+    const selfPatient = patients.find((p) => p.relationshipToOwner === "self");
+    const selfPatientId = selfPatient?._id?.toString();
+
     // Ensure new fields have default values for backward compatibility
     // Also ensure patientId is properly populated
     const appointmentsWithDefaults = appointments.map((apt) => {
@@ -1120,6 +1124,28 @@ export async function getPatientAppointments(req, res) {
           phone: apt.patientId?.phone || null,
           relationshipToOwner: apt.patientId?.relationshipToOwner || null,
         };
+      } else {
+        // Ensure relationshipToOwner is set correctly
+        // If relationshipToOwner is missing/null/empty, try to infer it
+        if (
+          !patientId.relationshipToOwner ||
+          patientId.relationshipToOwner === ""
+        ) {
+          // If this appointment's patientId matches self patient, it's "self"
+          const currentPatientId =
+            patientId._id?.toString() ||
+            (typeof patientId._id === "object"
+              ? patientId._id.toString()
+              : null);
+          if (selfPatientId && currentPatientId === selfPatientId) {
+            patientId.relationshipToOwner = "self";
+          } else {
+            // If it doesn't match self patient, it's likely a family member
+            // But we can't determine the exact relationship, so leave it as null
+            // The frontend will handle this case
+            patientId.relationshipToOwner = null;
+          }
+        }
       }
 
       return {
@@ -1801,13 +1827,15 @@ export async function getFamilyMembers(req, res) {
 
     // Get only family members (exclude "self" - the user's own profile)
     // Chỉ lấy những patient có relationshipToOwner là family member hợp lệ
-    const familyMembers = await Patient.find({ 
+    const familyMembers = await Patient.find({
       userId: appUserId,
-      relationshipToOwner: { 
-        $in: ["father", "mother", "spouse", "child", "grandparent", "other"] 
-      } // Chỉ lấy người thân, loại bỏ "self" và null/undefined
+      relationshipToOwner: {
+        $in: ["father", "mother", "spouse", "child", "grandparent", "other"],
+      }, // Chỉ lấy người thân, loại bỏ "self" và null/undefined
     })
-      .select("_id fullName dob gender relationshipToOwner phone avatarUrl citizenId address ethnicity occupation bloodType allergyNotes medicalHistory")
+      .select(
+        "_id fullName dob gender relationshipToOwner phone avatarUrl citizenId address ethnicity occupation bloodType allergyNotes medicalHistory"
+      )
       .sort({ relationshipToOwner: 1, createdAt: 1 })
       .lean();
 
@@ -2384,24 +2412,46 @@ export async function getFavoriteDoctors(req, res) {
       );
     }
 
-    // Find patient profile
-    let patient = await Patient.findOne({ userId: appUserId });
-    if (!patient) {
-      // Create a basic patient profile if it doesn't exist
-      const user = await User.findById(appUserId);
-      if (!user) {
-        return fail(res, 404, ERROR_CODES.USER_NOT_FOUND, "User not found");
-      }
+    // Find self patient profile (favorites belong to the account owner, not family members)
+    let patient = await Patient.findOne({
+      userId: appUserId,
+      relationshipToOwner: "self",
+    });
 
-      const newPatient = new Patient({
+    if (!patient) {
+      // Check for legacy patient without relationshipToOwner
+      const legacyPatient = await Patient.findOne({
         userId: appUserId,
-        fullName: user.fullName || "Chưa cập nhật",
-        phone: user.phone || "",
-        isComplete: false,
+        $or: [
+          { relationshipToOwner: { $exists: false } },
+          { relationshipToOwner: null },
+          { relationshipToOwner: "" },
+        ],
       });
 
-      await newPatient.save();
-      patient = newPatient;
+      if (legacyPatient) {
+        // Upgrade legacy patient to "self"
+        legacyPatient.relationshipToOwner = "self";
+        await legacyPatient.save();
+        patient = legacyPatient;
+      } else {
+        // Create a basic patient profile if it doesn't exist
+        const user = await User.findById(appUserId);
+        if (!user) {
+          return fail(res, 404, ERROR_CODES.USER_NOT_FOUND, "User not found");
+        }
+
+        const newPatient = new Patient({
+          userId: appUserId,
+          fullName: user.fullName || "Chưa cập nhật",
+          phone: user.phone || "",
+          relationshipToOwner: "self",
+          isComplete: false,
+        });
+
+        await newPatient.save();
+        patient = newPatient;
+      }
     }
 
     // Get all favorite doctors for this patient
@@ -2518,23 +2568,45 @@ export async function addFavoriteDoctor(req, res) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Doctor not found");
     }
 
-    // Find or create patient profile
-    let patient = await Patient.findOne({ userId: appUserId });
-    if (!patient) {
-      const user = await User.findById(appUserId);
-      if (!user) {
-        return fail(res, 404, ERROR_CODES.USER_NOT_FOUND, "User not found");
-      }
+    // Find or create self patient profile (favorites belong to the account owner, not family members)
+    let patient = await Patient.findOne({
+      userId: appUserId,
+      relationshipToOwner: "self",
+    });
 
-      const newPatient = new Patient({
+    if (!patient) {
+      // Check for legacy patient without relationshipToOwner
+      const legacyPatient = await Patient.findOne({
         userId: appUserId,
-        fullName: user.fullName || "Chưa cập nhật",
-        phone: user.phone || "",
-        isComplete: false,
+        $or: [
+          { relationshipToOwner: { $exists: false } },
+          { relationshipToOwner: null },
+          { relationshipToOwner: "" },
+        ],
       });
 
-      await newPatient.save();
-      patient = newPatient;
+      if (legacyPatient) {
+        // Upgrade legacy patient to "self"
+        legacyPatient.relationshipToOwner = "self";
+        await legacyPatient.save();
+        patient = legacyPatient;
+      } else {
+        const user = await User.findById(appUserId);
+        if (!user) {
+          return fail(res, 404, ERROR_CODES.USER_NOT_FOUND, "User not found");
+        }
+
+        const newPatient = new Patient({
+          userId: appUserId,
+          fullName: user.fullName || "Chưa cập nhật",
+          phone: user.phone || "",
+          relationshipToOwner: "self",
+          isComplete: false,
+        });
+
+        await newPatient.save();
+        patient = newPatient;
+      }
     }
 
     // Check if already favorited
@@ -2597,10 +2669,36 @@ export async function removeFavoriteDoctor(req, res) {
       return fail(res, 400, ERROR_CODES.INVALID_INPUT, "Doctor ID is required");
     }
 
-    // Find patient profile
-    const patient = await Patient.findOne({ userId: appUserId });
+    // Find self patient profile (favorites belong to the account owner, not family members)
+    let patient = await Patient.findOne({
+      userId: appUserId,
+      relationshipToOwner: "self",
+    });
+
     if (!patient) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
+      // Check for legacy patient without relationshipToOwner
+      const legacyPatient = await Patient.findOne({
+        userId: appUserId,
+        $or: [
+          { relationshipToOwner: { $exists: false } },
+          { relationshipToOwner: null },
+          { relationshipToOwner: "" },
+        ],
+      });
+
+      if (legacyPatient) {
+        // Upgrade legacy patient to "self"
+        legacyPatient.relationshipToOwner = "self";
+        await legacyPatient.save();
+        patient = legacyPatient;
+      } else {
+        return fail(
+          res,
+          404,
+          ERROR_CODES.NOT_FOUND,
+          "Patient profile not found"
+        );
+      }
     }
 
     // Remove favorite
@@ -3501,6 +3599,9 @@ export async function createPaymentForSingleAppointment(req, res) {
       scheduledStart: appointmentScheduledStart,
       scheduledEnd: appointmentScheduledEnd,
       reason: reason || "",
+      // IMPORTANT: Include patientId if provided (for family member booking)
+      // This ensures the webhook can create the appointment with the correct patient
+      patientId: patientId || undefined, // Only include if provided (booking for family)
     };
 
     // Calculate price

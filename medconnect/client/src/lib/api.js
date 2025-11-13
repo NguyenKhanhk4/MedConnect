@@ -1472,7 +1472,11 @@ export async function createAiConversation() {
   return r.json();
 }
 
-export async function sendAiMessage(conversationId, text, isAuthenticated = false) {
+export async function sendAiMessage(
+  conversationId,
+  text,
+  isAuthenticated = false
+) {
   const r = await fetch(`${BASE}/api/ai/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1484,9 +1488,12 @@ export async function sendAiMessage(conversationId, text, isAuthenticated = fals
 }
 
 export async function getAiConversationMessages(conversationId) {
-  const r = await fetch(`${BASE}/api/ai/conversations/${conversationId}/messages`, {
-    credentials: "include",
-  });
+  const r = await fetch(
+    `${BASE}/api/ai/conversations/${conversationId}/messages`,
+    {
+      credentials: "include",
+    }
+  );
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }

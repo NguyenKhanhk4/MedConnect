@@ -8,6 +8,7 @@ import { LichKham } from "../lich-kham/LichKham";
 import { HanhDongNhanh } from "../hanh-dong-nhanh/HanhDongNhanh";
 import { TimKiemBacSi } from "../tim-kiem-bac-si/TimKiemBacSi";
 import { LichHenCuaToi } from "../lich-hen-cua-toi/LichHenCuaToi";
+import { LichDatHo } from "../lich-dat-ho/LichDatHo";
 import { HoSoSucKhoe } from "../ho-so-suc-khoe/HoSoSucKhoe";
 import { HoSoSucKhoeGiaDinh } from "../ho-so-suc-khoe-gia-dinh/HoSoSucKhoeGiaDinh";
 import { ThongBao } from "../thong-bao/ThongBao";
@@ -40,6 +41,7 @@ const ROUTE_MAP = {
   "/benh-nhan/lich-hen-cua-toi": LichHenCuaToi,
   "/lich-hen-cua-toi": LichHenCuaToi,
   "/my-appointments": LichHenCuaToi,
+  "/benh-nhan/lich-dat-ho": LichDatHo,
   "/benh-nhan/ho-so-benh-an": HoSoSucKhoe,
   "/ho-so-benh-an": HoSoSucKhoe,
   "/medical-records": HoSoSucKhoe,
