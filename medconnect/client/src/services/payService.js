@@ -12,13 +12,13 @@ export async function createPayOSPayment(paymentData) {
     credentials: "include", // cookie auth
     body: JSON.stringify(paymentData),
   });
-  
+
   const data = await resp.json();
-  
+
   if (!resp.ok) {
     throw new Error(data.message || "Create payment failed");
   }
-  
+
   return data;
 }
 
@@ -28,18 +28,21 @@ export async function createPayOSPayment(paymentData) {
  * @returns {Promise<object>}
  */
 export async function checkPayOSStatus(orderCode) {
-  const resp = await fetch(`${API_BASE}/api/payments/payos/check-status/${orderCode}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-  });
-  
+  const resp = await fetch(
+    `${API_BASE}/api/payments/payos/check-status/${orderCode}`,
+    {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    }
+  );
+
   const data = await resp.json();
-  
+
   if (!resp.ok) {
     throw new Error(data.message || "Check status failed");
   }
-  
+
   return data;
 }
 
@@ -49,17 +52,20 @@ export async function checkPayOSStatus(orderCode) {
  * @returns {Promise<object>}
  */
 export async function cancelPayOSPayment(orderCode) {
-  const resp = await fetch(`${API_BASE}/api/payments/payos/cancel/${orderCode}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-  });
-  
+  const resp = await fetch(
+    `${API_BASE}/api/payments/payos/cancel/${orderCode}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    }
+  );
+
   const data = await resp.json();
-  
+
   if (!resp.ok) {
     throw new Error(data.message || "Cancel payment failed");
   }
-  
+
   return data;
 }

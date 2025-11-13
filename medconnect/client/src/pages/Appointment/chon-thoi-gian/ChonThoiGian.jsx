@@ -43,11 +43,19 @@ import ClinicMap from "../../../components/ClinicMap/ClinicMap";
 import { api } from "../../../lib/api";
 import { useUserProfile } from "../../../hooks/useUserProfile";
 import { CustomAlert } from "../../../components/ui/CustomAlert";
+import {
+  validateCitizenId,
+  validateFullName,
+  isValidVietnamesePhone,
+} from "../../../utils/validationUtils";
 import "./ChonThoiGian.css";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
+
+// Giới hạn ký tự cho trường lý do khám
+const REASON_MAX_LENGTH = 500;
 
 const ChonThoiGian = () => {
   const navigate = useNavigate();
@@ -618,7 +626,8 @@ const ChonThoiGian = () => {
     try {
       setLoading(true);
 
-      let patientIdForBooking = null;
+      // Use state patientIdForBooking directly, not a local variable
+      let currentPatientIdForBooking = patientIdForBooking;
 
       // Validate profile if booking for "me"
       if (bookingFor === "me") {
@@ -637,46 +646,54 @@ const ChonThoiGian = () => {
 
         // IMPORTANT: Đảm bảo reset patientIdForBooking ngay khi booking for "me"
         setPatientIdForBooking(null);
-        // IMPORTANT: patientIdForBooking local variable = null (đặt cho chính mình)
-        patientIdForBooking = null;
+        currentPatientIdForBooking = null;
       }
 
-      // If booking for family, create family member first
+      // If booking for family, check if using existing member or create new
       if (bookingFor === "family") {
-        try {
-          const familyResponse = await api.post(
-            "/api/patients/me/family-members",
-            {
-              fullName: values.fullName,
-              dob: values.dob ? values.dob.format("YYYY-MM-DD") : undefined,
-              gender: values.gender,
-              ethnicity: values.ethnicity,
-              occupation: values.occupation,
-              bloodType: values.bloodType || "Unknown",
-              relationshipToOwner: values.relationshipToOwner,
-              phone: values.phone,
-              citizenId: values.citizenId,
-              address: values.address,
-              allergyNotes: values.allergyNotes || "",
-              medicalHistory: values.medicalHistory || [],
-            }
-          );
+        // If patientIdForBooking is already set (selected from dropdown), use it
+        if (currentPatientIdForBooking && selectedFamilyMember) {
+          // Using existing family member, no need to create new
+          console.log("Using existing family member:", currentPatientIdForBooking);
+        } else {
+          // Create new family member
+          try {
+            const familyResponse = await api.post(
+              "/api/patients/me/family-members",
+              {
+                fullName: values.fullName,
+                dob: values.dob ? values.dob.format("YYYY-MM-DD") : undefined,
+                gender: values.gender,
+                ethnicity: values.ethnicity,
+                occupation: values.occupation,
+                bloodType: values.bloodType || "Unknown",
+                relationshipToOwner: values.relationshipToOwner,
+                phone: values.phone,
+                citizenId: values.citizenId,
+                address: values.address,
+                allergyNotes: values.allergyNotes || "",
+                medicalHistory: values.medicalHistory || [],
+              }
+            );
 
-          if (familyResponse.success) {
-            message.success("Thêm người thân thành công!");
-            const newPatientId = familyResponse.data.patient._id;
-            patientIdForBooking = newPatientId;
-            setPatientIdForBooking(newPatientId); // Store in state
-            await fetchFamilyMembers();
-          } else {
-            message.error(familyResponse.message || "Thêm người thân thất bại");
+            if (familyResponse.success) {
+              message.success("Thêm người thân thành công!");
+              const newPatientId = familyResponse.data.patient._id;
+              currentPatientIdForBooking = newPatientId;
+              setPatientIdForBooking(newPatientId); // Store in state
+              await fetchFamilyMembers();
+            } else {
+              message.error(
+                familyResponse.message || "Thêm người thân thất bại"
+              );
+              setLoading(false);
+              return;
+            }
+          } catch (error) {
+            message.error("Có lỗi xảy ra khi thêm người thân");
             setLoading(false);
             return;
           }
-        } catch (error) {
-          message.error("Có lỗi xảy ra khi thêm người thân");
-          setLoading(false);
-          return;
         }
       }
 
@@ -705,8 +722,8 @@ const ChonThoiGian = () => {
 
       // ONLY add patientId for family member booking
       // IMPORTANT: Check bookingFor instead of just patientIdForBooking to be absolutely sure
-      if (bookingFor === "family" && patientIdForBooking) {
-        appointmentData.patientId = patientIdForBooking;
+      if (bookingFor === "family" && currentPatientIdForBooking) {
+        appointmentData.patientId = currentPatientIdForBooking;
       } else {
         // IMPORTANT: Explicitly delete patientId if booking for "me" to prevent backend from adding it
         delete appointmentData.patientId;
@@ -715,7 +732,7 @@ const ChonThoiGian = () => {
       // Debug log để kiểm tra
       console.log("🔍 handleBookingSubmit - Debug Info:");
       console.log("bookingFor:", bookingFor);
-      console.log("patientIdForBooking (local):", patientIdForBooking);
+      console.log("currentPatientIdForBooking:", currentPatientIdForBooking);
       console.log(
         "appointmentData BEFORE sending to API:",
         JSON.parse(JSON.stringify(appointmentData))
@@ -1463,6 +1480,8 @@ const ChonThoiGian = () => {
                             setSelectedFamilyMember(null);
                             setPatientIdForBooking(null); // Reset patientId khi chuyển sang family
                             form.resetFields(); // Reset toàn bộ form
+                            // Fetch family members when switching to family booking
+                            fetchFamilyMembers();
                           }}
                           className="booking-button"
                         >
@@ -1477,6 +1496,108 @@ const ChonThoiGian = () => {
                         <Title level={5} style={{ marginBottom: 16 }}>
                           Thông tin người thân
                         </Title>
+
+                        {/* Dropdown to select existing family member */}
+                        <Form.Item
+                          label="Chọn người thân đã có"
+                          name="selectedFamilyMemberId"
+                          style={{ marginBottom: 16 }}
+                        >
+                          <Select
+                            placeholder="Chọn người thân hoặc thêm mới"
+                            allowClear
+                            showSearch
+                            optionFilterProp="children"
+                            onChange={(value) => {
+                              if (value === "new") {
+                                // Reset form when selecting "Add new"
+                                setSelectedFamilyMember(null);
+                                setPatientIdForBooking(null);
+                                form.resetFields([
+                                  "fullName",
+                                  "citizenId",
+                                  "dob",
+                                  "gender",
+                                  "ethnicity",
+                                  "occupation",
+                                  "bloodType",
+                                  "relationshipToOwner",
+                                  "phone",
+                                  "address",
+                                  "allergyNotes",
+                                  "medicalHistory",
+                                ]);
+                              } else if (value) {
+                                // Find selected family member
+                                const member = familyMembers.find(
+                                  (m) => m._id === value
+                                );
+                                if (member) {
+                                  setSelectedFamilyMember(member);
+                                  setPatientIdForBooking(member._id);
+
+                                  // Auto-fill form with member data
+                                  form.setFieldsValue({
+                                    fullName: member.fullName,
+                                    citizenId:
+                                      member.citizenId || member.nationalId,
+                                    dob: member.dob ? dayjs(member.dob) : null,
+                                    gender: member.gender,
+                                    ethnicity: member.ethnicity || undefined,
+                                    occupation: member.occupation || undefined,
+                                    bloodType: member.bloodType || undefined,
+                                    relationshipToOwner:
+                                      member.relationshipToOwner,
+                                    phone: member.phone,
+                                    address: member.address || undefined,
+                                    allergyNotes:
+                                      member.allergyNotes || undefined,
+                                    medicalHistory: member.medicalHistory || [],
+                                  });
+                                }
+                              } else {
+                                // Clear selection
+                                setSelectedFamilyMember(null);
+                                setPatientIdForBooking(null);
+                                form.resetFields([
+                                  "fullName",
+                                  "citizenId",
+                                  "dob",
+                                  "gender",
+                                  "ethnicity",
+                                  "occupation",
+                                  "bloodType",
+                                  "relationshipToOwner",
+                                  "phone",
+                                  "address",
+                                  "allergyNotes",
+                                  "medicalHistory",
+                                ]);
+                              }
+                            }}
+                            loading={loadingFamilyMembers}
+                          >
+                            <Option value="new">➕ Thêm người thân mới</Option>
+                            {familyMembers.map((member) => (
+                              <Option key={member._id} value={member._id}>
+                                {member.fullName} (
+                                {member.relationshipToOwner === "father"
+                                  ? "Cha"
+                                  : member.relationshipToOwner === "mother"
+                                  ? "Mẹ"
+                                  : member.relationshipToOwner === "spouse"
+                                  ? "Vợ/Chồng"
+                                  : member.relationshipToOwner === "child"
+                                  ? "Con"
+                                  : member.relationshipToOwner === "grandparent"
+                                  ? "Ông/Bà"
+                                  : "Khác"}
+                                )
+                              </Option>
+                            ))}
+                          </Select>
+                        </Form.Item>
+
                         <Form.Item
                           label="Họ và tên"
                           name="fullName"
@@ -1485,9 +1606,33 @@ const ChonThoiGian = () => {
                               required: true,
                               message: "Vui lòng nhập họ tên!",
                             },
+                            {
+                              min: 2,
+                              message: "Họ và tên phải có ít nhất 2 ký tự!",
+                            },
+                            {
+                              max: 100,
+                              message:
+                                "Họ và tên không được vượt quá 100 ký tự!",
+                            },
+                            {
+                              pattern: /^[a-zA-ZÀ-ỹ\s]+$/,
+                              message:
+                                "Họ và tên chỉ được chứa chữ cái và khoảng trắng!",
+                            },
+                            () => ({
+                              validator(_, value) {
+                                if (!value || value.trim().length >= 2) {
+                                  return Promise.resolve();
+                                }
+                                return Promise.reject(
+                                  new Error("Họ và tên không hợp lệ!")
+                                );
+                              },
+                            }),
                           ]}
                         >
-                          <Input placeholder="Nhập họ và tên" />
+                          <Input placeholder="Nhập họ và tên" maxLength={100} />
                         </Form.Item>
 
                         <Form.Item
@@ -1496,11 +1641,48 @@ const ChonThoiGian = () => {
                           rules={[
                             {
                               required: true,
-                              message: "Vui lòng nhập số CCCD!",
+                              message: "Vui lòng nhập số CCCD/CMND!",
                             },
+                            {
+                              pattern: /^[0-9]{9,12}$/,
+                              message: "Số CCCD/CMND phải có 9-12 chữ số!",
+                            },
+                            () => ({
+                              validator(_, value) {
+                                if (!value) {
+                                  return Promise.resolve();
+                                }
+                                // Check duplicate citizenId in family members
+                                // Exclude selectedFamilyMember if editing existing member
+                                const duplicate = familyMembers.find(
+                                  (member) =>
+                                    // Skip if this is the selected family member being edited
+                                    (!selectedFamilyMember || member._id !== selectedFamilyMember._id) &&
+                                    (member.citizenId === value ||
+                                    member.nationalId === value)
+                                );
+                                if (duplicate) {
+                                  return Promise.reject(
+                                    new Error(
+                                      `Số CCCD/CMND này đã được sử dụng cho ${duplicate.fullName}!`
+                                    )
+                                  );
+                                }
+                                return Promise.resolve();
+                              },
+                            }),
                           ]}
                         >
-                          <Input placeholder="Nhập số CCCD/CMND" />
+                          <Input
+                            placeholder="Nhập số CCCD/CMND (9-12 chữ số)"
+                            maxLength={12}
+                            onInput={(e) => {
+                              e.target.value = e.target.value.replace(
+                                /[^0-9]/g,
+                                ""
+                              );
+                            }}
+                          />
                         </Form.Item>
 
                         <Row gutter={16}>
@@ -1513,6 +1695,38 @@ const ChonThoiGian = () => {
                                   required: true,
                                   message: "Vui lòng chọn ngày sinh!",
                                 },
+                                () => ({
+                                  validator(_, value) {
+                                    if (!value) {
+                                      return Promise.resolve();
+                                    }
+                                    const selectedDate = dayjs(value);
+                                    const today = dayjs();
+                                    const age = today.diff(
+                                      selectedDate,
+                                      "year"
+                                    );
+
+                                    if (selectedDate.isAfter(today)) {
+                                      return Promise.reject(
+                                        new Error(
+                                          "Ngày sinh không thể là tương lai!"
+                                        )
+                                      );
+                                    }
+                                    if (age > 120) {
+                                      return Promise.reject(
+                                        new Error("Tuổi không hợp lệ!")
+                                      );
+                                    }
+                                    if (age < 0) {
+                                      return Promise.reject(
+                                        new Error("Ngày sinh không hợp lệ!")
+                                      );
+                                    }
+                                    return Promise.resolve();
+                                  },
+                                }),
                               ]}
                             >
                               <DatePicker
@@ -1520,7 +1734,7 @@ const ChonThoiGian = () => {
                                 format="DD/MM/YYYY"
                                 placeholder="Chọn ngày sinh"
                                 disabledDate={(current) =>
-                                  current && current > new Date()
+                                  current && current > dayjs().endOf("day")
                                 }
                               />
                             </Form.Item>
@@ -1547,13 +1761,44 @@ const ChonThoiGian = () => {
 
                         <Row gutter={16}>
                           <Col span={12}>
-                            <Form.Item label="Dân tộc" name="ethnicity">
-                              <Input placeholder="Nhập dân tộc (nếu có)" />
+                            <Form.Item
+                              label="Dân tộc"
+                              name="ethnicity"
+                              rules={[
+                                {
+                                  max: 50,
+                                  message:
+                                    "Dân tộc không được vượt quá 50 ký tự!",
+                                },
+                                {
+                                  pattern: /^[a-zA-ZÀ-ỹ\s]*$/,
+                                  message:
+                                    "Dân tộc chỉ được chứa chữ cái và khoảng trắng!",
+                                },
+                              ]}
+                            >
+                              <Input
+                                placeholder="Nhập dân tộc (nếu có)"
+                                maxLength={50}
+                              />
                             </Form.Item>
                           </Col>
                           <Col span={12}>
-                            <Form.Item label="Nghề nghiệp" name="occupation">
-                              <Input placeholder="Nhập nghề nghiệp (nếu có)" />
+                            <Form.Item
+                              label="Nghề nghiệp"
+                              name="occupation"
+                              rules={[
+                                {
+                                  max: 100,
+                                  message:
+                                    "Nghề nghiệp không được vượt quá 100 ký tự!",
+                                },
+                              ]}
+                            >
+                              <Input
+                                placeholder="Nhập nghề nghiệp (nếu có)"
+                                maxLength={100}
+                              />
                             </Form.Item>
                           </Col>
                         </Row>
@@ -1603,13 +1848,66 @@ const ChonThoiGian = () => {
                               required: true,
                               message: "Vui lòng nhập số điện thoại!",
                             },
-                            {
-                              pattern: /^[0-9]{10}$/,
-                              message: "Số điện thoại không hợp lệ!",
-                            },
+                            () => ({
+                              validator(_, value) {
+                                if (!value) {
+                                  return Promise.resolve();
+                                }
+                                // Normalize phone number (remove spaces, +84, 84)
+                                const normalizedPhone = value
+                                  .replace(/\s/g, "")
+                                  .replace(/^\+84/, "0")
+                                  .replace(/^84/, "0");
+
+                                // Validate Vietnamese phone format
+                                if (!isValidVietnamesePhone(normalizedPhone)) {
+                                  return Promise.reject(
+                                    new Error(
+                                      "Số điện thoại không hợp lệ! (Ví dụ: 0987654321 hoặc +84987654321)"
+                                    )
+                                  );
+                                }
+
+                                // Check duplicate phone in family members
+                                // Exclude selectedFamilyMember if editing existing member
+                                const duplicate = familyMembers.find(
+                                  (member) => {
+                                    // Skip if this is the selected family member being edited
+                                    if (selectedFamilyMember && member._id === selectedFamilyMember._id) {
+                                      return false;
+                                    }
+                                    const memberPhone = member.phone
+                                      ?.replace(/\s/g, "")
+                                      .replace(/^\+84/, "0")
+                                      .replace(/^84/, "0");
+                                    return memberPhone === normalizedPhone;
+                                  }
+                                );
+
+                                if (duplicate) {
+                                  return Promise.reject(
+                                    new Error(
+                                      `Số điện thoại này đã được sử dụng cho ${duplicate.fullName}!`
+                                    )
+                                  );
+                                }
+
+                                return Promise.resolve();
+                              },
+                            }),
                           ]}
                         >
-                          <Input placeholder="Nhập số điện thoại" />
+                          <Input
+                            placeholder="Nhập số điện thoại (VD: 0987654321)"
+                            maxLength={15}
+                            onInput={(e) => {
+                              // Allow numbers, +, and spaces
+                              e.target.value = e.target.value.replace(
+                                /[^0-9+\s]/g,
+                                ""
+                              );
+                            }}
+                          />
                         </Form.Item>
 
                         <Form.Item
@@ -1620,9 +1918,17 @@ const ChonThoiGian = () => {
                               required: true,
                               message: "Vui lòng nhập địa chỉ!",
                             },
+                            {
+                              min: 5,
+                              message: "Địa chỉ phải có ít nhất 5 ký tự!",
+                            },
+                            {
+                              max: 200,
+                              message: "Địa chỉ không được vượt quá 200 ký tự!",
+                            },
                           ]}
                         >
-                          <Input placeholder="Nhập địa chỉ" />
+                          <Input placeholder="Nhập địa chỉ" maxLength={200} />
                         </Form.Item>
 
                         <Form.Item
@@ -1918,7 +2224,8 @@ const ChonThoiGian = () => {
                       >
                         {({ getFieldValue }) => {
                           const reasonValue = getFieldValue("reason") || "";
-                          const isMaxLength = reasonValue.length >= 250;
+                          const isMaxLength =
+                            reasonValue.length >= REASON_MAX_LENGTH;
                           return (
                             <>
                               <TextArea
@@ -1926,17 +2233,17 @@ const ChonThoiGian = () => {
                                 rows={4}
                                 value={reasonValue}
                                 placeholder="Mô tả triệu chứng hoặc lý do khám (không bắt buộc)"
-                                maxLength={250}
+                                maxLength={REASON_MAX_LENGTH}
                                 showCount
                                 onChange={(e) => {
                                   const newValue = e.target.value;
                                   const newLength = newValue.length;
 
-                                  // Cắt bớt nếu vượt quá 100 ký tự
-                                  if (newLength > 250) {
+                                  // Cắt bớt nếu vượt quá giới hạn ký tự
+                                  if (newLength > REASON_MAX_LENGTH) {
                                     const truncatedValue = newValue.slice(
                                       0,
-                                      250
+                                      REASON_MAX_LENGTH
                                     );
                                     form.setFieldsValue({
                                       reason: truncatedValue,
@@ -1953,8 +2260,8 @@ const ChonThoiGian = () => {
                                     getFieldValue("reason") || "";
                                   const currentLength = currentValue.length;
 
-                                  // Nếu đã có 100 ký tự
-                                  if (currentLength >= 250) {
+                                  // Nếu đã đạt giới hạn ký tự
+                                  if (currentLength >= REASON_MAX_LENGTH) {
                                     // Cho phép xóa (Backspace, Delete)
                                     if (
                                       e.key === "Backspace" ||
@@ -2003,10 +2310,12 @@ const ChonThoiGian = () => {
                                   }
                                 }}
                                 onBeforeInput={(e) => {
-                                  // Chặn input event nếu đã có 100 ký tự
+                                  // Chặn input event nếu đã đạt giới hạn ký tự
                                   const currentValue =
                                     getFieldValue("reason") || "";
-                                  if (currentValue.length >= 250) {
+                                  if (
+                                    currentValue.length >= REASON_MAX_LENGTH
+                                  ) {
                                     // Kiểm tra xem có phải đang xóa không
                                     const inputType = e.inputType;
                                     const isDeleteOperation =
@@ -2027,12 +2336,12 @@ const ChonThoiGian = () => {
                                   }
                                 }}
                                 onInput={(e) => {
-                                  // Cắt bớt nếu vượt quá 100 ký tự
+                                  // Cắt bớt nếu vượt quá giới hạn ký tự
                                   const newValue = e.target.value;
-                                  if (newValue.length >250) {
+                                  if (newValue.length > REASON_MAX_LENGTH) {
                                     const truncatedValue = newValue.slice(
                                       0,
-                                      250
+                                      REASON_MAX_LENGTH
                                     );
                                     e.target.value = truncatedValue;
                                     form.setFieldsValue({
@@ -2044,13 +2353,13 @@ const ChonThoiGian = () => {
                                   const currentValue =
                                     getFieldValue("reason") || "";
                                   const currentLength = currentValue.length;
-                                  // Nếu đã có 100 ký tự, chặn paste hoàn toàn
-                                  if (currentLength >= 250) {
+                                  // Nếu đã đạt giới hạn ký tự, chặn paste hoàn toàn
+                                  if (currentLength >= REASON_MAX_LENGTH) {
                                     e.preventDefault();
                                     e.stopPropagation();
                                     return;
                                   }
-                                  // Nếu chưa đạt 100, xử lý paste
+                                  // Nếu chưa đạt giới hạn, xử lý paste
                                   const pastedText =
                                     e.clipboardData.getData("text/plain");
                                   const textarea = e.target;
@@ -2067,10 +2376,10 @@ const ChonThoiGian = () => {
                                   const newText =
                                     textBefore + pastedText + textAfter;
 
-                                  if (newText.length > 250) {
+                                  if (newText.length > REASON_MAX_LENGTH) {
                                     e.preventDefault();
                                     // Chỉ paste phần vừa đủ
-                                    const maxAllowedLength = 250;
+                                    const maxAllowedLength = REASON_MAX_LENGTH;
                                     const availableLength =
                                       maxAllowedLength -
                                       (textBefore.length + textAfter.length);
@@ -2116,8 +2425,8 @@ const ChonThoiGian = () => {
                                       fontWeight: 500,
                                     }}
                                   >
-                                    ⚠️ Bạn đã nhập đủ 250 ký tự (giới hạn tối
-                                    đa)
+                                    ⚠️ Bạn đã nhập đủ {REASON_MAX_LENGTH} ký tự
+                                    (giới hạn tối đa)
                                   </Text>
                                 </div>
                               )}
@@ -2130,9 +2439,10 @@ const ChonThoiGian = () => {
                                     display: "block",
                                   }}
                                 >
-                                  Bạn có thể nhập tối đa 250 ký tự để mô tả lý
-                                  do khám ({250 - reasonValue.length} ký tự còn
-                                  lại)
+                                  Bạn có thể nhập tối đa {REASON_MAX_LENGTH} ký
+                                  tự để mô tả lý do khám (
+                                  {REASON_MAX_LENGTH - reasonValue.length} ký tự
+                                  còn lại)
                                 </Text>
                               )}
                             </>

@@ -24,14 +24,13 @@ import ModalDanhGia from "../modal-danh-gia/ModalDanhGia";
 import { RescheduleButton } from "../../../components/RescheduleButton/RescheduleButton";
 import { useAppointments } from "../../../hooks/useAppointments";
 import { useSpecializations } from "../../../hooks/useSpecializations";
-import { useUserProfile } from "../../../hooks/useUserProfile";
 import {
   filterByStatuses,
   getUniqueClinics,
   applyAppointmentFilters,
 } from "../../../utils/appointmentUtils";
 import { CustomAlert } from "../../../components/ui/CustomAlert";
-import "./LichHenCuaToi.scss";
+import "./LichDatHo.scss";
 
 const STATUS = {
   confirmed: { label: "Đã xác nhận", tone: "#1d4ed8", text: "#ffffff" },
@@ -41,7 +40,7 @@ const STATUS = {
   done: { label: "Hoàn thành", tone: "#e5e7eb", text: "#111827" },
 };
 
-export function LichHenCuaToi() {
+export function LichDatHo() {
   const [activeTab, setActiveTab] = useState("upcoming");
   const [selectedAppointmentId, setSelectedAppointmentId] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -81,8 +80,14 @@ export function LichHenCuaToi() {
   // Fetch specializations
   const { specializations } = useSpecializations();
 
-  // Get current user profile to identify self patient
-  const { userProfile } = useUserProfile();
+  // Filter appointments to only show those booked for others (đặt hộ)
+  const bookedForOthersAppointments = useMemo(() => {
+    return appointments.filter(
+      (apt) =>
+        apt.patientId?.relationshipToOwner &&
+        apt.patientId.relationshipToOwner !== "self"
+    );
+  }, [appointments]);
 
   const handleCancelAppointment = async (appointmentId) => {
     showConfirm("Bạn có chắc chắn muốn hủy lịch hẹn này?", async () => {
@@ -125,8 +130,8 @@ export function LichHenCuaToi() {
 
   // Get unique clinics from appointments
   const uniqueClinics = useMemo(() => {
-    return getUniqueClinics(appointments);
-  }, [appointments]);
+    return getUniqueClinics(bookedForOthersAppointments);
+  }, [bookedForOthersAppointments]);
 
   // Clear all filters
   const clearAllFilters = () => {
@@ -140,18 +145,22 @@ export function LichHenCuaToi() {
     });
   };
 
-  // Phân chia appointments
+  // Phân chia appointments (chỉ lấy appointments đặt hộ)
   const upcomingAppointments = useMemo(
-    () => filterByStatuses(appointments, ["pending_doctor", "accepted"]),
-    [appointments]
+    () =>
+      filterByStatuses(bookedForOthersAppointments, [
+        "pending_doctor",
+        "accepted",
+      ]),
+    [bookedForOthersAppointments]
   );
   const completedAppointments = useMemo(
-    () => filterByStatuses(appointments, ["done"]),
-    [appointments]
+    () => filterByStatuses(bookedForOthersAppointments, ["done"]),
+    [bookedForOthersAppointments]
   );
   const cancelledAppointments = useMemo(
-    () => filterByStatuses(appointments, ["cancelled"]),
-    [appointments]
+    () => filterByStatuses(bookedForOthersAppointments, ["cancelled"]),
+    [bookedForOthersAppointments]
   );
 
   // Apply all filters to current tab appointments
@@ -213,9 +222,9 @@ export function LichHenCuaToi() {
       <div className="my-appointments-header">
         <div className="header-content-wrapper">
           <div className="header-text-section">
-            <h1 className="page-title">Lịch hẹn của tôi</h1>
+            <h1 className="page-title">Lịch đặt hộ</h1>
             <p className="page-subtitle">
-              Quản lý và theo dõi các lịch hẹn khám bệnh
+              Quản lý và theo dõi các lịch hẹn đã đặt cho người thân
             </p>
             <p className="page-note">
               Lưu ý : Bạn chỉ có thể dời lịch trước 24h
@@ -497,6 +506,20 @@ export function LichHenCuaToi() {
           const feeText =
             fee > 0 ? new Intl.NumberFormat("vi-VN").format(fee) + "đ" : "";
 
+          // Get relationship text
+          const relationshipText =
+            a.patientId?.relationshipToOwner === "father"
+              ? "Cha"
+              : a.patientId?.relationshipToOwner === "mother"
+              ? "Mẹ"
+              : a.patientId?.relationshipToOwner === "spouse"
+              ? "Vợ/Chồng"
+              : a.patientId?.relationshipToOwner === "child"
+              ? "Con"
+              : a.patientId?.relationshipToOwner === "grandparent"
+              ? "Ông/Bà"
+              : "Người thân";
+
           return (
             <div
               key={a._id}
@@ -546,6 +569,21 @@ export function LichHenCuaToi() {
                     >
                       {status.label}
                     </span>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        padding: "4px 12px",
+                        borderRadius: 6,
+                        background: "#3b82f6",
+                        color: "#ffffff",
+                        fontWeight: 600,
+                        display: "inline-block",
+                      }}
+                      title="Lịch hẹn đã được đặt hộ"
+                    >
+                      👤 Đặt hộ cho {a.patientId?.fullName || "người thân"} (
+                      {relationshipText})
+                    </span>
                     {a.rescheduledFromId && (
                       <span
                         style={{
@@ -560,48 +598,6 @@ export function LichHenCuaToi() {
                         📅 Đã dời lịch
                       </span>
                     )}
-                    {/* Badge "Đặt hộ" - hiển thị khi appointment là lịch đặt hộ (relationshipToOwner !== "self") */}
-                    {(() => {
-                      const relationshipToOwner =
-                        a.patientId?.relationshipToOwner;
-                      // Check if this is a booked-for-others appointment
-                      // 1. If relationshipToOwner exists and is not "self", it's booked for others
-                      // 2. If relationshipToOwner is null/undefined, we can't determine, so don't show badge
-                      const isBookedForOthers =
-                        relationshipToOwner && relationshipToOwner !== "self";
-
-                      // Debug log để kiểm tra
-                      if (process.env.NODE_ENV === "development") {
-                        console.log("Appointment badge check:", {
-                          appointmentId: a._id,
-                          patientId: a.patientId?._id,
-                          relationshipToOwner: relationshipToOwner,
-                          isBookedForOthers: isBookedForOthers,
-                          patientData: a.patientId,
-                          userProfileRelationship:
-                            userProfile?.relationshipToOwner,
-                        });
-                      }
-
-                      return isBookedForOthers ? (
-                        <span
-                          style={{
-                            fontSize: 13,
-                            padding: "4px 12px",
-                            borderRadius: 6,
-                            background: "#3b82f6",
-                            color: "#ffffff",
-                            fontWeight: 600,
-                            display: "inline-block",
-                          }}
-                          title={`Lịch hẹn đã được đặt hộ cho ${
-                            a.patientId?.fullName || "người thân"
-                          }`}
-                        >
-                          👤 Đặt hộ
-                        </span>
-                      ) : null;
-                    })()}
                   </div>
                   <div style={{ color: "#334155", marginTop: 2 }}>
                     {specialty}
@@ -770,10 +766,10 @@ export function LichHenCuaToi() {
               {filters.doctorSearch
                 ? `Không tìm thấy lịch hẹn nào với bác sĩ "${filters.doctorSearch}"`
                 : activeTab === "upcoming"
-                ? "Bạn chưa có lịch hẹn nào. Hãy đặt lịch khám để bắt đầu!"
+                ? "Bạn chưa có lịch hẹn đặt hộ nào. Hãy đặt lịch khám cho người thân để bắt đầu!"
                 : activeTab === "completed"
-                ? "Chưa có lịch hẹn đã khám"
-                : "Chưa có lịch hẹn đã hủy"}
+                ? "Chưa có lịch hẹn đặt hộ đã khám"
+                : "Chưa có lịch hẹn đặt hộ đã hủy"}
             </p>
           </div>
         )}
@@ -807,3 +803,4 @@ export function LichHenCuaToi() {
     </div>
   );
 }
+
