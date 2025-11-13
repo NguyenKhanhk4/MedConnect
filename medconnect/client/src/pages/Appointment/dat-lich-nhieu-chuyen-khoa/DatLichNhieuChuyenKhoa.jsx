@@ -22,6 +22,9 @@ import {
   Rate,
   Divider,
   Input,
+  Form,
+  Select,
+  Checkbox,
 } from "antd";
 import {
   CalendarOutlined,
@@ -49,6 +52,7 @@ const { Title, Text, Paragraph } = Typography;
 const { Step } = Steps;
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
+const { Option } = Select;
 
 const DatLichNhieuChuyenKhoa = () => {
   const navigate = useNavigate();
@@ -102,6 +106,15 @@ const DatLichNhieuChuyenKhoa = () => {
   const [paymentSummary, setPaymentSummary] = useState(null);
   const [loadingPaymentSummary, setLoadingPaymentSummary] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
+
+  // Family member booking state
+  const [bookingFor, setBookingFor] = useState("me"); // "me" or "family"
+  const [familyMembers, setFamilyMembers] = useState([]);
+  const [selectedFamilyMember, setSelectedFamilyMember] = useState(null);
+  const [loadingFamilyMembers, setLoadingFamilyMembers] = useState(false);
+  const [patientIdForBooking, setPatientIdForBooking] = useState(null); // Store patientId for family member booking
+  const [familyForm] = Form.useForm(); // Form for family member info
+  const [savedFamilyFormValues, setSavedFamilyFormValues] = useState(null); // Store form values when form is filled
 
   // Fetch reviews when reviewDoctor changes
   useEffect(() => {
@@ -158,6 +171,13 @@ const DatLichNhieuChuyenKhoa = () => {
     fetchSpecializations();
   }, []);
 
+  // Fetch family members when booking for family
+  useEffect(() => {
+    if (bookingFor === "family") {
+      fetchFamilyMembers();
+    }
+  }, [bookingFor]);
+
   const fetchSpecializations = async () => {
     try {
       setLoading(true);
@@ -199,7 +219,27 @@ const DatLichNhieuChuyenKhoa = () => {
     }
   };
 
-  // Step 1: Chọn ngày khám
+  // Fetch family members
+  const fetchFamilyMembers = async () => {
+    try {
+      setLoadingFamilyMembers(true);
+      const response = await api.get("/api/patients/me/family-members");
+
+      if (response.success && response.data.familyMembers) {
+        setFamilyMembers(response.data.familyMembers);
+      } else {
+        message.error("Không thể tải danh sách người thân");
+        setFamilyMembers([]);
+      }
+    } catch (error) {
+      message.error("Có lỗi xảy ra khi tải danh sách người thân");
+      setFamilyMembers([]);
+    } finally {
+      setLoadingFamilyMembers(false);
+    }
+  };
+
+  // Step 0: Chọn ngày khám
   const handleDateSelect = async (date) => {
     if (!date) return;
 
@@ -220,10 +260,8 @@ const DatLichNhieuChuyenKhoa = () => {
           setVisitDate(visit.visitDate);
           setVisitStatus("draft"); // draft = not saved to DB
           setAppointments([]); // Start with empty appointments
-          setCurrentStep(1);
-          message.success(
-            "Đã chọn ngày khám. Vui lòng chọn chuyên khoa và bác sĩ."
-          );
+          // Don't auto-advance to next step - user must choose booking for me/family first
+          message.success("Đã chọn ngày khám. Vui lòng chọn đặt khám cho mình hoặc người thân.");
         } else {
           message.error("Không tìm thấy thông tin phiên khám");
         }
@@ -612,6 +650,9 @@ const DatLichNhieuChuyenKhoa = () => {
         : null);
 
     // Create local appointment object
+    const trimmedReason =
+      typeof appointmentReason === "string" ? appointmentReason.trim() : "";
+
     const newAppointment = {
       _id: appointmentToReplace ? appointmentToReplace._id : `temp-${Date.now()}`, // Keep same ID if replacing
       doctor: {
@@ -626,14 +667,25 @@ const DatLichNhieuChuyenKhoa = () => {
       scheduledEnd: slotEndAt,
       status: "draft", // Not saved yet
       mode: selectedMode,
-      reason: appointmentReason || (appointmentToReplace ? appointmentToReplace.reason : `Khám ${currentSpecialization.name}`),
+      reason:
+        trimmedReason ||
+        (appointmentToReplace && appointmentToReplace.reason
+          ? appointmentToReplace.reason
+          : ""),
       // Store original data for saving later
       _tempData: {
         doctorId: selectedDoctor._id,
         slotId: selectedSlot._id,
         mode: selectedMode,
-        clinicId: selectedMode === "offline" && defaultClinic ? defaultClinic._id : undefined, // Required for offline
-        reason: appointmentReason || (appointmentToReplace ? appointmentToReplace.reason : `Khám ${currentSpecialization.name}`),
+        clinicId:
+          selectedMode === "offline" && defaultClinic
+            ? defaultClinic._id
+            : undefined, // Required for offline
+        reason:
+          trimmedReason ||
+          (appointmentToReplace && appointmentToReplace.reason
+            ? appointmentToReplace.reason
+            : ""),
       },
       // Store slot reference for display
       slotId: selectedSlot._id,
@@ -668,23 +720,200 @@ const DatLichNhieuChuyenKhoa = () => {
       return;
     }
 
+    // Validate and create family member if booking for family
+    let currentPatientIdForBooking = null;
+    if (bookingFor === "family") {
+      try {
+        // Create or get family member
+        if (selectedFamilyMember && selectedFamilyMember._id) {
+          // Use existing family member - allergyNotes sẽ lấy từ form (có thể đã được sửa)
+          currentPatientIdForBooking = selectedFamilyMember._id;
+          setPatientIdForBooking(selectedFamilyMember._id);
+          // Note: allergyNotes từ form sẽ được dùng khi tạo appointment, không cần update vào DB
+        } else {
+          // Validate family form for new member
+          let familyValues;
+          try {
+            // Try validateFields first (only if form is still mounted)
+            if (familyForm && typeof familyForm.validateFields === 'function') {
+              try {
+                familyValues = await familyForm.validateFields();
+              } catch (validationError) {
+                // Continue to try getFieldsValue
+              }
+            }
+            
+            // If validateFields returns empty or form is unmounted, try getFieldsValue
+            if (!familyValues || Object.keys(familyValues).length === 0) {
+              try {
+                if (familyForm && typeof familyForm.getFieldsValue === 'function') {
+                  familyValues = familyForm.getFieldsValue(true); // true = include disabled fields
+                  
+                  // If still empty, try without disabled fields
+                  if (!familyValues || Object.keys(familyValues).length === 0) {
+                    familyValues = familyForm.getFieldsValue(false);
+                  }
+                }
+              } catch (e) {
+                // Ignore
+              }
+            }
+            
+            // If still empty, use saved form values from state
+            if (!familyValues || Object.keys(familyValues).length === 0) {
+              if (savedFamilyFormValues && Object.keys(savedFamilyFormValues).length > 0) {
+                familyValues = savedFamilyFormValues;
+              } else {
+                message.error("Vui lòng điền đầy đủ thông tin người thân");
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (validationError) {
+            // Form validation failed
+            // Try to get values anyway
+            try {
+              if (familyForm && typeof familyForm.getFieldsValue === 'function') {
+                familyValues = familyForm.getFieldsValue(true);
+              }
+            } catch (e) {
+              // Ignore
+            }
+            
+            // If still empty, use saved form values
+            if ((!familyValues || Object.keys(familyValues).length === 0) && savedFamilyFormValues) {
+              familyValues = savedFamilyFormValues;
+            }
+            
+            if (validationError.errorFields) {
+              const missingFields = validationError.errorFields.map(f => f.name).join(", ");
+              message.error(`Vui lòng điền đầy đủ thông tin: ${missingFields}`);
+            } else {
+              message.error("Vui lòng kiểm tra lại thông tin đã nhập");
+            }
+            
+            // If we have values, continue; otherwise return
+            if (!familyValues || Object.keys(familyValues).length === 0) {
+              setLoading(false);
+              return;
+            }
+          }
+
+          // Format dob properly first to check if it's valid
+          let dobFormatted = null;
+          if (familyValues.dob) {
+            try {
+              if (typeof familyValues.dob.format === 'function') {
+                // dayjs object - try to format it
+                try {
+                  dobFormatted = familyValues.dob.format("YYYY-MM-DD");
+                } catch (formatError) {
+                  // Try to convert to dayjs and format
+                  const dayjsObj = dayjs(familyValues.dob);
+                  if (dayjsObj.isValid()) {
+                    dobFormatted = dayjsObj.format("YYYY-MM-DD");
+                  }
+                }
+              } else if (typeof familyValues.dob === 'string' && familyValues.dob.trim()) {
+                // Already a string
+                dobFormatted = familyValues.dob.trim();
+              } else if (familyValues.dob instanceof Date) {
+                // Date object
+                dobFormatted = dayjs(familyValues.dob).format("YYYY-MM-DD");
+              }
+            } catch (e) {
+              // Ignore
+            }
+          }
+
+          // Validate required fields with proper checks
+          const fullNameValid = familyValues.fullName && typeof familyValues.fullName === 'string' && familyValues.fullName.trim().length > 0;
+          const dobValid = dobFormatted && typeof dobFormatted === 'string' && dobFormatted.length > 0;
+          const genderValid = familyValues.gender && typeof familyValues.gender === 'string' && ['male', 'female', 'other'].includes(familyValues.gender);
+          const relationshipValid = familyValues.relationshipToOwner && typeof familyValues.relationshipToOwner === 'string' && ['father', 'mother', 'spouse', 'child', 'grandparent', 'other'].includes(familyValues.relationshipToOwner);
+
+          if (!fullNameValid || !dobValid || !genderValid || !relationshipValid) {
+            const missingFields = [];
+            if (!fullNameValid) missingFields.push("Họ tên");
+            if (!dobValid) missingFields.push("Ngày sinh");
+            if (!genderValid) missingFields.push("Giới tính");
+            if (!relationshipValid) missingFields.push("Mối quan hệ");
+            
+            message.error(`Vui lòng điền đầy đủ các thông tin bắt buộc: ${missingFields.join(", ")}`);
+            setLoading(false);
+            return;
+          }
+
+          // Create new family member
+          const familyResponse = await api.post(
+            "/api/patients/me/family-members",
+            {
+              fullName: familyValues.fullName?.trim() || "",
+              dob: dobFormatted,
+              gender: familyValues.gender,
+              ethnicity: familyValues.ethnicity || "",
+              occupation: familyValues.occupation || "",
+              bloodType: familyValues.bloodType || "Unknown",
+              relationshipToOwner: familyValues.relationshipToOwner,
+              phone: familyValues.phone?.trim() || "",
+              citizenId: familyValues.citizenId?.trim() || "",
+              address: familyValues.address?.trim() || "",
+              allergyNotes: familyValues.allergyNotes || "",
+              medicalHistory: Array.isArray(familyValues.medicalHistory) ? familyValues.medicalHistory : [],
+            }
+          );
+
+          if (familyResponse.success) {
+            message.success("Thêm người thân thành công!");
+            const newPatientId = familyResponse.data.patient._id;
+            setPatientIdForBooking(newPatientId);
+            currentPatientIdForBooking = newPatientId;
+            await fetchFamilyMembers();
+          } else {
+            const errorMsg = familyResponse.message || familyResponse.data?.message || "Thêm người thân thất bại";
+            message.error(errorMsg);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (error) {
+        if (error.errorFields) {
+          // Form validation error
+          message.error("Vui lòng điền đầy đủ thông tin người thân");
+        } else if (error.response?.data?.message) {
+          // API error with message
+          message.error(error.response.data.message);
+        } else if (error.message) {
+          // General error
+          message.error(error.message);
+        } else {
+          message.error("Có lỗi xảy ra khi thêm người thân. Vui lòng thử lại.");
+        }
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       setLoading(true);
 
       // Prepare appointments data for API
       const appointmentsData = appointments
         .map((apt) => {
-          if (apt._tempData) {
-            return apt._tempData;
-          }
-          // Fallback - extract from appointment object
-          return {
+          const aptData = apt._tempData ? { ...apt._tempData } : {
             doctorId: apt.doctor?._id || apt.doctorId,
             slotId: apt.slotId || apt._tempData?.slotId,
             mode: apt.mode,
             clinicId: apt.clinicId || apt._tempData?.clinicId,
             reason: apt.reason || apt._tempData?.reason || "",
           };
+          
+          // Add patientId for family member booking
+          if (bookingFor === "family" && currentPatientIdForBooking) {
+            aptData.patientId = currentPatientIdForBooking;
+          }
+          
+          return aptData;
         })
         .filter((apt) => apt && apt.doctorId && apt.slotId && apt.mode); // Filter out invalid appointments
 
@@ -855,17 +1084,20 @@ const DatLichNhieuChuyenKhoa = () => {
       // Prepare appointments data for payment creation
       const appointmentsData = appointments
         .map((apt) => {
-          if (apt._tempData) {
-            return apt._tempData;
-          }
-          // Fallback - extract from appointment object
-          return {
+          const aptData = apt._tempData ? { ...apt._tempData } : {
             doctorId: apt.doctor?._id || apt.doctorId,
             slotId: apt.slotId || apt._tempData?.slotId,
             mode: apt.mode,
             clinicId: apt.clinicId || apt._tempData?.clinicId,
             reason: apt.reason || apt._tempData?.reason || "",
           };
+          
+          // Add patientId for family member booking
+          if (bookingFor === "family" && patientIdForBooking) {
+            aptData.patientId = patientIdForBooking;
+          }
+          
+          return aptData;
         })
         .filter((apt) => apt && apt.doctorId && apt.slotId && apt.mode);
 
@@ -1045,7 +1277,7 @@ const DatLichNhieuChuyenKhoa = () => {
             <Step
               title="Chọn ngày khám"
               icon={<CalendarOutlined />}
-              description="Chọn ngày bạn muốn khám"
+              description="Chọn ngày và người khám"
             />
             <Step
               title="Chọn chuyên khoa"
@@ -1065,33 +1297,543 @@ const DatLichNhieuChuyenKhoa = () => {
           </Steps>
         </Card>
 
-        {/* Step 0: Chọn ngày */}
+        {/* Step 0: Chọn ngày và người khám */}
         {currentStep === 0 && (
           <Card>
             <Title level={3}>Chọn ngày khám mong muốn</Title>
-            <Space direction="vertical" size="large" style={{ width: "100%" }}>
-              {loading && <Spin size="large" />}
-              <DatePicker
-                size="large"
-                style={{ width: "100%", maxWidth: 400 }}
-                placeholder="Chọn ngày khám"
-                disabledDate={(current) =>
-                  current && current < dayjs().startOf("day")
-                }
-                onChange={handleDateSelect}
-                disabled={loading}
-              />
-              <Paragraph type="secondary">
-                Bạn có thể đặt nhiều lịch khám trong cùng một ngày
-              </Paragraph>
-              {visitDate && (
-                <Alert
-                  message={`Đã chọn ngày: ${visitDate}`}
-                  type="info"
-                  showIcon
-                />
+            <Row gutter={24}>
+              {/* Left: Date Picker and Booking Selection */}
+              <Col xs={24} md={12}>
+                <Space direction="vertical" size="large" style={{ width: "100%" }}>
+                  {loading && <Spin size="large" />}
+                  
+                  {/* Date Picker Section */}
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
+                      <CalendarOutlined style={{ marginRight: 8, fontSize: 18, color: "#1890ff" }} />
+                      <Text strong style={{ fontSize: 16 }}>
+                        CHỌN NGÀY KHÁM
+                      </Text>
+                    </div>
+                    <Text type="secondary" style={{ display: "block", marginBottom: 12, fontSize: 14 }}>
+                      Chọn ngày muốn khám
+                    </Text>
+                    <DatePicker
+                      size="large"
+                      style={{ width: "100%" }}
+                      placeholder="dd/mm/yyyy"
+                      format="DD/MM/YYYY"
+                      disabledDate={(current) =>
+                        current && current < dayjs().startOf("day")
+                      }
+                      onChange={handleDateSelect}
+                      disabled={loading}
+                    />
+                  </div>
+
+                  {/* Info Alert */}
+                  {visitDate && (
+                    <Alert
+                      message="Bạn có thể đặt nhiều lịch khám trong cùng một ngày"
+                      type="info"
+                      showIcon
+                      style={{ marginTop: 16 }}
+                    />
+                  )}
+
+                  {/* Booking For Selection - Below Date Picker */}
+                  {visitDate && (
+                    <div style={{ marginTop: 24 }}>
+                      <Text strong style={{ display: "block", marginBottom: 12 }}>
+                        Đặt khám cho:
+                      </Text>
+                      <Row gutter={12}>
+                        <Col span={12}>
+                          <Button
+                            type={bookingFor === "me" ? "primary" : "default"}
+                            size="large"
+                            block
+                            onClick={() => {
+                              setBookingFor("me");
+                              setSelectedFamilyMember(null);
+                              familyForm.resetFields();
+                            }}
+                            style={{
+                              height: 48,
+                              fontSize: 15,
+                              fontWeight: 500,
+                            }}
+                          >
+                            Khám cho mình
+                          </Button>
+                        </Col>
+                        <Col span={12}>
+                          <Button
+                            type={bookingFor === "family" ? "primary" : "default"}
+                            size="large"
+                            block
+                            onClick={() => {
+                              setBookingFor("family");
+                              setSelectedFamilyMember(null);
+                            }}
+                            style={{
+                              height: 48,
+                              fontSize: 15,
+                              fontWeight: 500,
+                            }}
+                          >
+                            Khám cho người thân
+                          </Button>
+                        </Col>
+                      </Row>
+                    </div>
+                  )}
+
+                  {/* Continue Button - Only show when booking for me */}
+                  {visitDate && bookingFor === "me" && (
+                    <div style={{ marginTop: 24 }}>
+                      <Button
+                        type="primary"
+                        size="large"
+                        block
+                        onClick={() => setCurrentStep(1)}
+                        style={{
+                          height: 50,
+                          fontSize: 16,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Tiếp tục →
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Info boxes */}
+                  <Row gutter={16} style={{ marginTop: 24 }}>
+                    <Col span={12}>
+                      <div style={{ 
+                        padding: 16, 
+                        background: "#f6ffed", 
+                        borderRadius: 8,
+                        border: "1px solid #b7eb8f"
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+                          <CheckCircleOutlined style={{ color: "#52c41a", marginRight: 8 }} />
+                          <Text strong style={{ color: "#52c41a" }}>Nhanh chóng</Text>
+                        </div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          Đăng ký trong 2 phút
+                        </Text>
+                      </div>
+                    </Col>
+                    <Col span={12}>
+                      <div style={{ 
+                        padding: 16, 
+                        background: "#f6ffed", 
+                        borderRadius: 8,
+                        border: "1px solid #b7eb8f"
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+                          <CheckCircleOutlined style={{ color: "#52c41a", marginRight: 8 }} />
+                          <Text strong style={{ color: "#52c41a" }}>An toàn</Text>
+                        </div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          Bảo mật thông tin 100%
+                        </Text>
+                      </div>
+                    </Col>
+                  </Row>
+                </Space>
+              </Col>
+
+              {/* Right: Family Member Form - Only show when booking for family */}
+              {bookingFor === "family" && (
+              <Col xs={24} md={12}>
+                <Card style={{ background: "#fff" }}>
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+                      <Text strong style={{ fontSize: 16, marginRight: 8 }}>1</Text>
+                      <Title level={4} style={{ margin: 0 }}>Thông tin người thân</Title>
+                    </div>
+                    <Text type="secondary" style={{ fontSize: 14 }}>
+                      Điền thông tin chi tiết của người cần khám
+                    </Text>
+                  </div>
+
+                  <Form
+                    form={familyForm}
+                    layout="vertical"
+                    initialValues={{
+                      bloodType: "Unknown",
+                    }}
+                    onValuesChange={(changedValues, allValues) => {
+                      // Save form values to state whenever form changes
+                      setSavedFamilyFormValues(allValues);
+                    }}
+                  >
+                    {/* Select existing family member or create new */}
+                    {familyMembers.length > 0 && (
+                      <Form.Item label="Chọn người thân đã có">
+                        <Select
+                          placeholder="Chọn người thân hoặc để trống để thêm mới"
+                          allowClear
+                          size="large"
+                          onChange={(value) => {
+                            if (value) {
+                              const member = familyMembers.find(
+                                (m) => m._id === value
+                              );
+                              setSelectedFamilyMember(member);
+                              // Persist patientId immediately to avoid losing selection across steps
+                              setPatientIdForBooking(member?._id || null);
+                              // Fill form with existing member data
+                              familyForm.setFieldsValue({
+                                fullName: member.fullName,
+                                dob: member.dob ? dayjs(member.dob) : undefined,
+                                gender: member.gender,
+                                ethnicity: member.ethnicity,
+                                occupation: member.occupation,
+                                bloodType: member.bloodType || "Unknown",
+                                relationshipToOwner: member.relationshipToOwner,
+                                phone: member.phone,
+                                citizenId: member.citizenId,
+                                address: member.address,
+                                allergyNotes: member.allergyNotes || "",
+                                medicalHistory: member.medicalHistory || [],
+                              });
+                            } else {
+                              setSelectedFamilyMember(null);
+                              setPatientIdForBooking(null);
+                              familyForm.resetFields();
+                            }
+                          }}
+                        >
+                          {familyMembers.map((member) => (
+                            <Option key={member._id} value={member._id}>
+                              {member.fullName} ({member.relationshipToOwner === "father" ? "Cha" : 
+                                member.relationshipToOwner === "mother" ? "Mẹ" :
+                                member.relationshipToOwner === "spouse" ? "Vợ/Chồng" :
+                                member.relationshipToOwner === "child" ? "Con" :
+                                member.relationshipToOwner === "grandparent" ? "Ông/Bà" : "Khác"})
+                            </Option>
+                          ))}
+                        </Select>
+                        <Button
+                          type="link"
+                          icon={<PlusOutlined />}
+                          onClick={() => {
+                            setSelectedFamilyMember(null);
+                            familyForm.resetFields();
+                          }}
+                          style={{ padding: 0, marginTop: 8 }}
+                        >
+                          + Thêm người mới
+                        </Button>
+                      </Form.Item>
+                    )}
+
+                    <Form.Item
+                      label={
+                        <span>
+                          Họ và tên <Text type="danger">*</Text>
+                        </span>
+                      }
+                      name="fullName"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Vui lòng nhập họ tên!",
+                        },
+                      ]}
+                    >
+                      <Input 
+                        placeholder="Nhập họ và tên" 
+                        size="large" 
+                        disabled={!!selectedFamilyMember}
+                        readOnly={!!selectedFamilyMember}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      label={
+                        <span>
+                          SỐ CCCD/CMND <Text type="danger">*</Text>
+                        </span>
+                      }
+                      name="citizenId"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Vui lòng nhập số CCCD!",
+                        },
+                      ]}
+                    >
+                      <Input 
+                        placeholder="Nhập số CCCD/CMND" 
+                        size="large"
+                        disabled={!!selectedFamilyMember}
+                        readOnly={!!selectedFamilyMember}
+                      />
+                    </Form.Item>
+
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Form.Item
+                          label={
+                            <span>
+                              Ngày sinh <Text type="danger">*</Text>
+                            </span>
+                          }
+                          name="dob"
+                          rules={[
+                            {
+                              required: true,
+                              message: "Vui lòng chọn ngày sinh!",
+                            },
+                          ]}
+                        >
+                          <DatePicker
+                            style={{ width: "100%" }}
+                            format="DD/MM/YYYY"
+                            placeholder="dd/mm/yyyy"
+                            size="large"
+                            disabled={!!selectedFamilyMember}
+                            disabledDate={(current) =>
+                              current && current > new Date()
+                            }
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item
+                          label={
+                            <span>
+                              Giới tính <Text type="danger">*</Text>
+                            </span>
+                          }
+                          name="gender"
+                          rules={[
+                            {
+                              required: true,
+                              message: "Vui lòng chọn giới tính!",
+                            },
+                          ]}
+                        >
+                          <Select 
+                            placeholder="Chọn giới tính" 
+                            size="large"
+                            disabled={!!selectedFamilyMember}
+                          >
+                            <Option value="male">Nam</Option>
+                            <Option value="female">Nữ</Option>
+                            <Option value="other">Khác</Option>
+                          </Select>
+                        </Form.Item>
+                      </Col>
+                    </Row>
+
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Form.Item label="Dân tộc" name="ethnicity">
+                          <Input 
+                            placeholder="Nhập dân tộc (nếu có)" 
+                            size="large"
+                            disabled={!!selectedFamilyMember}
+                            readOnly={!!selectedFamilyMember}
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item label="Nghề nghiệp" name="occupation">
+                          <Input 
+                            placeholder="Nhập nghề nghiệp (nếu có)" 
+                            size="large"
+                            disabled={!!selectedFamilyMember}
+                            readOnly={!!selectedFamilyMember}
+                          />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+
+                    <Form.Item label="Nhóm máu" name="bloodType">
+                      <Select
+                        placeholder="Chọn nhóm máu (nếu có)"
+                        allowClear
+                        size="large"
+                        disabled={!!selectedFamilyMember}
+                      >
+                        <Option value="A+">A+</Option>
+                        <Option value="A-">A-</Option>
+                        <Option value="B+">B+</Option>
+                        <Option value="B-">B-</Option>
+                        <Option value="AB+">AB+</Option>
+                        <Option value="AB-">AB-</Option>
+                        <Option value="O+">O+</Option>
+                        <Option value="O-">O-</Option>
+                        <Option value="Unknown">Không rõ</Option>
+                      </Select>
+                    </Form.Item>
+
+                    <Form.Item
+                      label={
+                        <span>
+                          Số điện thoại <Text type="danger">*</Text>
+                        </span>
+                      }
+                      name="phone"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Vui lòng nhập số điện thoại!",
+                        },
+                        {
+                          pattern: /^[0-9]{10}$/,
+                          message: "Số điện thoại không hợp lệ!",
+                        },
+                      ]}
+                    >
+                      <Input 
+                        placeholder="Nhập số điện thoại" 
+                        size="large"
+                        prefix={<PhoneOutlined />}
+                        disabled={!!selectedFamilyMember}
+                        readOnly={!!selectedFamilyMember}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      label={
+                        <span>
+                          Địa chỉ <Text type="danger">*</Text>
+                        </span>
+                      }
+                      name="address"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Vui lòng nhập địa chỉ!",
+                        },
+                      ]}
+                    >
+                      <Input 
+                        placeholder="Nhập địa chỉ" 
+                        size="large"
+                        prefix={<EnvironmentOutlined />}
+                        disabled={!!selectedFamilyMember}
+                        readOnly={!!selectedFamilyMember}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      label={
+                        <span>
+                          Mối quan hệ <Text type="danger">*</Text>
+                        </span>
+                      }
+                      name="relationshipToOwner"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Vui lòng chọn mối quan hệ!",
+                        },
+                      ]}
+                    >
+                      <Select 
+                        placeholder="Chọn mối quan hệ" 
+                        size="large"
+                        disabled={!!selectedFamilyMember}
+                      >
+                        <Option value="father">Cha</Option>
+                        <Option value="mother">Mẹ</Option>
+                        <Option value="spouse">Vợ/Chồng</Option>
+                        <Option value="child">Con</Option>
+                        <Option value="grandparent">Ông/Bà</Option>
+                        <Option value="other">Khác</Option>
+                      </Select>
+                    </Form.Item>
+
+                    <Form.Item
+                      label="Ghi chú dị ứng"
+                      name="allergyNotes"
+                      rules={[
+                        {
+                          max: 500,
+                          message:
+                            "Ghi chú dị ứng không được vượt quá 500 ký tự!",
+                        },
+                      ]}
+                    >
+                      <TextArea
+                        rows={4}
+                        placeholder="Nhập thông tin dị ứng, tiền sử dị ứng thuốc, thức ăn (nếu có)"
+                        maxLength={500}
+                        showCount
+                        // Cho phép edit allergyNotes ngay cả khi đã chọn người thân
+                        disabled={false}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      name="agreement"
+                      valuePropName="checked"
+                      rules={[
+                        {
+                          required: true,
+                          message:
+                            "Vui lòng xác nhận chịu trách nhiệm về thông tin cung cấp!",
+                        },
+                      ]}
+                    >
+                      <Checkbox>
+                        Người đặt hộ chịu trách nhiệm về thông tin cung cấp
+                      </Checkbox>
+                    </Form.Item>
+
+                    {/* Continue Button for Family */}
+                    <Form.Item>
+                      <Button
+                        type="primary"
+                        size="large"
+                        block
+                        onClick={async () => {
+                          // If family member is already selected, no need to validate
+                          if (selectedFamilyMember) {
+                            // Persist selected patient id to ensure downstream steps use correct patient
+                            setPatientIdForBooking(selectedFamilyMember._id);
+                            setCurrentStep(1);
+                            return;
+                          }
+
+                          // If creating new member, validate form and save values
+                          try {
+                            await familyForm.validateFields();
+                            // Save form values before moving to next step
+                            const formValues = familyForm.getFieldsValue(true);
+                            setSavedFamilyFormValues(formValues);
+                            setCurrentStep(1);
+                          } catch (error) {
+                            if (error.errorFields) {
+                              message.error("Vui lòng điền đầy đủ thông tin người thân");
+                            } else {
+                              message.error("Vui lòng kiểm tra lại thông tin đã nhập");
+                            }
+                          }
+                        }}
+                        style={{
+                          height: 50,
+                          fontSize: 16,
+                          fontWeight: 600,
+                          marginTop: 16,
+                        }}
+                      >
+                        Xác nhận đặt khám →
+                      </Button>
+                    </Form.Item>
+                  </Form>
+                </Card>
+              </Col>
               )}
-            </Space>
+            </Row>
           </Card>
         )}
 
@@ -1384,9 +2126,22 @@ const DatLichNhieuChuyenKhoa = () => {
                       );
                     });
 
+                    const reasonFromAppointment =
+                      matchingAppointment?.reason ||
+                      matchingAppointment?._tempData?.reason ||
+                      "";
+
+                    const finalReason =
+                      typeof reasonFromAppointment === "string" &&
+                      reasonFromAppointment.trim().length > 0
+                        ? reasonFromAppointment.trim()
+                        : (typeof summary.reason === "string" && summary.reason.trim().length > 0
+                            ? summary.reason.trim()
+                            : "Không có");
+
                     return {
                       ...summary,
-                      reason: matchingAppointment?.reason || matchingAppointment?._tempData?.reason || summary.reason || "Không có",
+                      reason: finalReason,
                     };
                   });
 
@@ -1413,11 +2168,17 @@ const DatLichNhieuChuyenKhoa = () => {
                             title: "Lý do",
                             dataIndex: "reason",
                             key: "reason",
-                            render: (text) => (
-                              <Text ellipsis={{ tooltip: text }} style={{ maxWidth: 200 }}>
-                                {text || "Không có"}
+                            render: (text) => {
+                              const displayText =
+                                typeof text === "string" && text.trim().length > 0
+                                  ? text
+                                  : "Không có";
+                              return (
+                                <Text ellipsis={{ tooltip: displayText }} style={{ maxWidth: 200 }}>
+                                  {displayText}
                               </Text>
-                            ),
+                              );
+                            },
                           },
                           {
                             title: "Thời gian",

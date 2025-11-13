@@ -14,6 +14,7 @@ import videoCallRouter from "./videoCallRoutes.js";
 import payosRouter from "./payos.routes.js";
 import medicalVisitRouter from "./medicalVisitRoutes.js";
 import managerRouter from "./managerRoutes.js";
+import aiRouter from "./aiRoutes.js";
 import { getAllAppointments } from "../controllers/doctorController.js";
 import { getAppointmentBySlotId } from "../controllers/appointmentController.js";
 
@@ -78,6 +79,10 @@ console.log("[router] mounted /api/medical-visits");
 // Manager routes
 apiRouter.use("/managers", managerRouter);
 console.log("[router] mounted /api/managers");
+
+// AI routes
+apiRouter.use("/ai", aiRouter);
+console.log("[router] mounted /api/ai");
 
 // Public service prices route (for doctor to get active services)
 import { getActiveServicePrices } from "../controllers/servicePriceController.js";

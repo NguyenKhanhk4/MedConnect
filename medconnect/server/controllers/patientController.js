@@ -266,22 +266,47 @@ export async function getCurrentPatientProfile(req, res) {
     let patient = null;
 
     if (user.role === "patient") {
-      // Find patient profile, create if not exists (only for patients)
-      patient = await Patient.findOne({ userId: appUserId }).lean();
+      // 1) Ưu tiên lấy đúng hồ sơ "self" (chính chủ)
+      patient = await Patient.findOne({
+        userId: appUserId,
+        relationshipToOwner: "self",
+      }).lean();
 
       if (!patient) {
-        // Create a basic patient profile if it doesn't exist
-        console.log("Creating new patient profile for user:", appUserId);
-        const newPatient = new Patient({
+        // 2) Nếu không có "self", kiểm tra hồ sơ cũ chưa set relationshipToOwner
+        const legacyOrMissingRelationship = await Patient.findOne({
           userId: appUserId,
-          fullName: user.fullName || "Chưa cập nhật",
-          phone: user.phone || "",
-          isComplete: false,
+          $or: [
+            { relationshipToOwner: { $exists: false } },
+            { relationshipToOwner: null },
+            { relationshipToOwner: "" },
+          ],
         });
 
-        await newPatient.save();
-        patient = newPatient.toObject();
-        console.log("Created patient profile:", patient._id);
+        if (legacyOrMissingRelationship) {
+          // Gắn cờ "self" cho hồ sơ cũ thay vì tạo mới để tránh trùng lặp
+          legacyOrMissingRelationship.relationshipToOwner = "self";
+          await legacyOrMissingRelationship.save();
+          patient = legacyOrMissingRelationship.toObject();
+          console.log(
+            "✅ Upgraded legacy/missing relationship to 'self' for patient:",
+            patient._id
+          );
+        } else {
+          // 3) Chỉ khi hoàn toàn không có hồ sơ nào của userId thì mới tạo mới
+          console.log("Creating new SELF patient profile for user:", appUserId);
+          const newPatient = new Patient({
+            userId: appUserId,
+            fullName: user.fullName || "Chưa cập nhật",
+            phone: user.phone || "",
+            relationshipToOwner: "self",
+            isComplete: false,
+          });
+
+          await newPatient.save();
+          patient = newPatient.toObject();
+          console.log("Created self patient profile:", patient._id);
+        }
       }
     } else {
       // For non-patient users (doctor, admin, manager), check if Patient exists and remove it
@@ -1774,9 +1799,15 @@ export async function getFamilyMembers(req, res) {
       );
     }
 
-    // Get all patients under this userId
-    const familyMembers = await Patient.find({ userId: appUserId })
-      .select("_id fullName dob gender relationshipToOwner phone avatarUrl")
+    // Get only family members (exclude "self" - the user's own profile)
+    // Chỉ lấy những patient có relationshipToOwner là family member hợp lệ
+    const familyMembers = await Patient.find({ 
+      userId: appUserId,
+      relationshipToOwner: { 
+        $in: ["father", "mother", "spouse", "child", "grandparent", "other"] 
+      } // Chỉ lấy người thân, loại bỏ "self" và null/undefined
+    })
+      .select("_id fullName dob gender relationshipToOwner phone avatarUrl citizenId address ethnicity occupation bloodType allergyNotes medicalHistory")
       .sort({ relationshipToOwner: 1, createdAt: 1 })
       .lean();
 

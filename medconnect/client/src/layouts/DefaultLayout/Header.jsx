@@ -236,10 +236,14 @@ const Header = () => {
 
   const handleLogout = async () => {
     try {
+      // Sign out from Firebase first
       await signOut(auth);
-      navigate("/");
+      // Use window.location.href for hard redirect to homepage to avoid middleware redirects
+      window.location.href = "/";
     } catch (error) {
       console.error("Logout error:", error);
+      // Fallback: hard redirect to homepage
+      window.location.href = "/";
     }
   };
 

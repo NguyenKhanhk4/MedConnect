@@ -93,18 +93,18 @@ export function AppSidebar() {
 
   const handleLogout = async () => {
     try {
-      // Navigate to homepage first, then sign out
-      // This prevents the brief login page flash
-      navigate("/", { replace: true });
-
       // Import auth from firebase
       const { auth } = await import("../../../lib/firebase");
 
-      // Sign out from Firebase (non-blocking)
-      auth.signOut().catch(console.error);
+      // Sign out from Firebase first
+      await auth.signOut();
+      
+      // Use window.location.href for hard redirect to homepage to avoid middleware redirects
+      window.location.href = "/";
     } catch (error) {
-      // Still navigate to homepage even if there's an error
-      navigate("/", { replace: true });
+      console.error("Error during logout:", error);
+      // Fallback: redirect to homepage
+      window.location.href = "/";
     }
   };
 
