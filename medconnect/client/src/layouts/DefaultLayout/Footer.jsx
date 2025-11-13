@@ -89,7 +89,7 @@ const AppFooter = () => {
                 <Link to="/help">Trung tâm trợ giúp</Link>
               </li>
               <li>
-                <Link to="/contact">Liên hệ</Link>
+                <Link to="/dieu-khoan-su-dung">Điều khoản sử dụng</Link>
               </li>
               <li>
                 <Link to="/chinh-sach-bao-mat">Chính sách bảo mật</Link>

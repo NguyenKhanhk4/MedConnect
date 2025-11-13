@@ -70,7 +70,6 @@ const Header = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // register dropdown state (was referenced but not defined)
   const [registerDropdownOpen, setRegisterDropdownOpen] = useState(false);
-  const [legalDropdownOpen, setLegalDropdownOpen] = useState(false);
   // search placeholder state (fix: placeholders / phIndex undefined)
   const placeholders = [
     "Tìm bác sĩ, chuyên khoa, cơ sở...",
@@ -187,11 +186,6 @@ const Header = () => {
       setActiveCat("hospital");
     } else if (currentPath === "/gioi-thieu") {
       setActiveCat("about");
-    } else if (
-      currentPath === "/chinh-sach-bao-mat" ||
-      currentPath === "/dieu-khoan-su-dung"
-    ) {
-      setActiveCat("legal");
     } else {
       setActiveCat("all");
     }
@@ -317,37 +311,6 @@ const Header = () => {
               {c.label}
             </Link>
           ))}
-
-          {/* Legal dropdown */}
-          <div className="register-dropdown">
-            <button
-              className={`cat dropdown-toggle ${
-                activeCat === "legal" ? "active" : ""
-              }`}
-              onClick={() => setLegalDropdownOpen(!legalDropdownOpen)}
-            >
-              Pháp lý
-              <DownOutlined style={{ fontSize: "12px" }} />
-            </button>
-            {legalDropdownOpen && (
-              <div className="dropdown-menu">
-                <Link
-                  to="/chinh-sach-bao-mat"
-                  className="dropdown-item"
-                  onClick={() => setLegalDropdownOpen(false)}
-                >
-                  Chính sách bảo mật
-                </Link>
-                <Link
-                  to="/dieu-khoan-su-dung"
-                  className="dropdown-item"
-                  onClick={() => setLegalDropdownOpen(false)}
-                >
-                  Điều khoản sử dụng
-                </Link>
-              </div>
-            )}
-          </div>
 
           {/* Search (Ant Design) - REMOVED */}
           {/* {showSearch && (
@@ -657,28 +620,6 @@ const Header = () => {
                   <li>
                     <Link to="/lien-he" onClick={() => setSidebarOpen(false)}>
                       Liên hệ
-                    </Link>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="sidebar-section">
-                <h4>Pháp lý</h4>
-                <ul>
-                  <li>
-                    <Link
-                      to="/chinh-sach-bao-mat"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      Chính sách bảo mật
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/dieu-khoan-su-dung"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      Điều khoản sử dụng
                     </Link>
                   </li>
                 </ul>

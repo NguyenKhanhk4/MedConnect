@@ -1905,7 +1905,7 @@ const ChonThoiGian = () => {
                       label="Lý do khám"
                       rules={[
                         {
-                          max: 100,
+                          max: 250,
                           message: "Lý do khám không được vượt quá 100 ký tự",
                         },
                       ]}
@@ -1918,7 +1918,7 @@ const ChonThoiGian = () => {
                       >
                         {({ getFieldValue }) => {
                           const reasonValue = getFieldValue("reason") || "";
-                          const isMaxLength = reasonValue.length >= 100;
+                          const isMaxLength = reasonValue.length >= 250;
                           return (
                             <>
                               <TextArea
@@ -1926,17 +1926,17 @@ const ChonThoiGian = () => {
                                 rows={4}
                                 value={reasonValue}
                                 placeholder="Mô tả triệu chứng hoặc lý do khám (không bắt buộc)"
-                                maxLength={100}
+                                maxLength={250}
                                 showCount
                                 onChange={(e) => {
                                   const newValue = e.target.value;
                                   const newLength = newValue.length;
 
                                   // Cắt bớt nếu vượt quá 100 ký tự
-                                  if (newLength > 100) {
+                                  if (newLength > 250) {
                                     const truncatedValue = newValue.slice(
                                       0,
-                                      100
+                                      250
                                     );
                                     form.setFieldsValue({
                                       reason: truncatedValue,
@@ -1954,7 +1954,7 @@ const ChonThoiGian = () => {
                                   const currentLength = currentValue.length;
 
                                   // Nếu đã có 100 ký tự
-                                  if (currentLength >= 100) {
+                                  if (currentLength >= 250) {
                                     // Cho phép xóa (Backspace, Delete)
                                     if (
                                       e.key === "Backspace" ||
@@ -2006,7 +2006,7 @@ const ChonThoiGian = () => {
                                   // Chặn input event nếu đã có 100 ký tự
                                   const currentValue =
                                     getFieldValue("reason") || "";
-                                  if (currentValue.length >= 100) {
+                                  if (currentValue.length >= 250) {
                                     // Kiểm tra xem có phải đang xóa không
                                     const inputType = e.inputType;
                                     const isDeleteOperation =
@@ -2029,10 +2029,10 @@ const ChonThoiGian = () => {
                                 onInput={(e) => {
                                   // Cắt bớt nếu vượt quá 100 ký tự
                                   const newValue = e.target.value;
-                                  if (newValue.length > 100) {
+                                  if (newValue.length >250) {
                                     const truncatedValue = newValue.slice(
                                       0,
-                                      100
+                                      250
                                     );
                                     e.target.value = truncatedValue;
                                     form.setFieldsValue({
@@ -2045,7 +2045,7 @@ const ChonThoiGian = () => {
                                     getFieldValue("reason") || "";
                                   const currentLength = currentValue.length;
                                   // Nếu đã có 100 ký tự, chặn paste hoàn toàn
-                                  if (currentLength >= 100) {
+                                  if (currentLength >= 250) {
                                     e.preventDefault();
                                     e.stopPropagation();
                                     return;
@@ -2067,10 +2067,10 @@ const ChonThoiGian = () => {
                                   const newText =
                                     textBefore + pastedText + textAfter;
 
-                                  if (newText.length > 100) {
+                                  if (newText.length > 250) {
                                     e.preventDefault();
                                     // Chỉ paste phần vừa đủ
-                                    const maxAllowedLength = 100;
+                                    const maxAllowedLength = 250;
                                     const availableLength =
                                       maxAllowedLength -
                                       (textBefore.length + textAfter.length);
@@ -2116,7 +2116,7 @@ const ChonThoiGian = () => {
                                       fontWeight: 500,
                                     }}
                                   >
-                                    ⚠️ Bạn đã nhập đủ 100 ký tự (giới hạn tối
+                                    ⚠️ Bạn đã nhập đủ 250 ký tự (giới hạn tối
                                     đa)
                                   </Text>
                                 </div>
@@ -2130,8 +2130,8 @@ const ChonThoiGian = () => {
                                     display: "block",
                                   }}
                                 >
-                                  Bạn có thể nhập tối đa 100 ký tự để mô tả lý
-                                  do khám ({100 - reasonValue.length} ký tự còn
+                                  Bạn có thể nhập tối đa 250 ký tự để mô tả lý
+                                  do khám ({250 - reasonValue.length} ký tự còn
                                   lại)
                                 </Text>
                               )}
