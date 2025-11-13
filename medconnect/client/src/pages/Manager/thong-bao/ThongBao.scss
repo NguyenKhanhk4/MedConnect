@@ -134,6 +134,17 @@ $gray-900: #111827;
         }
       }
 
+      &.payment-notification {
+        &.unread {
+          background: #fef3c7;
+          border-left: 4px solid #fbbf24;
+        }
+
+        &:hover {
+          background: #fef3c7;
+        }
+      }
+
       .notification-content {
         width: 100%;
 
@@ -221,6 +232,35 @@ $gray-900: #111827;
 
             svg {
               color: #9ca3af;
+            }
+
+            &.highlight {
+              background: #fef3c7;
+              color: #92400e;
+              font-weight: 500;
+
+              svg {
+                color: #f59e0b;
+              }
+            }
+          }
+        }
+
+        .notification-actions {
+          margin-top: 12px;
+          display: flex;
+          gap: 8px;
+
+          button {
+            background: linear-gradient(135deg, #4db8c4 0%, #3a9ba8 100%);
+            border: none;
+            color: white;
+            font-weight: 500;
+
+            &:hover {
+              background: linear-gradient(135deg, #3a9ba8 0%, #2d7a85 100%);
+              transform: translateY(-1px);
+              box-shadow: 0 4px 8px rgba(77, 184, 196, 0.3);
             }
           }
         }

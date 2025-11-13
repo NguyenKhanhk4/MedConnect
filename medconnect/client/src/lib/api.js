@@ -624,12 +624,12 @@ export async function blockSingleSlot(slotId, reason = "") {
 }
 
 // Leave request functions
-export async function createLeaveRequest(slotId, reason) {
+export async function createLeaveRequest(startDate, endDate, reason) {
   const r = await fetch(`${BASE}/api/doctors/me/leave-requests`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ slotId, reason }),
+    body: JSON.stringify({ startDate, endDate, reason }),
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();

@@ -690,53 +690,75 @@ export default function LichHen() {
     console.log("🔍 handleViewRescheduleInfo - appointment:", appointment);
     console.log("🔍 rescheduledFromId:", appointment.rescheduledFromId);
     console.log(
-      "🔍 Type of rescheduledFromId:",
-      typeof appointment.rescheduledFromId
+      "🔍 originalScheduledStart:",
+      appointment.originalScheduledStart
     );
+    console.log("🔍 originalScheduledEnd:", appointment.originalScheduledEnd);
 
-    // Check if rescheduledFromId is already populated (object) or just an ID (string)
     let originalAppointment = null;
 
-    if (!appointment.rescheduledFromId) {
-      showAlert(
-        "Không tìm thấy thông tin lịch cũ (rescheduledFromId không có)"
+    // Check if this is an in-place rescheduled appointment (has originalScheduledStart)
+    // This happens when manager reschedules and updates the appointment in-place
+    if (appointment.originalScheduledStart) {
+      // Create a virtual original appointment object from saved original data
+      originalAppointment = {
+        _id: appointment._id, // Same appointment ID (in-place update)
+        scheduledStart: appointment.originalScheduledStart,
+        scheduledEnd: appointment.originalScheduledEnd,
+        slotId: appointment.originalSlotId, // Already populated by backend
+        doctorId: appointment.originalDoctorId, // Already populated by backend
+        clinicId: appointment.originalClinicId, // Already populated by backend
+        patientId: appointment.patientId, // Same patient
+        mode: appointment.mode, // Same mode (could be different if changed)
+        status: "accepted", // Original status before reschedule
+      };
+      console.log(
+        "✅ Using original appointment info from in-place reschedule"
       );
-      return;
-    }
+      console.log("✅ Original slot:", appointment.originalSlotId);
+      console.log("✅ Original doctor:", appointment.originalDoctorId);
+      console.log("✅ Original clinic:", appointment.originalClinicId);
+    } else if (appointment.rescheduledFromId) {
+      // Legacy: appointment was rescheduled by creating a new appointment
+      // If rescheduledFromId is already populated (object with _id and other fields)
+      if (
+        typeof appointment.rescheduledFromId === "object" &&
+        appointment.rescheduledFromId._id
+      ) {
+        originalAppointment = appointment.rescheduledFromId;
+        console.log("✅ Using populated rescheduledFromId object");
+      } else {
+        // If it's just an ID (string or ObjectId), find it in the appointments list
+        const rescheduledFromIdStr =
+          typeof appointment.rescheduledFromId === "string"
+            ? appointment.rescheduledFromId
+            : appointment.rescheduledFromId.toString();
 
-    // If rescheduledFromId is already populated (object with _id and other fields)
-    if (
-      typeof appointment.rescheduledFromId === "object" &&
-      appointment.rescheduledFromId._id
-    ) {
-      originalAppointment = appointment.rescheduledFromId;
-      console.log("✅ Using populated rescheduledFromId object");
-    } else {
-      // If it's just an ID (string or ObjectId), find it in the appointments list
-      const rescheduledFromIdStr =
-        typeof appointment.rescheduledFromId === "string"
-          ? appointment.rescheduledFromId
-          : appointment.rescheduledFromId.toString();
-
-      originalAppointment = appointments.find(
-        (apt) => apt._id?.toString() === rescheduledFromIdStr
-      );
-
-      if (!originalAppointment) {
-        console.log(
-          "⚠️ Original appointment not found in list, trying to fetch..."
+        originalAppointment = appointments.find(
+          (apt) => apt._id?.toString() === rescheduledFromIdStr
         );
-        // If not found in list, it might be because it's filtered out
-        // We can still show what we have from rescheduledFromId if it's populated
-        if (typeof appointment.rescheduledFromId === "object") {
-          originalAppointment = appointment.rescheduledFromId;
-        } else {
-          showAlert(
-            "Không tìm thấy thông tin lịch cũ. Lịch cũ có thể đã bị lọc bỏ do trạng thái 'rescheduled'."
+
+        if (!originalAppointment) {
+          console.log(
+            "⚠️ Original appointment not found in list, trying to fetch..."
           );
-          return;
+          // If not found in list, it might be because it's filtered out
+          // We can still show what we have from rescheduledFromId if it's populated
+          if (typeof appointment.rescheduledFromId === "object") {
+            originalAppointment = appointment.rescheduledFromId;
+          } else {
+            showAlert(
+              "Không tìm thấy thông tin lịch cũ. Lịch cũ có thể đã bị lọc bỏ do trạng thái 'rescheduled'."
+            );
+            return;
+          }
         }
       }
+    } else {
+      showAlert(
+        "Không tìm thấy thông tin lịch cũ (không có rescheduledFromId hoặc originalScheduledStart)"
+      );
+      return;
     }
 
     if (originalAppointment) {

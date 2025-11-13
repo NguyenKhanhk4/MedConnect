@@ -193,10 +193,11 @@ export async function getDoctorTimeSlotsForManager(req, res) {
     // This ensures appointments created by manager booking only appear after payment success
     // For manager booking flow, appointments MUST have paymentStatus = "paid" to appear
     // Legacy appointments without paymentStatus are also excluded to ensure consistency
+    // CRITICAL: Exclude cancelled and rescheduled appointments - they should not appear in the schedule
     const appointments = await Appointment.find({
       slotId: { $in: slotIds },
-      // Filter out ALL appointments with status "rescheduled" - they should not appear in the schedule
-      status: { $ne: "rescheduled" },
+      // Filter out ALL appointments with status "rescheduled" or "cancelled" - they should not appear in the schedule
+      status: { $nin: ["rescheduled", "cancelled"] },
       // CRITICAL: Only show appointments that are paid
       // Manager booking appointments MUST be paid before appearing in schedule
       paymentStatus: "paid",
@@ -239,19 +240,45 @@ export async function getDoctorTimeSlotsForManager(req, res) {
       };
     });
 
-    // Fetch leave requests for these slots
+    // Fetch leave requests that overlap with the date range of these slots
     const LeaveRequest = (await import("../models/leaveRequest.model.js"))
       .default;
+
+    // Get date range from slots
+    const slotDates = timeSlots.map((slot) => new Date(slot.startAt));
+    const minDate = new Date(Math.min(...slotDates));
+    const maxDate = new Date(Math.max(...slotDates));
+    minDate.setHours(0, 0, 0, 0);
+    maxDate.setHours(23, 59, 59, 999);
+
+    // Find leave requests that overlap with this date range
+    // Overlap occurs when: startDate <= maxDate AND endDate >= minDate
     const leaveRequests = await LeaveRequest.find({
-      slotId: { $in: slotIds },
+      doctorId: doctor._id,
       status: "pending",
+      startDate: { $lte: maxDate },
+      endDate: { $gte: minDate },
     }).lean();
 
-    // Create a map of slotId -> leave request
+    // Create a map of slotId -> leave request (check if slot date is within leave request range)
     const leaveRequestMap = {};
-    leaveRequests.forEach((leaveRequest) => {
-      const slotIdKey = leaveRequest.slotId.toString();
-      leaveRequestMap[slotIdKey] = leaveRequest;
+    timeSlots.forEach((slot) => {
+      const slotDate = new Date(slot.startAt);
+      slotDate.setHours(0, 0, 0, 0);
+
+      // Check if this slot date falls within any pending leave request
+      const matchingRequest = leaveRequests.find((lr) => {
+        const lrStart = new Date(lr.startDate);
+        lrStart.setHours(0, 0, 0, 0);
+        const lrEnd = new Date(lr.endDate);
+        lrEnd.setHours(23, 59, 59, 999);
+        return slotDate >= lrStart && slotDate <= lrEnd;
+      });
+
+      if (matchingRequest) {
+        const slotIdKey = slot._id.toString();
+        leaveRequestMap[slotIdKey] = matchingRequest;
+      }
     });
 
     // Format slots similar to doctor's own view with proper status mapping
@@ -1648,6 +1675,17 @@ export async function rescheduleAppointmentByManager(req, res) {
       }
 
       // Update the existing appointment instead of creating a new one
+      // IMPORTANT: We update in-place, we do NOT create a new appointment
+      // Save original appointment info for display when doctor clicks "Đã dời lịch" badge
+      const originalScheduledStart = originalAppointment.scheduledStart;
+      const originalScheduledEnd = originalAppointment.scheduledEnd;
+      const originalSlotId =
+        originalAppointment.slotId?._id || originalAppointment.slotId;
+      const originalDoctorId =
+        originalAppointment.doctorId?._id || originalAppointment.doctorId;
+      const originalClinicId =
+        originalAppointment.clinicId?._id || originalAppointment.clinicId;
+
       const updateData = {
         doctorId: doctorId,
         clinicId: targetClinicId,
@@ -1655,12 +1693,20 @@ export async function rescheduleAppointmentByManager(req, res) {
         scheduledStart: newScheduledStart,
         scheduledEnd: newScheduledEnd,
         mode: mode,
-        status: "accepted",
+        status: "accepted", // Keep as accepted, NOT "rescheduled"
         rescheduledBy: userId,
         rescheduledAt: new Date(),
         rescheduleReason: reason.trim(),
         paymentStatus: paymentStatus,
         updatedAt: new Date(),
+        // Explicitly clear rescheduledToId to ensure we don't create a new appointment
+        rescheduledToId: null,
+        // Save original appointment info for display
+        originalScheduledStart: originalScheduledStart,
+        originalScheduledEnd: originalScheduledEnd,
+        originalSlotId: originalSlotId,
+        originalDoctorId: originalDoctorId,
+        originalClinicId: originalClinicId,
       };
 
       // Copy payment information from original appointment if doctor was changed
@@ -1670,9 +1716,18 @@ export async function rescheduleAppointmentByManager(req, res) {
           originalAppointment.totalPay || originalAppointment.amountPaid;
       }
 
+      console.log(
+        `🔄 Updating appointment ${originalAppointment._id} in-place (NOT creating new appointment)`
+      );
+      console.log("Update data:", JSON.stringify(updateData, null, 2));
+
       await Appointment.findByIdAndUpdate(originalAppointment._id, updateData, {
         session,
       });
+
+      console.log(
+        `✅ Successfully updated appointment ${originalAppointment._id} in-place`
+      );
 
       // Mark the new time slot as booked
       await DoctorTimeSlot.findByIdAndUpdate(

@@ -8,7 +8,6 @@ import {
   Search,
   Calendar,
   Filter,
-  RefreshCw,
   Phone,
   User,
   MessageSquare,
@@ -258,19 +257,8 @@ export default function QuanLyLich() {
     const slotsMap = {};
     const timesSet = new Set(); // Để collect tất cả times từ slots
 
-    console.log("🔍 Processing slots:", timeSlots);
-
     // Chỉ thêm slot thật từ database vào map
     timeSlots.forEach((slot) => {
-      console.log("🔍 Processing slot:", {
-        id: slot._id,
-        startAt: slot.startAt,
-        status: slot.status,
-        patientName: slot.patientName,
-        hasPatientName: !!slot.patientName,
-        appointmentId: slot.appointmentId || "NULL - Không có appointment",
-      });
-
       const slotDate = new Date(slot.startAt).toISOString().split("T")[0];
       const slotTime = new Date(slot.startAt).toLocaleTimeString("vi-VN", {
         hour: "2-digit",
@@ -281,7 +269,6 @@ export default function QuanLyLich() {
       // Filter out times >= 17:00
       const hour = parseInt(slotTime.split(":")[0]);
       if (hour >= 17) {
-        console.log(`🔍 Skipping slot at ${slotTime} (hour >= 17)`);
         return; // Skip slots >= 17:00
       }
 
@@ -293,25 +280,19 @@ export default function QuanLyLich() {
         slotsMap[slotDate] = {};
       }
 
-      console.log("🔍 Slot mapping:", {
-        slotDate,
-        slotTime,
-        existsInMap: !!(slotsMap[slotDate] && slotsMap[slotDate][slotTime]),
-      });
-
-      // Tạo mapped slot
+      // Nếu slot đã hủy, xử lý như slot trống (available) - không hiển thị thông tin appointment
       const mappedSlot = {
         id: slot._id,
         startAt: slot.startAt,
         endAt: slot.endAt,
-        status: slot.status,
-        patientName: slot.patientName || null,
-        reason: slot.reason || null,
-        mode: slot.mode || null,
-        appointmentId: slot.appointmentId || null,
-        rescheduledFromId: slot.rescheduledFromId || null, // Flag to identify rescheduled appointments
-        leaveReason: slot.leaveReason || null, // Lý do nghỉ
-        hasPendingLeaveRequest: slot.hasPendingLeaveRequest || false, // Flag leave request đang pending
+        status: slot.status === "cancelled" ? "available" : slot.status,
+        patientName: slot.status === "cancelled" ? null : (slot.patientName || null),
+        reason: slot.status === "cancelled" ? null : (slot.reason || null),
+        mode: slot.status === "cancelled" ? null : (slot.mode || null),
+        appointmentId: slot.status === "cancelled" ? null : (slot.appointmentId || null),
+        rescheduledFromId: slot.status === "cancelled" ? null : (slot.rescheduledFromId || null), // Flag to identify rescheduled appointments
+        leaveReason: slot.status === "cancelled" ? null : (slot.leaveReason || null), // Lý do nghỉ
+        hasPendingLeaveRequest: slot.status === "cancelled" ? false : (slot.hasPendingLeaveRequest || false), // Flag leave request đang pending
         isEmpty: false,
       };
 
@@ -325,54 +306,23 @@ export default function QuanLyLich() {
 
         // Nếu slot mới có appointment và slot cũ không có, thay thế
         if (newHasAppointment && !existingHasAppointment) {
-          console.log(
-            `🔄 Replacing slot at ${slotTime} for date ${slotDate} (new has appointment)`
-          );
           slotsMap[slotDate][slotTime] = mappedSlot;
         } else if (!newHasAppointment && existingHasAppointment) {
-          console.log(
-            `⏭️ Keeping existing slot at ${slotTime} for date ${slotDate} (existing has appointment)`
-          );
           // Giữ slot cũ
-        } else {
-          // Cả hai đều có hoặc không có appointment, giữ slot đầu tiên
-          console.log(
-            `⚠️ Duplicate slot time found: ${slotTime} for date: ${slotDate}, keeping first`
-          );
         }
+        // Cả hai đều có hoặc không có appointment, giữ slot đầu tiên
       } else {
         // Chưa có slot, thêm mới
         slotsMap[slotDate][slotTime] = mappedSlot;
-
-        // Log for booked slots
-        if (
-          slot.status === "booked" ||
-          slot.status === "pending" ||
-          slot.status === "confirmed" ||
-          slot.status === "completed" ||
-          slot.status === "in_progress"
-        ) {
-          console.log("✅ Booked slot mapped:", {
-            slotId: slot._id,
-            date: slotDate,
-            time: slotTime,
-            patientName: mappedSlot.patientName,
-            mode: mappedSlot.mode,
-            status: mappedSlot.status,
-          });
-        }
       }
     });
 
-    console.log("🔍 Processed slots map:", slotsMap);
-    console.log("🔍 All unique times found:", Array.from(timesSet).sort());
     return { slotsMap, timesSet };
   }, [timeSlots, currentDate]);
 
   // Extract unique times from processed slots - chỉ lấy từ database
   const timeSlotsList = React.useMemo(() => {
     const times = Array.from(processedSlots.timesSet || []).sort();
-    console.log("🔍 Extracted unique times from processed slots:", times);
     return times;
   }, [processedSlots]);
 
@@ -383,38 +333,8 @@ export default function QuanLyLich() {
 
   // Lấy danh sách giờ làm việc (hiển thị đủ giờ)
   const timesWithSlots = React.useMemo(() => {
-    console.log("🔍 timesWithSlots from timeSlotsList:", timeSlotsList);
     return timeSlotsList;
   }, [timeSlotsList]);
-
-  // Tính toán số liệu thống kê từ timeSlots
-  const stats = React.useMemo(() => {
-    const counts = {
-      pending: 0,
-      completed: 0,
-      booked: 0,
-      cancelled: 0,
-    };
-
-    timeSlots.forEach((slot) => {
-      if (slot.status === "pending" || slot.status === "pending_doctor")
-        counts.pending++;
-      else if (slot.status === "completed" || slot.status === "done")
-        counts.completed++;
-      else if (
-        slot.status === "booked" ||
-        slot.status === "confirmed" ||
-        slot.status === "accepted"
-      )
-        counts.booked++;
-      else if (slot.status === "cancelled") counts.cancelled++;
-    });
-
-    return counts;
-  }, [timeSlots]);
-
-  // State cho filter status
-  const [selectedStatus, setSelectedStatus] = useState("pending");
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -621,27 +541,46 @@ export default function QuanLyLich() {
       return;
     }
 
+    if (!leaveData.reason || !leaveData.reason.trim()) {
+      showAlert("Vui lòng nhập lý do nghỉ!");
+      return;
+    }
+
     try {
-      console.log("Leave request:", leaveData);
-      const response = await blockSlotsByDateRange(
+      // Gửi 1 yêu cầu nghỉ phép cho toàn bộ khoảng thời gian
+      const response = await createLeaveRequest(
         leaveData.startDate,
         leaveData.endDate,
-        leaveData.reason || ""
+        leaveData.reason.trim()
       );
 
-      if (response.success) {
+      if (response && response.success) {
         showAlert(
-          `✅ Đã chặn ${response.data.blockedSlots} slot từ ${leaveData.startDate} đến ${leaveData.endDate}`
+          `✅ Đã gửi yêu cầu nghỉ phép từ ${leaveData.startDate} đến ${leaveData.endDate} thành công! Vui lòng chờ manager phê duyệt.`
         );
         setShowLeaveRequest(false);
         setLeaveData({ startDate: "", endDate: "", reason: "" });
-        await loadTimeSlots(); // Reload to show blocked slots
+        await loadTimeSlots(); // Reload to show pending leave requests
       } else {
-        showAlert("❌ Lỗi khi chặn slot: " + (response.message || "Unknown error"));
+        const message = response?.message || response?.error?.message || "Unknown error";
+        showAlert(`❌ Không thể gửi yêu cầu nghỉ phép: ${message}`);
       }
     } catch (error) {
-      console.error("❌ Error blocking slots:", error);
-      showAlert("❌ Lỗi khi chặn slot: " + error.message);
+      console.error("❌ Error creating leave request:", error);
+      
+      // Parse error message từ response nếu có
+      let errorMessage = error.message || "";
+      try {
+        // Nếu error là JSON string, parse nó
+        if (errorMessage.startsWith('{')) {
+          const errorObj = JSON.parse(errorMessage);
+          errorMessage = errorObj.message || errorMessage;
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+      
+      showAlert("❌ Lỗi khi gửi yêu cầu nghỉ phép: " + errorMessage);
     }
   };
 
@@ -680,7 +619,13 @@ export default function QuanLyLich() {
         return;
       }
 
-      const response = await createLeaveRequest(slotId, blockSlotReason.trim());
+      // Lấy ngày từ slot
+      const slotDate = new Date(actionMenuSlot.startAt);
+      slotDate.setHours(0, 0, 0, 0);
+      const dateStr = slotDate.toISOString().split('T')[0];
+      
+      // Tạo leave request cho 1 ngày (startDate = endDate)
+      const response = await createLeaveRequest(dateStr, dateStr, blockSlotReason.trim());
 
       if (response.success) {
         showAlert(
@@ -978,82 +923,22 @@ export default function QuanLyLich() {
 
   return (
     <div className="schedule-management">
-      {/* Summary Cards */}
-      <div className="summary-cards">
-        <div className="summary-card pending">
-          <div className="summary-label">Chờ duyệt</div>
-          <div className="summary-value">{stats.pending}</div>
-        </div>
-        <div className="summary-card completed">
-          <div className="summary-label">Hoàn thành</div>
-          <div className="summary-value">{stats.completed}</div>
-        </div>
-        <div className="summary-card booked">
-          <div className="summary-label">Đã đặt</div>
-          <div className="summary-value">{stats.booked}</div>
-        </div>
-        <div className="summary-card cancelled">
-          <div className="summary-label">Đã hủy</div>
-          <div className="summary-value">{stats.cancelled}</div>
-        </div>
-      </div>
-
-      {/* Navigation and Filters */}
-      <div className="schedule-controls">
-        <div className="week-navigation">
-          <span>Tuần:</span>
-          <button className="nav-arrow" onClick={() => navigateWeek(-1)}>
-            &lt;
-          </button>
-          <span className="date-range">{formatDateRange()}</span>
-          <button className="nav-arrow" onClick={() => navigateWeek(1)}>
-            &gt;
-          </button>
-        </div>
-
-        <div className="status-filters">
-          <span>Trạng thái:</span>
-          <button
-            className={`status-filter pending ${
-              selectedStatus === "pending" ? "active" : ""
-            }`}
-            onClick={() => setSelectedStatus("pending")}
-          >
-            Chờ duyệt
-          </button>
-          <button
-            className={`status-filter completed ${
-              selectedStatus === "completed" ? "active" : ""
-            }`}
-            onClick={() => setSelectedStatus("completed")}
-          >
-            Hoàn thành
-          </button>
-          <button
-            className={`status-filter booked ${
-              selectedStatus === "booked" ? "active" : ""
-            }`}
-            onClick={() => setSelectedStatus("booked")}
-          >
-            Đã đặt
-          </button>
-          <button
-            className={`status-filter cancelled ${
-              selectedStatus === "cancelled" ? "active" : ""
-            }`}
-            onClick={() => setSelectedStatus("cancelled")}
-          >
-            Đã hủy
-          </button>
-        </div>
-      </div>
-
       <div className="schedule-header">
         <div className="header-left">
           <h1>
             <Calendar className="icon" />
             Lịch làm việc
           </h1>
+          <div className="week-navigation">
+            <span>Tuần:</span>
+            <button className="nav-arrow" onClick={() => navigateWeek(-1)}>
+              &lt;
+            </button>
+            <span className="date-range">{formatDateRange()}</span>
+            <button className="nav-arrow" onClick={() => navigateWeek(1)}>
+              &gt;
+            </button>
+          </div>
         </div>
 
         <div className="header-right">
@@ -1069,12 +954,6 @@ export default function QuanLyLich() {
               className="today-btn"
             >
               🏠 Hôm nay
-            </Button>
-            <Button
-              onClick={() => window.location.reload()}
-              className="refresh-btn"
-            >
-              <RefreshCw size={16} />
             </Button>
           </div>
         </div>
@@ -1108,7 +987,7 @@ export default function QuanLyLich() {
               </div>
               {daysWithSlots.map((day, index) => (
                 <div
-                  key={index}
+                  key={`day-${day.fullDate}-${index}`}
                   className={`day-column ${day.isPast ? "past-day" : ""}`}
                 >
                   <div className="day-name">{day.name}</div>
@@ -1138,10 +1017,6 @@ export default function QuanLyLich() {
                 );
                 const afternoonStartIndex = timesWithSlots.findIndex(
                   (t) => parseInt(t.split(":")[0]) >= 13
-                );
-
-                console.log(
-                  `🔍 Time ${time} (index ${timeIndex}): morningStart=${morningStartIndex}, afternoonStart=${afternoonStartIndex}`
                 );
 
                 return (

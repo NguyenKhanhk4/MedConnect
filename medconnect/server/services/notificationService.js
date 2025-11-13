@@ -487,10 +487,6 @@ export async function createLeaveRequestNotification(leaveRequestId) {
         path: "doctorId",
         select: "fullName userId",
       })
-      .populate({
-        path: "slotId",
-        select: "startAt endAt",
-      })
       .lean();
 
     if (!leaveRequest) {
@@ -507,24 +503,23 @@ export async function createLeaveRequestNotification(leaveRequestId) {
     }
 
     const doctorName = leaveRequest.doctorId?.fullName || "Bác sĩ";
-    const slotStart = new Date(leaveRequest.slotId?.startAt);
-    const slotEnd = new Date(leaveRequest.slotId?.endAt);
-    const slotTime = `${slotStart.toLocaleString("vi-VN", {
+    const startDate = new Date(leaveRequest.startDate);
+    const endDate = new Date(leaveRequest.endDate);
+    const dateRange = `${startDate.toLocaleDateString("vi-VN", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })} - ${slotEnd.toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
+    })} - ${endDate.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     })}`;
 
     const notifications = managers.map((manager) => ({
       userId: manager._id,
       type: "leave_request",
       title: "Yêu cầu nghỉ phép mới",
-      message: `BS. ${doctorName} đã gửi yêu cầu nghỉ phép vào ${slotTime}. Lý do: ${leaveRequest.reason}`,
+      message: `BS. ${doctorName} đã gửi yêu cầu nghỉ phép từ ${dateRange}. Lý do: ${leaveRequest.reason}`,
       priority: "high",
       relatedId: leaveRequestId,
       relatedType: "leave_request",
@@ -532,8 +527,9 @@ export async function createLeaveRequestNotification(leaveRequestId) {
         leaveRequestId: leaveRequestId.toString(),
         doctorId: leaveRequest.doctorId?._id?.toString(),
         doctorName,
-        slotId: leaveRequest.slotId?._id?.toString(),
-        slotTime,
+        startDate: leaveRequest.startDate,
+        endDate: leaveRequest.endDate,
+        dateRange,
         reason: leaveRequest.reason,
         status: "pending",
       },
@@ -663,10 +659,6 @@ export async function createLeaveRequestStatusNotification(
         select: "userId fullName",
       })
       .populate({
-        path: "slotId",
-        select: "startAt endAt",
-      })
-      .populate({
         path: "reviewedBy",
         select: "fullName",
       })
@@ -691,17 +683,16 @@ export async function createLeaveRequestStatusNotification(
     }
 
     const doctorUserId = doctor.userId._id || doctor.userId;
-    const slotStart = new Date(leaveRequest.slotId?.startAt);
-    const slotEnd = new Date(leaveRequest.slotId?.endAt);
-    const slotTime = `${slotStart.toLocaleString("vi-VN", {
+    const startDate = new Date(leaveRequest.startDate);
+    const endDate = new Date(leaveRequest.endDate);
+    const dateRange = `${startDate.toLocaleDateString("vi-VN", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })} - ${slotEnd.toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
+    })} - ${endDate.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     })}`;
 
     const managerName = leaveRequest.reviewedBy?.fullName || "Quản lý";
@@ -712,15 +703,16 @@ export async function createLeaveRequestStatusNotification(
         userId: doctorUserId,
         type: "leave_request",
         title: "Yêu cầu nghỉ phép đã được chấp nhận",
-        message: `Yêu cầu nghỉ phép của bạn vào ${slotTime} đã được ${managerName} chấp nhận.`,
+        message: `Yêu cầu nghỉ phép của bạn từ ${dateRange} đã được ${managerName} chấp nhận.`,
         priority: "high",
         relatedId: leaveRequestId,
         relatedType: "leave_request",
         metadata: {
           leaveRequestId: leaveRequestId.toString(),
           status: "approved",
-          slotId: leaveRequest.slotId?._id?.toString(),
-          slotTime,
+          startDate: leaveRequest.startDate,
+          endDate: leaveRequest.endDate,
+          dateRange,
           reason: leaveRequest.reason,
           reviewedBy: managerName,
           reviewedAt: leaveRequest.reviewedAt,
@@ -731,7 +723,7 @@ export async function createLeaveRequestStatusNotification(
         userId: doctorUserId,
         type: "leave_request",
         title: "Yêu cầu nghỉ phép bị từ chối",
-        message: `Yêu cầu nghỉ phép của bạn vào ${slotTime} đã bị ${managerName} từ chối.${
+        message: `Yêu cầu nghỉ phép của bạn từ ${dateRange} đã bị ${managerName} từ chối.${
           leaveRequest.rejectionReason
             ? ` Lý do: ${leaveRequest.rejectionReason}`
             : ""
@@ -742,8 +734,9 @@ export async function createLeaveRequestStatusNotification(
         metadata: {
           leaveRequestId: leaveRequestId.toString(),
           status: "rejected",
-          slotId: leaveRequest.slotId?._id?.toString(),
-          slotTime,
+          startDate: leaveRequest.startDate,
+          endDate: leaveRequest.endDate,
+          dateRange,
           reason: leaveRequest.reason,
           rejectionReason: leaveRequest.rejectionReason,
           reviewedBy: managerName,

@@ -618,6 +618,8 @@ const ChonThoiGian = () => {
     try {
       setLoading(true);
 
+      let patientIdForBooking = null;
+
       // Validate profile if booking for "me"
       if (bookingFor === "me") {
         const validation = validateProfileComplete();
@@ -632,9 +634,12 @@ const ChonThoiGian = () => {
           setLoading(false);
           return;
         }
-      }
 
-      let patientIdForBooking = null;
+        // IMPORTANT: Đảm bảo reset patientIdForBooking ngay khi booking for "me"
+        setPatientIdForBooking(null);
+        // IMPORTANT: patientIdForBooking local variable = null (đặt cho chính mình)
+        patientIdForBooking = null;
+      }
 
       // If booking for family, create family member first
       if (bookingFor === "family") {
@@ -660,7 +665,8 @@ const ChonThoiGian = () => {
           if (familyResponse.success) {
             message.success("Thêm người thân thành công!");
             const newPatientId = familyResponse.data.patient._id;
-            setPatientIdForBooking(newPatientId);
+            patientIdForBooking = newPatientId;
+            setPatientIdForBooking(newPatientId); // Store in state
             await fetchFamilyMembers();
           } else {
             message.error(familyResponse.message || "Thêm người thân thất bại");
@@ -697,15 +703,25 @@ const ChonThoiGian = () => {
         appointmentData.clinicId = defaultClinic._id;
       }
 
-      // Add patientId for family member booking
+      // ONLY add patientId for family member booking
+      // IMPORTANT: Check bookingFor instead of just patientIdForBooking to be absolutely sure
       if (bookingFor === "family" && patientIdForBooking) {
         appointmentData.patientId = patientIdForBooking;
+      } else {
+        // IMPORTANT: Explicitly delete patientId if booking for "me" to prevent backend from adding it
+        delete appointmentData.patientId;
       }
 
-      // Also store in state for later use in handleConfirmPayment
-      if (bookingFor === "family") {
-        appointmentData.patientId = patientIdForBooking;
-      }
+      // Debug log để kiểm tra
+      console.log("🔍 handleBookingSubmit - Debug Info:");
+      console.log("bookingFor:", bookingFor);
+      console.log("patientIdForBooking (local):", patientIdForBooking);
+      console.log(
+        "appointmentData BEFORE sending to API:",
+        JSON.parse(JSON.stringify(appointmentData))
+      );
+      console.log("appointmentData.patientId:", appointmentData.patientId);
+      console.log("Has patientId key:", "patientId" in appointmentData);
 
       // NEW FLOW: Calculate payment summary (don't create appointment yet)
       try {
@@ -716,6 +732,39 @@ const ChonThoiGian = () => {
 
         if (summaryResponse.success || summaryResponse?.data?.success) {
           const summary = summaryResponse?.data || summaryResponse;
+
+          // Debug log để xem response từ backend
+          console.log("📥 Summary Response from backend:", summary);
+
+          // IMPORTANT: Lưu bookingFor vào paymentSummary để dùng trong handleConfirmPayment
+          summary.bookingFor = bookingFor;
+          summary.familyMemberPatientId =
+            bookingFor === "family" ? patientIdForBooking : null;
+
+          // IMPORTANT: Nếu booking for "me", xóa patientId khỏi appointmentSummary (nếu backend trả về)
+          if (
+            bookingFor === "me" &&
+            summary.appointmentSummary &&
+            summary.appointmentSummary.patientId
+          ) {
+            console.warn(
+              '⚠️ Backend returned patientId for "me" booking, removing it...'
+            );
+            delete summary.appointmentSummary.patientId;
+          }
+
+          // Debug log
+          console.log("💾 Payment Summary AFTER cleanup:");
+          console.log("summary.bookingFor:", summary.bookingFor);
+          console.log(
+            "summary.familyMemberPatientId:",
+            summary.familyMemberPatientId
+          );
+          console.log(
+            "summary.appointmentSummary.patientId:",
+            summary.appointmentSummary?.patientId
+          );
+
           setPaymentSummary(summary);
           setShowPaymentSummary(true);
           message.success("Vui lòng xem lại hóa đơn và xác nhận thanh toán");
@@ -725,6 +774,7 @@ const ChonThoiGian = () => {
           );
         }
       } catch (summaryError) {
+        console.error("❌ Summary Error:", summaryError);
         message.error(
           summaryError?.response?.data?.message ||
             summaryError?.message ||
@@ -732,6 +782,7 @@ const ChonThoiGian = () => {
         );
       }
     } catch (error) {
+      console.error("❌ Booking Submit Error:", error);
       message.error("Có lỗi xảy ra khi đặt lịch. Vui lòng thử lại!");
     } finally {
       setLoading(false);
@@ -749,6 +800,14 @@ const ChonThoiGian = () => {
       message.warning("Vui lòng chọn đầy đủ thông tin lịch hẹn");
       return;
     }
+
+    // Debug log
+    console.log("💳 handleConfirmPayment - Debug Info:");
+    console.log("paymentSummary.bookingFor:", paymentSummary.bookingFor);
+    console.log(
+      "paymentSummary.familyMemberPatientId:",
+      paymentSummary.familyMemberPatientId
+    );
 
     try {
       setProcessingPayment(true);
@@ -838,9 +897,25 @@ const ChonThoiGian = () => {
         return;
       }
 
-      // Add patientId for family member booking
-      if (bookingFor === "family" && patientIdForBooking) {
-        appointmentData.patientId = patientIdForBooking;
+      // IMPORTANT: Sử dụng bookingFor và familyMemberPatientId từ paymentSummary (đã lưu khi submit)
+      // Thay vì dùng state patientIdForBooking (có thể đã bị thay đổi)
+      const isBookingForFamily = paymentSummary.bookingFor === "family";
+      const familyPatientId = paymentSummary.familyMemberPatientId;
+
+      // Debug log
+      console.log("isBookingForFamily:", isBookingForFamily);
+      console.log("familyPatientId:", familyPatientId);
+
+      // ONLY add patientId for family member booking
+      if (isBookingForFamily && familyPatientId) {
+        appointmentData.patientId = familyPatientId;
+        console.log("✅ Added patientId to appointmentData:", familyPatientId);
+      } else {
+        // IMPORTANT: Explicitly delete patientId if booking for "me"
+        delete appointmentData.patientId;
+        console.log(
+          "✅ No patientId added (booking for me) - deleted patientId key"
+        );
       }
 
       // Create payment and get PayOS link (tương tự logic nhiều lịch)
@@ -863,12 +938,13 @@ const ChonThoiGian = () => {
           // Sau khi thanh toán thành công, webhook sẽ tạo appointment với status "pending_doctor"
           window.location.href = payUrl;
         } else {
-          message.error("Không thể tạo liên kết thanh toán");
+          message.error("Không thể tạo liên kết thanh toán ");
         }
       } else {
         message.error(response?.message || "Không thể tạo thanh toán");
       }
     } catch (error) {
+      console.error("❌ Payment Error:", error);
       message.error(
         error?.response?.data?.message ||
           error?.message ||
@@ -1334,6 +1410,8 @@ const ChonThoiGian = () => {
                         onClick={() => {
                           setShowPaymentSummary(false);
                           setPaymentSummary(null);
+                          // IMPORTANT: Reset patientIdForBooking khi quay lại để tránh lỗi
+                          setPatientIdForBooking(null);
                         }}
                         style={{ marginTop: 16 }}
                       >
@@ -1371,6 +1449,8 @@ const ChonThoiGian = () => {
                           onClick={() => {
                             setBookingFor("me");
                             setSelectedFamilyMember(null);
+                            setPatientIdForBooking(null); // Reset patientId khi chuyển về "me"
+                            form.resetFields(); // Reset toàn bộ form
                           }}
                           className="booking-button"
                         >
@@ -1380,7 +1460,9 @@ const ChonThoiGian = () => {
                           type={bookingFor === "family" ? "primary" : "default"}
                           onClick={() => {
                             setBookingFor("family");
-                            setSelectedFamilyMember(null); // Clear any previous selection
+                            setSelectedFamilyMember(null);
+                            setPatientIdForBooking(null); // Reset patientId khi chuyển sang family
+                            form.resetFields(); // Reset toàn bộ form
                           }}
                           className="booking-button"
                         >
@@ -1842,6 +1924,7 @@ const ChonThoiGian = () => {
                               <TextArea
                                 ref={reasonTextareaRef}
                                 rows={4}
+                                value={reasonValue}
                                 placeholder="Mô tả triệu chứng hoặc lý do khám (không bắt buộc)"
                                 maxLength={100}
                                 showCount
@@ -1855,9 +1938,13 @@ const ChonThoiGian = () => {
                                       0,
                                       100
                                     );
-                                    e.target.value = truncatedValue;
                                     form.setFieldsValue({
                                       reason: truncatedValue,
+                                    });
+                                  } else {
+                                    // Cập nhật form với giá trị mới
+                                    form.setFieldsValue({
+                                      reason: newValue,
                                     });
                                   }
                                 }}
