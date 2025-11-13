@@ -17,6 +17,7 @@ import {
   Bell,
   Plus,
   Users,
+  UserPlus,
 } from "lucide-react";
 import "./AppSidebar.scss";
 
@@ -46,6 +47,11 @@ export function AppSidebar() {
       icon: CalendarCheck,
       label: "Lịch hẹn của tôi",
       href: "/benh-nhan/lich-hen-cua-toi",
+    },
+    {
+      icon: UserPlus,
+      label: "Lịch đặt hộ",
+      href: "/benh-nhan/lich-dat-ho",
     },
     {
       icon: FileText,
@@ -98,7 +104,7 @@ export function AppSidebar() {
 
       // Sign out from Firebase first
       await auth.signOut();
-      
+
       // Use window.location.href for hard redirect to homepage to avoid middleware redirects
       window.location.href = "/";
     } catch (error) {

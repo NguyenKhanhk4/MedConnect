@@ -54,6 +54,9 @@ const { RangePicker } = DatePicker;
 const { TextArea } = Input;
 const { Option } = Select;
 
+// Giới hạn ký tự cho trường lý do khám
+const REASON_MAX_LENGTH = 500;
+
 const DatLichNhieuChuyenKhoa = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -94,7 +97,7 @@ const DatLichNhieuChuyenKhoa = () => {
   const [defaultClinic, setDefaultClinic] = useState(null); // Default clinic for offline appointments
   const [clinicLoading, setClinicLoading] = useState(false); // Loading state for clinic
   const textareaRef = useRef(null); // Ref to textarea element
-  
+
   // Modal state for viewing reviews
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewDoctor, setReviewDoctor] = useState(null);
@@ -132,11 +135,11 @@ const DatLichNhieuChuyenKhoa = () => {
       const response = await api.get(
         `/api/doctors/${doctorId}/reviews?limit=10&page=1`
       );
-      
+
       // Handle different response structures
       let reviews = [];
       let pagination = null;
-      
+
       if (response?.success || response?.data?.success) {
         // Response structure: { success: true, data: { reviews: [...], pagination: {...} } }
         if (response?.data?.reviews) {
@@ -154,7 +157,7 @@ const DatLichNhieuChuyenKhoa = () => {
         reviews = response.reviews;
         pagination = response.pagination;
       }
-      
+
       setDoctorReviews(reviews);
       setReviewsPagination(pagination);
     } catch (error) {
@@ -261,7 +264,9 @@ const DatLichNhieuChuyenKhoa = () => {
           setVisitStatus("draft"); // draft = not saved to DB
           setAppointments([]); // Start with empty appointments
           // Don't auto-advance to next step - user must choose booking for me/family first
-          message.success("Đã chọn ngày khám. Vui lòng chọn đặt khám cho mình hoặc người thân.");
+          message.success(
+            "Đã chọn ngày khám. Vui lòng chọn đặt khám cho mình hoặc người thân."
+          );
         } else {
           message.error("Không tìm thấy thông tin phiên khám");
         }
@@ -339,24 +344,29 @@ const DatLichNhieuChuyenKhoa = () => {
         const doctors = response?.data?.doctors || response?.doctors || [];
         // Ensure all doctors have rating fields with default values
         // Check multiple possible locations for rating data
-        const doctorsWithRatings = doctors.map(doctor => {
+        const doctorsWithRatings = doctors.map((doctor) => {
           // Try to get rating from multiple possible locations
-          const ratingAvg = doctor.ratingAvg !== undefined && doctor.ratingAvg !== null 
-            ? Number(doctor.ratingAvg)
-            : (doctor.userId?.ratingAvg !== undefined && doctor.userId?.ratingAvg !== null
+          const ratingAvg =
+            doctor.ratingAvg !== undefined && doctor.ratingAvg !== null
+              ? Number(doctor.ratingAvg)
+              : doctor.userId?.ratingAvg !== undefined &&
+                doctor.userId?.ratingAvg !== null
               ? Number(doctor.userId.ratingAvg)
-              : (doctor.rating?.avg !== undefined && doctor.rating?.avg !== null
-                ? Number(doctor.rating.avg)
-                : 0));
-          
-          const ratingCount = doctor.ratingCount !== undefined && doctor.ratingCount !== null
-            ? Number(doctor.ratingCount)
-            : (doctor.userId?.ratingCount !== undefined && doctor.userId?.ratingCount !== null
+              : doctor.rating?.avg !== undefined && doctor.rating?.avg !== null
+              ? Number(doctor.rating.avg)
+              : 0;
+
+          const ratingCount =
+            doctor.ratingCount !== undefined && doctor.ratingCount !== null
+              ? Number(doctor.ratingCount)
+              : doctor.userId?.ratingCount !== undefined &&
+                doctor.userId?.ratingCount !== null
               ? Number(doctor.userId.ratingCount)
-              : (doctor.rating?.count !== undefined && doctor.rating?.count !== null
-                ? Number(doctor.rating.count)
-                : 0));
-          
+              : doctor.rating?.count !== undefined &&
+                doctor.rating?.count !== null
+              ? Number(doctor.rating.count)
+              : 0;
+
           return {
             ...doctor,
             ratingAvg,
@@ -364,10 +374,12 @@ const DatLichNhieuChuyenKhoa = () => {
           };
         });
         setAvailableDoctors(doctorsWithRatings);
-        
+
         // If replacing appointment, auto-select the same doctor
         if (appointmentToReplace?.doctor?._id) {
-          const doctorToSelect = doctors.find(d => d._id === appointmentToReplace.doctor._id);
+          const doctorToSelect = doctors.find(
+            (d) => d._id === appointmentToReplace.doctor._id
+          );
           if (doctorToSelect) {
             // Auto-select doctor and fetch slots
             setTimeout(() => {
@@ -457,12 +469,18 @@ const DatLichNhieuChuyenKhoa = () => {
     // Ensure doctor has rating fields with default values
     const doctorWithRatings = {
       ...doctor,
-      ratingAvg: doctor.ratingAvg !== undefined && doctor.ratingAvg !== null ? Number(doctor.ratingAvg) : 0,
-      ratingCount: doctor.ratingCount !== undefined && doctor.ratingCount !== null ? Number(doctor.ratingCount) : 0,
+      ratingAvg:
+        doctor.ratingAvg !== undefined && doctor.ratingAvg !== null
+          ? Number(doctor.ratingAvg)
+          : 0,
+      ratingCount:
+        doctor.ratingCount !== undefined && doctor.ratingCount !== null
+          ? Number(doctor.ratingCount)
+          : 0,
     };
     setSelectedDoctor(doctorWithRatings);
     setSelectedSlot(null);
-    
+
     // Fetch doctor pricing when doctor is selected
     fetchDoctorPricing(doctor._id);
     // Fetch default clinic for offline appointments
@@ -476,30 +494,36 @@ const DatLichNhieuChuyenKhoa = () => {
 
       if (response?.success || response?.data?.success) {
         const slots = response?.data?.timeSlots || response?.timeSlots || [];
-        
+
         // IMPORTANT: Use ALL slots from API (including booked and blocked ones)
         // Do NOT filter out any slots - we want to show everything
         let allSlots = [...slots]; // Copy all slots from API response
-        
+
         // If replacing appointment, ensure the current slot is visible and selectable
         if (appointmentToReplace && appointmentToReplace.slotId) {
           // Check if the current slot is already in the list
-          const currentSlotExists = allSlots.some(s => 
-            s._id?.toString() === appointmentToReplace.slotId?.toString() ||
-            (appointmentToReplace.scheduledStart && 
-             s.startAt && 
-             new Date(s.startAt).getTime() === new Date(appointmentToReplace.scheduledStart).getTime())
+          const currentSlotExists = allSlots.some(
+            (s) =>
+              s._id?.toString() === appointmentToReplace.slotId?.toString() ||
+              (appointmentToReplace.scheduledStart &&
+                s.startAt &&
+                new Date(s.startAt).getTime() ===
+                  new Date(appointmentToReplace.scheduledStart).getTime())
           );
-          
+
           // If not found, add it back so user can see the current slot
           if (!currentSlotExists && appointmentToReplace.scheduledStart) {
             const currentSlot = {
               _id: appointmentToReplace.slotId,
               startAt: appointmentToReplace.scheduledStart,
               endAt: appointmentToReplace.scheduledEnd,
-              startTime: dayjs(appointmentToReplace.scheduledStart).format("HH:mm"),
+              startTime: dayjs(appointmentToReplace.scheduledStart).format(
+                "HH:mm"
+              ),
               endTime: dayjs(appointmentToReplace.scheduledEnd).format("HH:mm"),
-              timeRange: `${dayjs(appointmentToReplace.scheduledStart).format("HH:mm")} - ${dayjs(appointmentToReplace.scheduledEnd).format("HH:mm")}`,
+              timeRange: `${dayjs(appointmentToReplace.scheduledStart).format(
+                "HH:mm"
+              )} - ${dayjs(appointmentToReplace.scheduledEnd).format("HH:mm")}`,
               available: true, // Mark as available since it's being replaced
               isCurrentSlot: true, // Flag to identify this is the current slot
               isBlocked: false,
@@ -507,27 +531,27 @@ const DatLichNhieuChuyenKhoa = () => {
             allSlots.push(currentSlot);
           } else if (currentSlotExists) {
             // If it exists, mark it as current slot and make it available for re-selection
-            allSlots = allSlots.map(s => 
-              (s._id?.toString() === appointmentToReplace.slotId?.toString() ||
-               (appointmentToReplace.scheduledStart && 
-                s.startAt && 
-                new Date(s.startAt).getTime() === new Date(appointmentToReplace.scheduledStart).getTime()))
+            allSlots = allSlots.map((s) =>
+              s._id?.toString() === appointmentToReplace.slotId?.toString() ||
+              (appointmentToReplace.scheduledStart &&
+                s.startAt &&
+                new Date(s.startAt).getTime() ===
+                  new Date(appointmentToReplace.scheduledStart).getTime())
                 ? { ...s, isCurrentSlot: true, available: true }
                 : s
             );
           }
         }
-        
+
         // Sort all slots by start time to ensure consistent display
         allSlots.sort((a, b) => {
           const timeA = new Date(a.startAt || a.startTime).getTime();
           const timeB = new Date(b.startAt || b.startTime).getTime();
           return timeA - timeB;
         });
-        
-        
+
         // Prepare the processed slots with all properties preserved
-        const processedSlots = allSlots.map(slot => {
+        const processedSlots = allSlots.map((slot) => {
           // Spread all original properties first, then ensure critical ones are set
           return {
             ...slot, // Preserve ALL original properties (timeRange, startTime, endTime, etc.)
@@ -535,35 +559,44 @@ const DatLichNhieuChuyenKhoa = () => {
             available: slot.available !== undefined ? slot.available : true,
             isBlocked: slot.isBlocked !== undefined ? slot.isBlocked : false,
             appointmentStatus: slot.appointmentStatus || null,
-            status: slot.status || 'available',
+            status: slot.status || "available",
             leaveReason: slot.leaveReason || null,
             // Ensure timeRange is set if missing
-            timeRange: slot.timeRange || 
-              (slot.startAt && slot.endAt 
-                ? `${dayjs(slot.startAt).format("HH:mm")} - ${dayjs(slot.endAt).format("HH:mm")}`
-                : slot.startTime && slot.endTime 
-                  ? `${slot.startTime} - ${slot.endTime}`
-                  : ''),
+            timeRange:
+              slot.timeRange ||
+              (slot.startAt && slot.endAt
+                ? `${dayjs(slot.startAt).format("HH:mm")} - ${dayjs(
+                    slot.endAt
+                  ).format("HH:mm")}`
+                : slot.startTime && slot.endTime
+                ? `${slot.startTime} - ${slot.endTime}`
+                : ""),
             // Ensure startTime and endTime are set if missing
-            startTime: slot.startTime || (slot.startAt ? dayjs(slot.startAt).format("HH:mm") : ''),
-            endTime: slot.endTime || (slot.endAt ? dayjs(slot.endAt).format("HH:mm") : ''),
+            startTime:
+              slot.startTime ||
+              (slot.startAt ? dayjs(slot.startAt).format("HH:mm") : ""),
+            endTime:
+              slot.endTime ||
+              (slot.endAt ? dayjs(slot.endAt).format("HH:mm") : ""),
           };
         });
-        
+
         // Update doctor object with slots (include ALL slots including booked/blocked ones)
         // Preserve ALL properties from original slot to ensure nothing is lost
         setAvailableDoctors((prev) =>
           prev.map((d) =>
-            d._id === doctor._id ? { 
-              ...d, 
-              availableSlots: processedSlots
-            } : d
+            d._id === doctor._id
+              ? {
+                  ...d,
+                  availableSlots: processedSlots,
+                }
+              : d
           )
         );
-        
+
         // IMPORTANT: Also update selectedDoctor with the slots to ensure it's in sync
         // This ensures the UI shows slots immediately, even on first selection
-        setSelectedDoctor(prev => {
+        setSelectedDoctor((prev) => {
           if (prev && prev._id === doctor._id) {
             return { ...prev, availableSlots: processedSlots };
           }
@@ -583,7 +616,7 @@ const DatLichNhieuChuyenKhoa = () => {
       message.warning("Vui lòng chọn bác sĩ và khung giờ");
       return;
     }
-    
+
     if (!selectedMode) {
       message.warning("Vui lòng chọn hình thức khám");
       return;
@@ -595,7 +628,7 @@ const DatLichNhieuChuyenKhoa = () => {
       if (appointmentToReplace && apt._id === appointmentToReplace._id) {
         return false;
       }
-      
+
       const aptStart = new Date(apt.scheduledStart);
       const aptEnd = new Date(apt.scheduledEnd);
       const newStart = new Date(selectedSlot.startAt);
@@ -613,7 +646,9 @@ const DatLichNhieuChuyenKhoa = () => {
     if (!selectedSlot.available || selectedSlot.isBlocked) {
       if (selectedSlot.isBlocked) {
         message.error({
-          content: `Không thể đặt lịch! Slot này đã bị chặn bởi bác sĩ${selectedSlot.leaveReason ? `: ${selectedSlot.leaveReason}` : ""}. Vui lòng chọn slot khác.`,
+          content: `Không thể đặt lịch! Slot này đã bị chặn bởi bác sĩ${
+            selectedSlot.leaveReason ? `: ${selectedSlot.leaveReason}` : ""
+          }. Vui lòng chọn slot khác.`,
           duration: 5,
         });
       } else {
@@ -627,25 +662,37 @@ const DatLichNhieuChuyenKhoa = () => {
 
     // Check if slot conflicts with existing local appointments
     if (conflictingAppointment) {
-      const conflictStart = dayjs(conflictingAppointment.scheduledStart).format("HH:mm");
-      const conflictEnd = dayjs(conflictingAppointment.scheduledEnd).format("HH:mm");
-      const newStart = dayjs(selectedSlot.startAt || selectedSlot.startTime).format("HH:mm");
-      const newEnd = dayjs(selectedSlot.endAt || selectedSlot.endTime).format("HH:mm");
-      
+      const conflictStart = dayjs(conflictingAppointment.scheduledStart).format(
+        "HH:mm"
+      );
+      const conflictEnd = dayjs(conflictingAppointment.scheduledEnd).format(
+        "HH:mm"
+      );
+      const newStart = dayjs(
+        selectedSlot.startAt || selectedSlot.startTime
+      ).format("HH:mm");
+      const newEnd = dayjs(selectedSlot.endAt || selectedSlot.endTime).format(
+        "HH:mm"
+      );
+
       message.error({
-        content: `Không thể đặt lịch! Slot ${newStart} - ${newEnd} trùng với lịch hẹn đã chọn (${conflictStart} - ${conflictEnd}) với ${conflictingAppointment.doctor?.fullName || "bác sĩ"}. Vui lòng chọn slot khác.`,
+        content: `Không thể đặt lịch! Slot ${newStart} - ${newEnd} trùng với lịch hẹn đã chọn (${conflictStart} - ${conflictEnd}) với ${
+          conflictingAppointment.doctor?.fullName || "bác sĩ"
+        }. Vui lòng chọn slot khác.`,
         duration: 5,
       });
       return; // Don't add the appointment
     }
 
     // Ensure slot has proper date format
-    const slotStartAt = selectedSlot.startAt || 
-      (selectedSlot.startTime && visitDate 
+    const slotStartAt =
+      selectedSlot.startAt ||
+      (selectedSlot.startTime && visitDate
         ? new Date(`${visitDate}T${selectedSlot.startTime}:00`).toISOString()
         : null);
-    const slotEndAt = selectedSlot.endAt || 
-      (selectedSlot.endTime && visitDate 
+    const slotEndAt =
+      selectedSlot.endAt ||
+      (selectedSlot.endTime && visitDate
         ? new Date(`${visitDate}T${selectedSlot.endTime}:00`).toISOString()
         : null);
 
@@ -654,7 +701,9 @@ const DatLichNhieuChuyenKhoa = () => {
       typeof appointmentReason === "string" ? appointmentReason.trim() : "";
 
     const newAppointment = {
-      _id: appointmentToReplace ? appointmentToReplace._id : `temp-${Date.now()}`, // Keep same ID if replacing
+      _id: appointmentToReplace
+        ? appointmentToReplace._id
+        : `temp-${Date.now()}`, // Keep same ID if replacing
       doctor: {
         _id: selectedDoctor._id,
         fullName: selectedDoctor.fullName,
@@ -693,9 +742,11 @@ const DatLichNhieuChuyenKhoa = () => {
 
     // If replacing an appointment, replace it in the list
     if (appointmentToReplace) {
-      setAppointments(appointments.map(apt => 
-        apt._id === appointmentToReplace._id ? newAppointment : apt
-      ));
+      setAppointments(
+        appointments.map((apt) =>
+          apt._id === appointmentToReplace._id ? newAppointment : apt
+        )
+      );
       message.success("Đã đổi slot thành công");
       setAppointmentToReplace(null);
     } else {
@@ -703,7 +754,7 @@ const DatLichNhieuChuyenKhoa = () => {
       setAppointments([...appointments, newAppointment]);
       message.success("Đã thêm lịch hẹn thành công");
     }
-    
+
     setShowDoctorModal(false);
     setSelectedDoctor(null);
     setSelectedSlot(null);
@@ -735,20 +786,23 @@ const DatLichNhieuChuyenKhoa = () => {
           let familyValues;
           try {
             // Try validateFields first (only if form is still mounted)
-            if (familyForm && typeof familyForm.validateFields === 'function') {
+            if (familyForm && typeof familyForm.validateFields === "function") {
               try {
                 familyValues = await familyForm.validateFields();
               } catch (validationError) {
                 // Continue to try getFieldsValue
               }
             }
-            
+
             // If validateFields returns empty or form is unmounted, try getFieldsValue
             if (!familyValues || Object.keys(familyValues).length === 0) {
               try {
-                if (familyForm && typeof familyForm.getFieldsValue === 'function') {
+                if (
+                  familyForm &&
+                  typeof familyForm.getFieldsValue === "function"
+                ) {
                   familyValues = familyForm.getFieldsValue(true); // true = include disabled fields
-                  
+
                   // If still empty, try without disabled fields
                   if (!familyValues || Object.keys(familyValues).length === 0) {
                     familyValues = familyForm.getFieldsValue(false);
@@ -758,10 +812,13 @@ const DatLichNhieuChuyenKhoa = () => {
                 // Ignore
               }
             }
-            
+
             // If still empty, use saved form values from state
             if (!familyValues || Object.keys(familyValues).length === 0) {
-              if (savedFamilyFormValues && Object.keys(savedFamilyFormValues).length > 0) {
+              if (
+                savedFamilyFormValues &&
+                Object.keys(savedFamilyFormValues).length > 0
+              ) {
                 familyValues = savedFamilyFormValues;
               } else {
                 message.error("Vui lòng điền đầy đủ thông tin người thân");
@@ -773,25 +830,33 @@ const DatLichNhieuChuyenKhoa = () => {
             // Form validation failed
             // Try to get values anyway
             try {
-              if (familyForm && typeof familyForm.getFieldsValue === 'function') {
+              if (
+                familyForm &&
+                typeof familyForm.getFieldsValue === "function"
+              ) {
                 familyValues = familyForm.getFieldsValue(true);
               }
             } catch (e) {
               // Ignore
             }
-            
+
             // If still empty, use saved form values
-            if ((!familyValues || Object.keys(familyValues).length === 0) && savedFamilyFormValues) {
+            if (
+              (!familyValues || Object.keys(familyValues).length === 0) &&
+              savedFamilyFormValues
+            ) {
               familyValues = savedFamilyFormValues;
             }
-            
+
             if (validationError.errorFields) {
-              const missingFields = validationError.errorFields.map(f => f.name).join(", ");
+              const missingFields = validationError.errorFields
+                .map((f) => f.name)
+                .join(", ");
               message.error(`Vui lòng điền đầy đủ thông tin: ${missingFields}`);
             } else {
               message.error("Vui lòng kiểm tra lại thông tin đã nhập");
             }
-            
+
             // If we have values, continue; otherwise return
             if (!familyValues || Object.keys(familyValues).length === 0) {
               setLoading(false);
@@ -803,7 +868,7 @@ const DatLichNhieuChuyenKhoa = () => {
           let dobFormatted = null;
           if (familyValues.dob) {
             try {
-              if (typeof familyValues.dob.format === 'function') {
+              if (typeof familyValues.dob.format === "function") {
                 // dayjs object - try to format it
                 try {
                   dobFormatted = familyValues.dob.format("YYYY-MM-DD");
@@ -814,7 +879,10 @@ const DatLichNhieuChuyenKhoa = () => {
                     dobFormatted = dayjsObj.format("YYYY-MM-DD");
                   }
                 }
-              } else if (typeof familyValues.dob === 'string' && familyValues.dob.trim()) {
+              } else if (
+                typeof familyValues.dob === "string" &&
+                familyValues.dob.trim()
+              ) {
                 // Already a string
                 dobFormatted = familyValues.dob.trim();
               } else if (familyValues.dob instanceof Date) {
@@ -827,19 +895,47 @@ const DatLichNhieuChuyenKhoa = () => {
           }
 
           // Validate required fields with proper checks
-          const fullNameValid = familyValues.fullName && typeof familyValues.fullName === 'string' && familyValues.fullName.trim().length > 0;
-          const dobValid = dobFormatted && typeof dobFormatted === 'string' && dobFormatted.length > 0;
-          const genderValid = familyValues.gender && typeof familyValues.gender === 'string' && ['male', 'female', 'other'].includes(familyValues.gender);
-          const relationshipValid = familyValues.relationshipToOwner && typeof familyValues.relationshipToOwner === 'string' && ['father', 'mother', 'spouse', 'child', 'grandparent', 'other'].includes(familyValues.relationshipToOwner);
+          const fullNameValid =
+            familyValues.fullName &&
+            typeof familyValues.fullName === "string" &&
+            familyValues.fullName.trim().length > 0;
+          const dobValid =
+            dobFormatted &&
+            typeof dobFormatted === "string" &&
+            dobFormatted.length > 0;
+          const genderValid =
+            familyValues.gender &&
+            typeof familyValues.gender === "string" &&
+            ["male", "female", "other"].includes(familyValues.gender);
+          const relationshipValid =
+            familyValues.relationshipToOwner &&
+            typeof familyValues.relationshipToOwner === "string" &&
+            [
+              "father",
+              "mother",
+              "spouse",
+              "child",
+              "grandparent",
+              "other",
+            ].includes(familyValues.relationshipToOwner);
 
-          if (!fullNameValid || !dobValid || !genderValid || !relationshipValid) {
+          if (
+            !fullNameValid ||
+            !dobValid ||
+            !genderValid ||
+            !relationshipValid
+          ) {
             const missingFields = [];
             if (!fullNameValid) missingFields.push("Họ tên");
             if (!dobValid) missingFields.push("Ngày sinh");
             if (!genderValid) missingFields.push("Giới tính");
             if (!relationshipValid) missingFields.push("Mối quan hệ");
-            
-            message.error(`Vui lòng điền đầy đủ các thông tin bắt buộc: ${missingFields.join(", ")}`);
+
+            message.error(
+              `Vui lòng điền đầy đủ các thông tin bắt buộc: ${missingFields.join(
+                ", "
+              )}`
+            );
             setLoading(false);
             return;
           }
@@ -859,7 +955,9 @@ const DatLichNhieuChuyenKhoa = () => {
               citizenId: familyValues.citizenId?.trim() || "",
               address: familyValues.address?.trim() || "",
               allergyNotes: familyValues.allergyNotes || "",
-              medicalHistory: Array.isArray(familyValues.medicalHistory) ? familyValues.medicalHistory : [],
+              medicalHistory: Array.isArray(familyValues.medicalHistory)
+                ? familyValues.medicalHistory
+                : [],
             }
           );
 
@@ -870,7 +968,10 @@ const DatLichNhieuChuyenKhoa = () => {
             currentPatientIdForBooking = newPatientId;
             await fetchFamilyMembers();
           } else {
-            const errorMsg = familyResponse.message || familyResponse.data?.message || "Thêm người thân thất bại";
+            const errorMsg =
+              familyResponse.message ||
+              familyResponse.data?.message ||
+              "Thêm người thân thất bại";
             message.error(errorMsg);
             setLoading(false);
             return;
@@ -900,19 +1001,21 @@ const DatLichNhieuChuyenKhoa = () => {
       // Prepare appointments data for API
       const appointmentsData = appointments
         .map((apt) => {
-          const aptData = apt._tempData ? { ...apt._tempData } : {
-            doctorId: apt.doctor?._id || apt.doctorId,
-            slotId: apt.slotId || apt._tempData?.slotId,
-            mode: apt.mode,
-            clinicId: apt.clinicId || apt._tempData?.clinicId,
-            reason: apt.reason || apt._tempData?.reason || "",
-          };
-          
+          const aptData = apt._tempData
+            ? { ...apt._tempData }
+            : {
+                doctorId: apt.doctor?._id || apt.doctorId,
+                slotId: apt.slotId || apt._tempData?.slotId,
+                mode: apt.mode,
+                clinicId: apt.clinicId || apt._tempData?.clinicId,
+                reason: apt.reason || apt._tempData?.reason || "",
+              };
+
           // Add patientId for family member booking
           if (bookingFor === "family" && currentPatientIdForBooking) {
             aptData.patientId = currentPatientIdForBooking;
           }
-          
+
           return aptData;
         })
         .filter((apt) => apt && apt.doctorId && apt.slotId && apt.mode); // Filter out invalid appointments
@@ -931,16 +1034,18 @@ const DatLichNhieuChuyenKhoa = () => {
 
       if (response?.success || response?.data?.success) {
         const data = response?.data || response;
-        
+
         // Set payment summary directly from response
         setPaymentSummary({
           totalAmount: data.totalAmount || 0,
           appointmentSummaries: data.appointmentSummaries || [],
           acceptedAppointments: data.appointmentSummaries || [], // All appointments are "accepted" for payment
-          acceptedCount: data.appointmentsCount || data.appointmentSummaries?.length || 0,
+          acceptedCount:
+            data.appointmentsCount || data.appointmentSummaries?.length || 0,
           pendingCount: 0,
           rejectedCount: 0,
-          totalCount: data.appointmentsCount || data.appointmentSummaries?.length || 0,
+          totalCount:
+            data.appointmentsCount || data.appointmentSummaries?.length || 0,
         });
 
         // Check for conflicts if any
@@ -951,12 +1056,18 @@ const DatLichNhieuChuyenKhoa = () => {
 
         // Move to step 3 (payment summary)
         setCurrentStep(3);
-        message.success("Đã tính toán hóa đơn. Vui lòng xem và xác nhận thanh toán.");
+        message.success(
+          "Đã tính toán hóa đơn. Vui lòng xem và xác nhận thanh toán."
+        );
       } else {
         message.error(response?.message || "Không thể tính toán hóa đơn");
       }
     } catch (error) {
-      message.error(error?.response?.data?.message || error?.message || "Không thể tính toán hóa đơn");
+      message.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Không thể tính toán hóa đơn"
+      );
     } finally {
       setLoading(false);
     }
@@ -1024,18 +1135,20 @@ const DatLichNhieuChuyenKhoa = () => {
 
     try {
       setLoadingPaymentSummary(true);
-      const response = await api.get(`/api/medical-visits/${visitIdParam}/payment-summary`);
+      const response = await api.get(
+        `/api/medical-visits/${visitIdParam}/payment-summary`
+      );
 
       let summary = null;
       if (response?.success) {
         summary = response?.data || response;
-        if (summary && 'success' in summary) {
+        if (summary && "success" in summary) {
           delete summary.success;
         }
         setPaymentSummary(summary);
       } else {
         summary = response?.data || response;
-        if (summary && (!('success' in summary) || summary.success !== false)) {
+        if (summary && (!("success" in summary) || summary.success !== false)) {
           setPaymentSummary(summary);
         } else {
           setPaymentSummary(null);
@@ -1043,7 +1156,10 @@ const DatLichNhieuChuyenKhoa = () => {
       }
     } catch (error) {
       const errorMessage = error?.message || "";
-      if (errorMessage.includes("404") || errorMessage.includes("Không tìm thấy")) {
+      if (
+        errorMessage.includes("404") ||
+        errorMessage.includes("Không tìm thấy")
+      ) {
         setPaymentSummary({
           totalAmount: 0,
           acceptedAppointments: [],
@@ -1084,19 +1200,21 @@ const DatLichNhieuChuyenKhoa = () => {
       // Prepare appointments data for payment creation
       const appointmentsData = appointments
         .map((apt) => {
-          const aptData = apt._tempData ? { ...apt._tempData } : {
-            doctorId: apt.doctor?._id || apt.doctorId,
-            slotId: apt.slotId || apt._tempData?.slotId,
-            mode: apt.mode,
-            clinicId: apt.clinicId || apt._tempData?.clinicId,
-            reason: apt.reason || apt._tempData?.reason || "",
-          };
-          
+          const aptData = apt._tempData
+            ? { ...apt._tempData }
+            : {
+                doctorId: apt.doctor?._id || apt.doctorId,
+                slotId: apt.slotId || apt._tempData?.slotId,
+                mode: apt.mode,
+                clinicId: apt.clinicId || apt._tempData?.clinicId,
+                reason: apt.reason || apt._tempData?.reason || "",
+              };
+
           // Add patientId for family member booking
           if (bookingFor === "family" && patientIdForBooking) {
             aptData.patientId = patientIdForBooking;
           }
-          
+
           return aptData;
         })
         .filter((apt) => apt && apt.doctorId && apt.slotId && apt.mode);
@@ -1131,7 +1249,11 @@ const DatLichNhieuChuyenKhoa = () => {
         message.error(response?.message || "Không thể tạo thanh toán");
       }
     } catch (error) {
-      message.error(error?.response?.data?.message || error?.message || "Không thể tạo thanh toán");
+      message.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Không thể tạo thanh toán"
+      );
     } finally {
       setProcessingPayment(false);
     }
@@ -1219,26 +1341,23 @@ const DatLichNhieuChuyenKhoa = () => {
   ];
 
   const handleCancelAppointment = async (appointmentId) => {
-    showConfirm(
-      "Bạn có chắc chắn muốn hủy lịch hẹn này?",
-      async () => {
-        try {
-          const response = await api.post(
-            "/api/medical-visits/cancel-appointment",
-            {
-              appointmentId,
-            }
-          );
-
-          if (response.data?.success) {
-            message.success("Đã hủy lịch hẹn");
-            loadVisitDetails();
+    showConfirm("Bạn có chắc chắn muốn hủy lịch hẹn này?", async () => {
+      try {
+        const response = await api.post(
+          "/api/medical-visits/cancel-appointment",
+          {
+            appointmentId,
           }
-        } catch (error) {
-          message.error("Không thể hủy lịch hẹn");
+        );
+
+        if (response.data?.success) {
+          message.success("Đã hủy lịch hẹn");
+          loadVisitDetails();
         }
+      } catch (error) {
+        message.error("Không thể hủy lịch hẹn");
       }
-    );
+    });
   };
 
   return (
@@ -1304,18 +1423,41 @@ const DatLichNhieuChuyenKhoa = () => {
             <Row gutter={24}>
               {/* Left: Date Picker and Booking Selection */}
               <Col xs={24} md={12}>
-                <Space direction="vertical" size="large" style={{ width: "100%" }}>
+                <Space
+                  direction="vertical"
+                  size="large"
+                  style={{ width: "100%" }}
+                >
                   {loading && <Spin size="large" />}
-                  
+
                   {/* Date Picker Section */}
                   <div>
-                    <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
-                      <CalendarOutlined style={{ marginRight: 8, fontSize: 18, color: "#1890ff" }} />
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        marginBottom: 12,
+                      }}
+                    >
+                      <CalendarOutlined
+                        style={{
+                          marginRight: 8,
+                          fontSize: 18,
+                          color: "#1890ff",
+                        }}
+                      />
                       <Text strong style={{ fontSize: 16 }}>
                         CHỌN NGÀY KHÁM
                       </Text>
                     </div>
-                    <Text type="secondary" style={{ display: "block", marginBottom: 12, fontSize: 14 }}>
+                    <Text
+                      type="secondary"
+                      style={{
+                        display: "block",
+                        marginBottom: 12,
+                        fontSize: 14,
+                      }}
+                    >
                       Chọn ngày muốn khám
                     </Text>
                     <DatePicker
@@ -1344,7 +1486,10 @@ const DatLichNhieuChuyenKhoa = () => {
                   {/* Booking For Selection - Below Date Picker */}
                   {visitDate && (
                     <div style={{ marginTop: 24 }}>
-                      <Text strong style={{ display: "block", marginBottom: 12 }}>
+                      <Text
+                        strong
+                        style={{ display: "block", marginBottom: 12 }}
+                      >
                         Đặt khám cho:
                       </Text>
                       <Row gutter={12}>
@@ -1369,7 +1514,9 @@ const DatLichNhieuChuyenKhoa = () => {
                         </Col>
                         <Col span={12}>
                           <Button
-                            type={bookingFor === "family" ? "primary" : "default"}
+                            type={
+                              bookingFor === "family" ? "primary" : "default"
+                            }
                             size="large"
                             block
                             onClick={() => {
@@ -1411,15 +1558,27 @@ const DatLichNhieuChuyenKhoa = () => {
                   {/* Info boxes */}
                   <Row gutter={16} style={{ marginTop: 24 }}>
                     <Col span={12}>
-                      <div style={{ 
-                        padding: 16, 
-                        background: "#f6ffed", 
-                        borderRadius: 8,
-                        border: "1px solid #b7eb8f"
-                      }}>
-                        <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
-                          <CheckCircleOutlined style={{ color: "#52c41a", marginRight: 8 }} />
-                          <Text strong style={{ color: "#52c41a" }}>Nhanh chóng</Text>
+                      <div
+                        style={{
+                          padding: 16,
+                          background: "#f6ffed",
+                          borderRadius: 8,
+                          border: "1px solid #b7eb8f",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            marginBottom: 8,
+                          }}
+                        >
+                          <CheckCircleOutlined
+                            style={{ color: "#52c41a", marginRight: 8 }}
+                          />
+                          <Text strong style={{ color: "#52c41a" }}>
+                            Nhanh chóng
+                          </Text>
                         </div>
                         <Text type="secondary" style={{ fontSize: 12 }}>
                           Đăng ký trong 2 phút
@@ -1427,15 +1586,27 @@ const DatLichNhieuChuyenKhoa = () => {
                       </div>
                     </Col>
                     <Col span={12}>
-                      <div style={{ 
-                        padding: 16, 
-                        background: "#f6ffed", 
-                        borderRadius: 8,
-                        border: "1px solid #b7eb8f"
-                      }}>
-                        <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
-                          <CheckCircleOutlined style={{ color: "#52c41a", marginRight: 8 }} />
-                          <Text strong style={{ color: "#52c41a" }}>An toàn</Text>
+                      <div
+                        style={{
+                          padding: 16,
+                          background: "#f6ffed",
+                          borderRadius: 8,
+                          border: "1px solid #b7eb8f",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            marginBottom: 8,
+                          }}
+                        >
+                          <CheckCircleOutlined
+                            style={{ color: "#52c41a", marginRight: 8 }}
+                          />
+                          <Text strong style={{ color: "#52c41a" }}>
+                            An toàn
+                          </Text>
                         </div>
                         <Text type="secondary" style={{ fontSize: 12 }}>
                           Bảo mật thông tin 100%
@@ -1448,390 +1619,416 @@ const DatLichNhieuChuyenKhoa = () => {
 
               {/* Right: Family Member Form - Only show when booking for family */}
               {bookingFor === "family" && (
-              <Col xs={24} md={12}>
-                <Card style={{ background: "#fff" }}>
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
-                      <Text strong style={{ fontSize: 16, marginRight: 8 }}>1</Text>
-                      <Title level={4} style={{ margin: 0 }}>Thông tin người thân</Title>
+                <Col xs={24} md={12}>
+                  <Card style={{ background: "#fff" }}>
+                    <div style={{ marginBottom: 16 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <Text strong style={{ fontSize: 16, marginRight: 8 }}>
+                          1
+                        </Text>
+                        <Title level={4} style={{ margin: 0 }}>
+                          Thông tin người thân
+                        </Title>
+                      </div>
+                      <Text type="secondary" style={{ fontSize: 14 }}>
+                        Điền thông tin chi tiết của người cần khám
+                      </Text>
                     </div>
-                    <Text type="secondary" style={{ fontSize: 14 }}>
-                      Điền thông tin chi tiết của người cần khám
-                    </Text>
-                  </div>
 
-                  <Form
-                    form={familyForm}
-                    layout="vertical"
-                    initialValues={{
-                      bloodType: "Unknown",
-                    }}
-                    onValuesChange={(changedValues, allValues) => {
-                      // Save form values to state whenever form changes
-                      setSavedFamilyFormValues(allValues);
-                    }}
-                  >
-                    {/* Select existing family member or create new */}
-                    {familyMembers.length > 0 && (
-                      <Form.Item label="Chọn người thân đã có">
+                    <Form
+                      form={familyForm}
+                      layout="vertical"
+                      initialValues={{
+                        bloodType: "Unknown",
+                      }}
+                      onValuesChange={(changedValues, allValues) => {
+                        // Save form values to state whenever form changes
+                        setSavedFamilyFormValues(allValues);
+                      }}
+                    >
+                      {/* Select existing family member or create new */}
+                      {familyMembers.length > 0 && (
+                        <Form.Item label="Chọn người thân đã có">
+                          <Select
+                            placeholder="Chọn người thân hoặc để trống để thêm mới"
+                            allowClear
+                            size="large"
+                            onChange={(value) => {
+                              if (value) {
+                                const member = familyMembers.find(
+                                  (m) => m._id === value
+                                );
+                                setSelectedFamilyMember(member);
+                                // Persist patientId immediately to avoid losing selection across steps
+                                setPatientIdForBooking(member?._id || null);
+                                // Fill form with existing member data
+                                familyForm.setFieldsValue({
+                                  fullName: member.fullName,
+                                  dob: member.dob
+                                    ? dayjs(member.dob)
+                                    : undefined,
+                                  gender: member.gender,
+                                  ethnicity: member.ethnicity,
+                                  occupation: member.occupation,
+                                  bloodType: member.bloodType || "Unknown",
+                                  relationshipToOwner:
+                                    member.relationshipToOwner,
+                                  phone: member.phone,
+                                  citizenId: member.citizenId,
+                                  address: member.address,
+                                  allergyNotes: member.allergyNotes || "",
+                                  medicalHistory: member.medicalHistory || [],
+                                });
+                              } else {
+                                setSelectedFamilyMember(null);
+                                setPatientIdForBooking(null);
+                                familyForm.resetFields();
+                              }
+                            }}
+                          >
+                            {familyMembers.map((member) => (
+                              <Option key={member._id} value={member._id}>
+                                {member.fullName} (
+                                {member.relationshipToOwner === "father"
+                                  ? "Cha"
+                                  : member.relationshipToOwner === "mother"
+                                  ? "Mẹ"
+                                  : member.relationshipToOwner === "spouse"
+                                  ? "Vợ/Chồng"
+                                  : member.relationshipToOwner === "child"
+                                  ? "Con"
+                                  : member.relationshipToOwner === "grandparent"
+                                  ? "Ông/Bà"
+                                  : "Khác"}
+                                )
+                              </Option>
+                            ))}
+                          </Select>
+                          <Button
+                            type="link"
+                            icon={<PlusOutlined />}
+                            onClick={() => {
+                              setSelectedFamilyMember(null);
+                              familyForm.resetFields();
+                            }}
+                            style={{ padding: 0, marginTop: 8 }}
+                          >
+                            + Thêm người mới
+                          </Button>
+                        </Form.Item>
+                      )}
+
+                      <Form.Item
+                        label={
+                          <span>
+                            Họ và tên <Text type="danger">*</Text>
+                          </span>
+                        }
+                        name="fullName"
+                        rules={[
+                          {
+                            required: true,
+                            message: "Vui lòng nhập họ tên!",
+                          },
+                        ]}
+                      >
+                        <Input
+                          placeholder="Nhập họ và tên"
+                          size="large"
+                          disabled={!!selectedFamilyMember}
+                          readOnly={!!selectedFamilyMember}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        label={
+                          <span>
+                            SỐ CCCD/CMND <Text type="danger">*</Text>
+                          </span>
+                        }
+                        name="citizenId"
+                        rules={[
+                          {
+                            required: true,
+                            message: "Vui lòng nhập số CCCD!",
+                          },
+                        ]}
+                      >
+                        <Input
+                          placeholder="Nhập số CCCD/CMND"
+                          size="large"
+                          disabled={!!selectedFamilyMember}
+                          readOnly={!!selectedFamilyMember}
+                        />
+                      </Form.Item>
+
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item
+                            label={
+                              <span>
+                                Ngày sinh <Text type="danger">*</Text>
+                              </span>
+                            }
+                            name="dob"
+                            rules={[
+                              {
+                                required: true,
+                                message: "Vui lòng chọn ngày sinh!",
+                              },
+                            ]}
+                          >
+                            <DatePicker
+                              style={{ width: "100%" }}
+                              format="DD/MM/YYYY"
+                              placeholder="dd/mm/yyyy"
+                              size="large"
+                              disabled={!!selectedFamilyMember}
+                              disabledDate={(current) =>
+                                current && current > new Date()
+                              }
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                          <Form.Item
+                            label={
+                              <span>
+                                Giới tính <Text type="danger">*</Text>
+                              </span>
+                            }
+                            name="gender"
+                            rules={[
+                              {
+                                required: true,
+                                message: "Vui lòng chọn giới tính!",
+                              },
+                            ]}
+                          >
+                            <Select
+                              placeholder="Chọn giới tính"
+                              size="large"
+                              disabled={!!selectedFamilyMember}
+                            >
+                              <Option value="male">Nam</Option>
+                              <Option value="female">Nữ</Option>
+                              <Option value="other">Khác</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item label="Dân tộc" name="ethnicity">
+                            <Input
+                              placeholder="Nhập dân tộc (nếu có)"
+                              size="large"
+                              disabled={!!selectedFamilyMember}
+                              readOnly={!!selectedFamilyMember}
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                          <Form.Item label="Nghề nghiệp" name="occupation">
+                            <Input
+                              placeholder="Nhập nghề nghiệp (nếu có)"
+                              size="large"
+                              disabled={!!selectedFamilyMember}
+                              readOnly={!!selectedFamilyMember}
+                            />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      <Form.Item label="Nhóm máu" name="bloodType">
                         <Select
-                          placeholder="Chọn người thân hoặc để trống để thêm mới"
+                          placeholder="Chọn nhóm máu (nếu có)"
                           allowClear
                           size="large"
-                          onChange={(value) => {
-                            if (value) {
-                              const member = familyMembers.find(
-                                (m) => m._id === value
-                              );
-                              setSelectedFamilyMember(member);
-                              // Persist patientId immediately to avoid losing selection across steps
-                              setPatientIdForBooking(member?._id || null);
-                              // Fill form with existing member data
-                              familyForm.setFieldsValue({
-                                fullName: member.fullName,
-                                dob: member.dob ? dayjs(member.dob) : undefined,
-                                gender: member.gender,
-                                ethnicity: member.ethnicity,
-                                occupation: member.occupation,
-                                bloodType: member.bloodType || "Unknown",
-                                relationshipToOwner: member.relationshipToOwner,
-                                phone: member.phone,
-                                citizenId: member.citizenId,
-                                address: member.address,
-                                allergyNotes: member.allergyNotes || "",
-                                medicalHistory: member.medicalHistory || [],
-                              });
-                            } else {
-                              setSelectedFamilyMember(null);
-                              setPatientIdForBooking(null);
-                              familyForm.resetFields();
+                          disabled={!!selectedFamilyMember}
+                        >
+                          <Option value="A+">A+</Option>
+                          <Option value="A-">A-</Option>
+                          <Option value="B+">B+</Option>
+                          <Option value="B-">B-</Option>
+                          <Option value="AB+">AB+</Option>
+                          <Option value="AB-">AB-</Option>
+                          <Option value="O+">O+</Option>
+                          <Option value="O-">O-</Option>
+                          <Option value="Unknown">Không rõ</Option>
+                        </Select>
+                      </Form.Item>
+
+                      <Form.Item
+                        label={
+                          <span>
+                            Số điện thoại <Text type="danger">*</Text>
+                          </span>
+                        }
+                        name="phone"
+                        rules={[
+                          {
+                            required: true,
+                            message: "Vui lòng nhập số điện thoại!",
+                          },
+                          {
+                            pattern: /^[0-9]{10}$/,
+                            message: "Số điện thoại không hợp lệ!",
+                          },
+                        ]}
+                      >
+                        <Input
+                          placeholder="Nhập số điện thoại"
+                          size="large"
+                          prefix={<PhoneOutlined />}
+                          disabled={!!selectedFamilyMember}
+                          readOnly={!!selectedFamilyMember}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        label={
+                          <span>
+                            Địa chỉ <Text type="danger">*</Text>
+                          </span>
+                        }
+                        name="address"
+                        rules={[
+                          {
+                            required: true,
+                            message: "Vui lòng nhập địa chỉ!",
+                          },
+                        ]}
+                      >
+                        <Input
+                          placeholder="Nhập địa chỉ"
+                          size="large"
+                          prefix={<EnvironmentOutlined />}
+                          disabled={!!selectedFamilyMember}
+                          readOnly={!!selectedFamilyMember}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        label={
+                          <span>
+                            Mối quan hệ <Text type="danger">*</Text>
+                          </span>
+                        }
+                        name="relationshipToOwner"
+                        rules={[
+                          {
+                            required: true,
+                            message: "Vui lòng chọn mối quan hệ!",
+                          },
+                        ]}
+                      >
+                        <Select
+                          placeholder="Chọn mối quan hệ"
+                          size="large"
+                          disabled={!!selectedFamilyMember}
+                        >
+                          <Option value="father">Cha</Option>
+                          <Option value="mother">Mẹ</Option>
+                          <Option value="spouse">Vợ/Chồng</Option>
+                          <Option value="child">Con</Option>
+                          <Option value="grandparent">Ông/Bà</Option>
+                          <Option value="other">Khác</Option>
+                        </Select>
+                      </Form.Item>
+
+                      <Form.Item
+                        label="Ghi chú dị ứng"
+                        name="allergyNotes"
+                        rules={[
+                          {
+                            max: 500,
+                            message:
+                              "Ghi chú dị ứng không được vượt quá 500 ký tự!",
+                          },
+                        ]}
+                      >
+                        <TextArea
+                          rows={4}
+                          placeholder="Nhập thông tin dị ứng, tiền sử dị ứng thuốc, thức ăn (nếu có)"
+                          maxLength={500}
+                          showCount
+                          // Cho phép edit allergyNotes ngay cả khi đã chọn người thân
+                          disabled={false}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        name="agreement"
+                        valuePropName="checked"
+                        rules={[
+                          {
+                            required: true,
+                            message:
+                              "Vui lòng xác nhận chịu trách nhiệm về thông tin cung cấp!",
+                          },
+                        ]}
+                      >
+                        <Checkbox>
+                          Người đặt hộ chịu trách nhiệm về thông tin cung cấp
+                        </Checkbox>
+                      </Form.Item>
+
+                      {/* Continue Button for Family */}
+                      <Form.Item>
+                        <Button
+                          type="primary"
+                          size="large"
+                          block
+                          onClick={async () => {
+                            // If family member is already selected, no need to validate
+                            if (selectedFamilyMember) {
+                              // Persist selected patient id to ensure downstream steps use correct patient
+                              setPatientIdForBooking(selectedFamilyMember._id);
+                              setCurrentStep(1);
+                              return;
+                            }
+
+                            // If creating new member, validate form and save values
+                            try {
+                              await familyForm.validateFields();
+                              // Save form values before moving to next step
+                              const formValues =
+                                familyForm.getFieldsValue(true);
+                              setSavedFamilyFormValues(formValues);
+                              setCurrentStep(1);
+                            } catch (error) {
+                              if (error.errorFields) {
+                                message.error(
+                                  "Vui lòng điền đầy đủ thông tin người thân"
+                                );
+                              } else {
+                                message.error(
+                                  "Vui lòng kiểm tra lại thông tin đã nhập"
+                                );
+                              }
                             }
                           }}
-                        >
-                          {familyMembers.map((member) => (
-                            <Option key={member._id} value={member._id}>
-                              {member.fullName} ({member.relationshipToOwner === "father" ? "Cha" : 
-                                member.relationshipToOwner === "mother" ? "Mẹ" :
-                                member.relationshipToOwner === "spouse" ? "Vợ/Chồng" :
-                                member.relationshipToOwner === "child" ? "Con" :
-                                member.relationshipToOwner === "grandparent" ? "Ông/Bà" : "Khác"})
-                            </Option>
-                          ))}
-                        </Select>
-                        <Button
-                          type="link"
-                          icon={<PlusOutlined />}
-                          onClick={() => {
-                            setSelectedFamilyMember(null);
-                            familyForm.resetFields();
+                          style={{
+                            height: 50,
+                            fontSize: 16,
+                            fontWeight: 600,
+                            marginTop: 16,
                           }}
-                          style={{ padding: 0, marginTop: 8 }}
                         >
-                          + Thêm người mới
+                          Xác nhận đặt khám →
                         </Button>
                       </Form.Item>
-                    )}
-
-                    <Form.Item
-                      label={
-                        <span>
-                          Họ và tên <Text type="danger">*</Text>
-                        </span>
-                      }
-                      name="fullName"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Vui lòng nhập họ tên!",
-                        },
-                      ]}
-                    >
-                      <Input 
-                        placeholder="Nhập họ và tên" 
-                        size="large" 
-                        disabled={!!selectedFamilyMember}
-                        readOnly={!!selectedFamilyMember}
-                      />
-                    </Form.Item>
-
-                    <Form.Item
-                      label={
-                        <span>
-                          SỐ CCCD/CMND <Text type="danger">*</Text>
-                        </span>
-                      }
-                      name="citizenId"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Vui lòng nhập số CCCD!",
-                        },
-                      ]}
-                    >
-                      <Input 
-                        placeholder="Nhập số CCCD/CMND" 
-                        size="large"
-                        disabled={!!selectedFamilyMember}
-                        readOnly={!!selectedFamilyMember}
-                      />
-                    </Form.Item>
-
-                    <Row gutter={16}>
-                      <Col span={12}>
-                        <Form.Item
-                          label={
-                            <span>
-                              Ngày sinh <Text type="danger">*</Text>
-                            </span>
-                          }
-                          name="dob"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Vui lòng chọn ngày sinh!",
-                            },
-                          ]}
-                        >
-                          <DatePicker
-                            style={{ width: "100%" }}
-                            format="DD/MM/YYYY"
-                            placeholder="dd/mm/yyyy"
-                            size="large"
-                            disabled={!!selectedFamilyMember}
-                            disabledDate={(current) =>
-                              current && current > new Date()
-                            }
-                          />
-                        </Form.Item>
-                      </Col>
-                      <Col span={12}>
-                        <Form.Item
-                          label={
-                            <span>
-                              Giới tính <Text type="danger">*</Text>
-                            </span>
-                          }
-                          name="gender"
-                          rules={[
-                            {
-                              required: true,
-                              message: "Vui lòng chọn giới tính!",
-                            },
-                          ]}
-                        >
-                          <Select 
-                            placeholder="Chọn giới tính" 
-                            size="large"
-                            disabled={!!selectedFamilyMember}
-                          >
-                            <Option value="male">Nam</Option>
-                            <Option value="female">Nữ</Option>
-                            <Option value="other">Khác</Option>
-                          </Select>
-                        </Form.Item>
-                      </Col>
-                    </Row>
-
-                    <Row gutter={16}>
-                      <Col span={12}>
-                        <Form.Item label="Dân tộc" name="ethnicity">
-                          <Input 
-                            placeholder="Nhập dân tộc (nếu có)" 
-                            size="large"
-                            disabled={!!selectedFamilyMember}
-                            readOnly={!!selectedFamilyMember}
-                          />
-                        </Form.Item>
-                      </Col>
-                      <Col span={12}>
-                        <Form.Item label="Nghề nghiệp" name="occupation">
-                          <Input 
-                            placeholder="Nhập nghề nghiệp (nếu có)" 
-                            size="large"
-                            disabled={!!selectedFamilyMember}
-                            readOnly={!!selectedFamilyMember}
-                          />
-                        </Form.Item>
-                      </Col>
-                    </Row>
-
-                    <Form.Item label="Nhóm máu" name="bloodType">
-                      <Select
-                        placeholder="Chọn nhóm máu (nếu có)"
-                        allowClear
-                        size="large"
-                        disabled={!!selectedFamilyMember}
-                      >
-                        <Option value="A+">A+</Option>
-                        <Option value="A-">A-</Option>
-                        <Option value="B+">B+</Option>
-                        <Option value="B-">B-</Option>
-                        <Option value="AB+">AB+</Option>
-                        <Option value="AB-">AB-</Option>
-                        <Option value="O+">O+</Option>
-                        <Option value="O-">O-</Option>
-                        <Option value="Unknown">Không rõ</Option>
-                      </Select>
-                    </Form.Item>
-
-                    <Form.Item
-                      label={
-                        <span>
-                          Số điện thoại <Text type="danger">*</Text>
-                        </span>
-                      }
-                      name="phone"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Vui lòng nhập số điện thoại!",
-                        },
-                        {
-                          pattern: /^[0-9]{10}$/,
-                          message: "Số điện thoại không hợp lệ!",
-                        },
-                      ]}
-                    >
-                      <Input 
-                        placeholder="Nhập số điện thoại" 
-                        size="large"
-                        prefix={<PhoneOutlined />}
-                        disabled={!!selectedFamilyMember}
-                        readOnly={!!selectedFamilyMember}
-                      />
-                    </Form.Item>
-
-                    <Form.Item
-                      label={
-                        <span>
-                          Địa chỉ <Text type="danger">*</Text>
-                        </span>
-                      }
-                      name="address"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Vui lòng nhập địa chỉ!",
-                        },
-                      ]}
-                    >
-                      <Input 
-                        placeholder="Nhập địa chỉ" 
-                        size="large"
-                        prefix={<EnvironmentOutlined />}
-                        disabled={!!selectedFamilyMember}
-                        readOnly={!!selectedFamilyMember}
-                      />
-                    </Form.Item>
-
-                    <Form.Item
-                      label={
-                        <span>
-                          Mối quan hệ <Text type="danger">*</Text>
-                        </span>
-                      }
-                      name="relationshipToOwner"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Vui lòng chọn mối quan hệ!",
-                        },
-                      ]}
-                    >
-                      <Select 
-                        placeholder="Chọn mối quan hệ" 
-                        size="large"
-                        disabled={!!selectedFamilyMember}
-                      >
-                        <Option value="father">Cha</Option>
-                        <Option value="mother">Mẹ</Option>
-                        <Option value="spouse">Vợ/Chồng</Option>
-                        <Option value="child">Con</Option>
-                        <Option value="grandparent">Ông/Bà</Option>
-                        <Option value="other">Khác</Option>
-                      </Select>
-                    </Form.Item>
-
-                    <Form.Item
-                      label="Ghi chú dị ứng"
-                      name="allergyNotes"
-                      rules={[
-                        {
-                          max: 500,
-                          message:
-                            "Ghi chú dị ứng không được vượt quá 500 ký tự!",
-                        },
-                      ]}
-                    >
-                      <TextArea
-                        rows={4}
-                        placeholder="Nhập thông tin dị ứng, tiền sử dị ứng thuốc, thức ăn (nếu có)"
-                        maxLength={500}
-                        showCount
-                        // Cho phép edit allergyNotes ngay cả khi đã chọn người thân
-                        disabled={false}
-                      />
-                    </Form.Item>
-
-                    <Form.Item
-                      name="agreement"
-                      valuePropName="checked"
-                      rules={[
-                        {
-                          required: true,
-                          message:
-                            "Vui lòng xác nhận chịu trách nhiệm về thông tin cung cấp!",
-                        },
-                      ]}
-                    >
-                      <Checkbox>
-                        Người đặt hộ chịu trách nhiệm về thông tin cung cấp
-                      </Checkbox>
-                    </Form.Item>
-
-                    {/* Continue Button for Family */}
-                    <Form.Item>
-                      <Button
-                        type="primary"
-                        size="large"
-                        block
-                        onClick={async () => {
-                          // If family member is already selected, no need to validate
-                          if (selectedFamilyMember) {
-                            // Persist selected patient id to ensure downstream steps use correct patient
-                            setPatientIdForBooking(selectedFamilyMember._id);
-                            setCurrentStep(1);
-                            return;
-                          }
-
-                          // If creating new member, validate form and save values
-                          try {
-                            await familyForm.validateFields();
-                            // Save form values before moving to next step
-                            const formValues = familyForm.getFieldsValue(true);
-                            setSavedFamilyFormValues(formValues);
-                            setCurrentStep(1);
-                          } catch (error) {
-                            if (error.errorFields) {
-                              message.error("Vui lòng điền đầy đủ thông tin người thân");
-                            } else {
-                              message.error("Vui lòng kiểm tra lại thông tin đã nhập");
-                            }
-                          }
-                        }}
-                        style={{
-                          height: 50,
-                          fontSize: 16,
-                          fontWeight: 600,
-                          marginTop: 16,
-                        }}
-                      >
-                        Xác nhận đặt khám →
-                      </Button>
-                    </Form.Item>
-                  </Form>
-                </Card>
-              </Col>
+                    </Form>
+                  </Card>
+                </Col>
               )}
             </Row>
           </Card>
@@ -1956,60 +2153,80 @@ const DatLichNhieuChuyenKhoa = () => {
                     }) || [];
 
                   return specAppointments.length > 0 ? (
-                    specAppointments                  .map((apt) => (
-                    <Card
-                      key={apt._id}
-                      size="small"
-                      style={{ marginBottom: 8 }}
-                      actions={
-                        visitStatus === "draft" ? [
-                          <Space key="actions" size="small">
-                            <Button
-                              size="small"
-                              icon={<EditOutlined />}
-                              onClick={() => {
-                                // Find the specialization for this appointment
-                                const aptSpecIds = apt.doctor?.specializationIds || [];
-                                const specForApt = selectedSpecializations.find((s) => {
-                                  return aptSpecIds.some((sid) => {
-                                    const specId = typeof sid === 'object' ? (sid._id || sid) : sid;
-                                    const currentSpecId = s._id || s;
-                                    return specId?.toString() === currentSpecId?.toString();
-                                  });
-                                });
-                                if (specForApt) {
-                                  handleOpenDoctorModal(specForApt, apt);
-                                } else {
-                                  message.warning("Không tìm thấy chuyên khoa cho lịch hẹn này");
-                                }
-                              }}
-                            >
-                              Đổi slot
-                            </Button>,
-                            <Button
-                              size="small"
-                              danger
-                              icon={<DeleteOutlined />}
-                              onClick={() => {
-                                // Remove from local appointments
-                                setAppointments(appointments.filter(a => a._id !== apt._id));
-                                message.success("Đã xóa lịch hẹn");
-                              }}
-                            >
-                              Xóa
-                            </Button>,
-                          </Space>,
-                        ] : [
-                          <Button
-                            size="small"
-                            danger
-                            onClick={() => handleCancelAppointment(apt._id)}
-                          >
-                            Hủy
-                          </Button>,
-                        ]
-                      }
-                    >
+                    specAppointments.map((apt) => (
+                      <Card
+                        key={apt._id}
+                        size="small"
+                        style={{ marginBottom: 8 }}
+                        actions={
+                          visitStatus === "draft"
+                            ? [
+                                <Space key="actions" size="small">
+                                  <Button
+                                    size="small"
+                                    icon={<EditOutlined />}
+                                    onClick={() => {
+                                      // Find the specialization for this appointment
+                                      const aptSpecIds =
+                                        apt.doctor?.specializationIds || [];
+                                      const specForApt =
+                                        selectedSpecializations.find((s) => {
+                                          return aptSpecIds.some((sid) => {
+                                            const specId =
+                                              typeof sid === "object"
+                                                ? sid._id || sid
+                                                : sid;
+                                            const currentSpecId = s._id || s;
+                                            return (
+                                              specId?.toString() ===
+                                              currentSpecId?.toString()
+                                            );
+                                          });
+                                        });
+                                      if (specForApt) {
+                                        handleOpenDoctorModal(specForApt, apt);
+                                      } else {
+                                        message.warning(
+                                          "Không tìm thấy chuyên khoa cho lịch hẹn này"
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    Đổi slot
+                                  </Button>
+                                  ,
+                                  <Button
+                                    size="small"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    onClick={() => {
+                                      // Remove from local appointments
+                                      setAppointments(
+                                        appointments.filter(
+                                          (a) => a._id !== apt._id
+                                        )
+                                      );
+                                      message.success("Đã xóa lịch hẹn");
+                                    }}
+                                  >
+                                    Xóa
+                                  </Button>
+                                  ,
+                                </Space>,
+                              ]
+                            : [
+                                <Button
+                                  size="small"
+                                  danger
+                                  onClick={() =>
+                                    handleCancelAppointment(apt._id)
+                                  }
+                                >
+                                  Hủy
+                                </Button>,
+                              ]
+                        }
+                      >
                         <Space direction="vertical" style={{ width: "100%" }}>
                           <Space>
                             <Text strong>{apt.doctor?.fullName || "N/A"}</Text>
@@ -2067,7 +2284,8 @@ const DatLichNhieuChuyenKhoa = () => {
           <Card style={{ marginBottom: 24 }}>
             <Title level={3}>Tổng hợp lịch hẹn và hóa đơn thanh toán</Title>
             <Paragraph>
-              Vui lòng xem lại thông tin lịch hẹn và hóa đơn thanh toán trước khi xác nhận.
+              Vui lòng xem lại thông tin lịch hẹn và hóa đơn thanh toán trước
+              khi xác nhận.
             </Paragraph>
 
             {conflicts.length > 0 && (
@@ -2091,10 +2309,20 @@ const DatLichNhieuChuyenKhoa = () => {
               <>
                 {/* Summary Info */}
                 <div style={{ marginBottom: 16 }}>
-                  <Space direction="vertical" size="small" style={{ width: "100%" }}>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <Space
+                    direction="vertical"
+                    size="small"
+                    style={{ width: "100%" }}
+                  >
+                    <div
+                      style={{ display: "flex", gap: 8, alignItems: "center" }}
+                    >
                       <Text>Số lịch hẹn:</Text>
-                      <Text strong>{paymentSummary.appointmentsCount || paymentSummary.totalCount || 0}</Text>
+                      <Text strong>
+                        {paymentSummary.appointmentsCount ||
+                          paymentSummary.totalCount ||
+                          0}
+                      </Text>
                     </div>
                     <Alert
                       message="Thông tin quan trọng"
@@ -2111,17 +2339,28 @@ const DatLichNhieuChuyenKhoa = () => {
                 {/* Appointments Details Table */}
                 {(() => {
                   // Merge paymentSummary with appointments to get reason
-                  const appointmentSummaries = paymentSummary.appointmentSummaries || paymentSummary.acceptedAppointments || [];
+                  const appointmentSummaries =
+                    paymentSummary.appointmentSummaries ||
+                    paymentSummary.acceptedAppointments ||
+                    [];
                   const mergedData = appointmentSummaries.map((summary) => {
                     // Find matching appointment by slotId or scheduledStart
                     const matchingAppointment = appointments.find((apt) => {
-                      const aptSlotId = apt.slotId?.toString() || apt._tempData?.slotId?.toString();
+                      const aptSlotId =
+                        apt.slotId?.toString() ||
+                        apt._tempData?.slotId?.toString();
                       const summarySlotId = summary.slotId?.toString();
-                      const aptStart = apt.scheduledStart ? new Date(apt.scheduledStart).getTime() : null;
-                      const summaryStart = summary.scheduledStart ? new Date(summary.scheduledStart).getTime() : null;
-                      
+                      const aptStart = apt.scheduledStart
+                        ? new Date(apt.scheduledStart).getTime()
+                        : null;
+                      const summaryStart = summary.scheduledStart
+                        ? new Date(summary.scheduledStart).getTime()
+                        : null;
+
                       return (
-                        (aptSlotId && summarySlotId && aptSlotId === summarySlotId) ||
+                        (aptSlotId &&
+                          summarySlotId &&
+                          aptSlotId === summarySlotId) ||
                         (aptStart && summaryStart && aptStart === summaryStart)
                       );
                     });
@@ -2135,9 +2374,10 @@ const DatLichNhieuChuyenKhoa = () => {
                       typeof reasonFromAppointment === "string" &&
                       reasonFromAppointment.trim().length > 0
                         ? reasonFromAppointment.trim()
-                        : (typeof summary.reason === "string" && summary.reason.trim().length > 0
-                            ? summary.reason.trim()
-                            : "Không có");
+                        : typeof summary.reason === "string" &&
+                          summary.reason.trim().length > 0
+                        ? summary.reason.trim()
+                        : "Không có";
 
                     return {
                       ...summary,
@@ -2147,10 +2387,14 @@ const DatLichNhieuChuyenKhoa = () => {
 
                   return mergedData.length > 0 ? (
                     <>
-              <Table
+                      <Table
                         dataSource={mergedData}
-                        rowKey={(record, index) => record.slotId?.toString() || record._id || `appt-${index}`}
-                pagination={false}
+                        rowKey={(record, index) =>
+                          record.slotId?.toString() ||
+                          record._id ||
+                          `appt-${index}`
+                        }
+                        pagination={false}
                         columns={[
                           {
                             title: "Bác sĩ",
@@ -2170,13 +2414,17 @@ const DatLichNhieuChuyenKhoa = () => {
                             key: "reason",
                             render: (text) => {
                               const displayText =
-                                typeof text === "string" && text.trim().length > 0
+                                typeof text === "string" &&
+                                text.trim().length > 0
                                   ? text
                                   : "Không có";
                               return (
-                                <Text ellipsis={{ tooltip: displayText }} style={{ maxWidth: 200 }}>
+                                <Text
+                                  ellipsis={{ tooltip: displayText }}
+                                  style={{ maxWidth: 200 }}
+                                >
                                   {displayText}
-                              </Text>
+                                </Text>
                               );
                             },
                           },
@@ -2184,8 +2432,15 @@ const DatLichNhieuChuyenKhoa = () => {
                             title: "Thời gian",
                             key: "time",
                             render: (_, record) => {
-                              if (record.scheduledStart && record.scheduledEnd) {
-                                return `${dayjs(record.scheduledStart).format("HH:mm")} - ${dayjs(record.scheduledEnd).format("HH:mm")}`;
+                              if (
+                                record.scheduledStart &&
+                                record.scheduledEnd
+                              ) {
+                                return `${dayjs(record.scheduledStart).format(
+                                  "HH:mm"
+                                )} - ${dayjs(record.scheduledEnd).format(
+                                  "HH:mm"
+                                )}`;
                               }
                               return "N/A";
                             },
@@ -2196,7 +2451,9 @@ const DatLichNhieuChuyenKhoa = () => {
                             key: "mode",
                             render: (mode) => (
                               <Tag color={mode === "online" ? "blue" : "green"}>
-                                {mode === "online" ? "Trực tuyến" : "Tại phòng khám"}
+                                {mode === "online"
+                                  ? "Trực tuyến"
+                                  : "Tại phòng khám"}
                               </Tag>
                             ),
                           },
@@ -2244,10 +2501,7 @@ const DatLichNhieuChuyenKhoa = () => {
                   <Title level={4} style={{ margin: 0 }}>
                     Tổng thanh toán:
                   </Title>
-                  <Title
-                    level={3}
-                    style={{ margin: 0, color: "#52c41a" }}
-                  >
+                  <Title level={3} style={{ margin: 0, color: "#52c41a" }}>
                     {paymentSummary.totalAmount
                       ? paymentSummary.totalAmount.toLocaleString("vi-VN")
                       : "0"}{" "}
@@ -2256,10 +2510,12 @@ const DatLichNhieuChuyenKhoa = () => {
                 </div>
 
                 {/* Payment Button */}
-                {paymentSummary.totalAmount > 0 && (paymentSummary.appointmentSummaries?.length > 0 || paymentSummary.acceptedAppointments?.length > 0) ? (
+                {paymentSummary.totalAmount > 0 &&
+                (paymentSummary.appointmentSummaries?.length > 0 ||
+                  paymentSummary.acceptedAppointments?.length > 0) ? (
                   <div style={{ textAlign: "center", marginTop: 24 }}>
-              <Button
-                type="primary"
+                    <Button
+                      type="primary"
                       size="large"
                       onClick={handleConfirmPayment}
                       loading={processingPayment}
@@ -2270,23 +2526,27 @@ const DatLichNhieuChuyenKhoa = () => {
                         fontSize: "16px",
                       }}
                     >
-                      {processingPayment ? "Đang xử lý..." : "Xác nhận thanh toán"}
-              </Button>
+                      {processingPayment
+                        ? "Đang xử lý..."
+                        : "Xác nhận thanh toán"}
+                    </Button>
                     <Paragraph
                       type="secondary"
                       style={{ marginTop: 12, marginBottom: 0 }}
                     >
-                      Bạn sẽ được chuyển đến trang thanh toán PayOS. Sau khi thanh toán thành công, lịch hẹn sẽ được tạo và chờ bác sĩ duyệt.
+                      Bạn sẽ được chuyển đến trang thanh toán PayOS. Sau khi
+                      thanh toán thành công, lịch hẹn sẽ được tạo và chờ bác sĩ
+                      duyệt.
                     </Paragraph>
                     <Button
-                onClick={() => {
+                      onClick={() => {
                         setCurrentStep(2);
                         setPaymentSummary(null);
-                }}
+                      }}
                       style={{ marginTop: 16 }}
-              >
+                    >
                       Quay lại
-              </Button>
+                    </Button>
                   </div>
                 ) : (
                   <Alert
@@ -2311,8 +2571,8 @@ const DatLichNhieuChuyenKhoa = () => {
         {/* Modal for selecting doctor and time slot */}
         <Modal
           title={
-            appointmentToReplace 
-              ? `Đổi slot - ${currentSpecialization?.name}` 
+            appointmentToReplace
+              ? `Đổi slot - ${currentSpecialization?.name}`
               : `Chọn bác sĩ và khung giờ - ${currentSpecialization?.name}`
           }
           open={showDoctorModal}
@@ -2329,11 +2589,11 @@ const DatLichNhieuChuyenKhoa = () => {
           footer={null}
           width={1000}
           style={{ top: 20 }}
-          bodyStyle={{ 
-            maxHeight: 'calc(100vh - 120px)', 
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            padding: '24px'
+          bodyStyle={{
+            maxHeight: "calc(100vh - 120px)",
+            overflowY: "auto",
+            overflowX: "hidden",
+            padding: "24px",
           }}
         >
           {loadingDoctors ? (
@@ -2351,20 +2611,36 @@ const DatLichNhieuChuyenKhoa = () => {
               {!selectedDoctor ? (
                 <div>
                   <Title level={4}>Chọn bác sĩ</Title>
-                  <div style={{ maxHeight: "500px", overflowY: "auto", paddingRight: 8 }}>
-                    <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+                  <div
+                    style={{
+                      maxHeight: "500px",
+                      overflowY: "auto",
+                      paddingRight: 8,
+                    }}
+                  >
+                    <Space
+                      direction="vertical"
+                      size="middle"
+                      style={{ width: "100%" }}
+                    >
                       {availableDoctors.map((doctor) => {
-                      const doctorName = doctor.userId?.fullName || doctor.fullName;
-                      const displayName = doctorName?.startsWith("BS.") ? doctorName : `BS. ${doctorName}`;
-                      const specializationNames = doctor.specializationIds?.map(s => s.name || s).join(", ") || "";
-                      
-                      return (
-                        <Card
-                          key={doctor._id}
-                          hoverable
-                          onClick={() => handleDoctorSelect(doctor)}
-                          style={{ cursor: "pointer", width: "100%" }}
-                        >
+                        const doctorName =
+                          doctor.userId?.fullName || doctor.fullName;
+                        const displayName = doctorName?.startsWith("BS.")
+                          ? doctorName
+                          : `BS. ${doctorName}`;
+                        const specializationNames =
+                          doctor.specializationIds
+                            ?.map((s) => s.name || s)
+                            .join(", ") || "";
+
+                        return (
+                          <Card
+                            key={doctor._id}
+                            hoverable
+                            onClick={() => handleDoctorSelect(doctor)}
+                            style={{ cursor: "pointer", width: "100%" }}
+                          >
                             <div style={{ display: "flex", gap: 16 }}>
                               <Avatar
                                 size={80}
@@ -2373,38 +2649,61 @@ const DatLichNhieuChuyenKhoa = () => {
                                 style={{ flexShrink: 0 }}
                               />
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <Title level={4} style={{ marginBottom: 8, marginTop: 0 }}>
+                                <Title
+                                  level={4}
+                                  style={{ marginBottom: 8, marginTop: 0 }}
+                                >
                                   {displayName}
                                 </Title>
-                                
-                                <div style={{ marginBottom: 8, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+
+                                <div
+                                  style={{
+                                    marginBottom: 8,
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 8,
+                                    alignItems: "center",
+                                  }}
+                                >
                                   {specializationNames && (
-                                    <Tag color="blue">{specializationNames}</Tag>
+                                    <Tag color="blue">
+                                      {specializationNames}
+                                    </Tag>
                                   )}
                                   {doctor.educationLevel && (
-                                    <Tag color="cyan">{doctor.educationLevel}</Tag>
+                                    <Tag color="cyan">
+                                      {doctor.educationLevel}
+                                    </Tag>
                                   )}
                                 </div>
-                                
+
                                 {doctor.yearsExperience && (
                                   <div style={{ marginBottom: 8 }}>
                                     <Text type="secondary">
-                                      <UserOutlined style={{ marginRight: 4 }} />
+                                      <UserOutlined
+                                        style={{ marginRight: 4 }}
+                                      />
                                       {doctor.yearsExperience} năm kinh nghiệm
                                     </Text>
                                   </div>
                                 )}
-                                
+
                                 {doctor.bio && (
                                   <Paragraph
                                     ellipsis={{ rows: 2 }}
-                                    style={{ marginBottom: 8, fontSize: "14px" }}
+                                    style={{
+                                      marginBottom: 8,
+                                      fontSize: "14px",
+                                    }}
                                   >
                                     {doctor.bio}
                                   </Paragraph>
                                 )}
-                                
-                                <div className="doctor-rating" style={{ marginTop: 4 }}>
+
+                                <div
+                                  className="doctor-rating"
+                                  style={{ marginTop: 4 }}
+                                >
                                   <Space>
                                     <Rate
                                       disabled
@@ -2413,7 +2712,10 @@ const DatLichNhieuChuyenKhoa = () => {
                                       count={5}
                                       style={{ fontSize: 14 }}
                                     />
-                                    <Text type="secondary" style={{ fontSize: "14px" }}>
+                                    <Text
+                                      type="secondary"
+                                      style={{ fontSize: "14px" }}
+                                    >
                                       ({doctor.ratingCount || 0} đánh giá)
                                     </Text>
                                     {doctor.ratingCount > 0 && (
@@ -2426,7 +2728,11 @@ const DatLichNhieuChuyenKhoa = () => {
                                           setReviewDoctor(doctor);
                                           setShowReviewModal(true);
                                         }}
-                                        style={{ padding: 0, height: 'auto', fontSize: "14px" }}
+                                        style={{
+                                          padding: 0,
+                                          height: "auto",
+                                          fontSize: "14px",
+                                        }}
                                       >
                                         Xem đánh giá
                                       </Button>
@@ -2436,28 +2742,62 @@ const DatLichNhieuChuyenKhoa = () => {
                               </div>
                             </div>
                           </Card>
-                      );
-                    })}
+                        );
+                      })}
                     </Space>
                   </div>
                 </div>
               ) : (
                 <>
                   {/* Selected Doctor Info */}
-                  <Card style={{ marginBottom: 16, width: '100%', maxWidth: '100%' }}>
-                    <div style={{ display: "flex", gap: 16, alignItems: "flex-start", width: '100%' }}>
+                  <Card
+                    style={{
+                      marginBottom: 16,
+                      width: "100%",
+                      maxWidth: "100%",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 16,
+                        alignItems: "flex-start",
+                        width: "100%",
+                      }}
+                    >
                       <Avatar
                         size={80}
                         src={selectedDoctor.avatarUrl}
                         icon={<UserOutlined />}
                         style={{ flexShrink: 0 }}
                       />
-                      <div style={{ flex: 1, minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                          <Title level={4} style={{ marginTop: 0, marginBottom: 8 }}>
+                      <div
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          maxWidth: "100%",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                            marginBottom: 8,
+                          }}
+                        >
+                          <Title
+                            level={4}
+                            style={{ marginTop: 0, marginBottom: 8 }}
+                          >
                             {(() => {
-                              const doctorName = selectedDoctor.userId?.fullName || selectedDoctor.fullName;
-                              return doctorName?.startsWith("BS.") ? doctorName : `BS. ${doctorName}`;
+                              const doctorName =
+                                selectedDoctor.userId?.fullName ||
+                                selectedDoctor.fullName;
+                              return doctorName?.startsWith("BS.")
+                                ? doctorName
+                                : `BS. ${doctorName}`;
                             })()}
                           </Title>
                           <Button
@@ -2470,18 +2810,31 @@ const DatLichNhieuChuyenKhoa = () => {
                             Chọn lại
                           </Button>
                         </div>
-                        
-                        <div style={{ marginBottom: 8, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                          {selectedDoctor.specializationIds && selectedDoctor.specializationIds.length > 0 && (
-                            <Tag color="blue">
-                              {selectedDoctor.specializationIds.map(s => s.name || s).join(", ")}
+
+                        <div
+                          style={{
+                            marginBottom: 8,
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 8,
+                            alignItems: "center",
+                          }}
+                        >
+                          {selectedDoctor.specializationIds &&
+                            selectedDoctor.specializationIds.length > 0 && (
+                              <Tag color="blue">
+                                {selectedDoctor.specializationIds
+                                  .map((s) => s.name || s)
+                                  .join(", ")}
+                              </Tag>
+                            )}
+                          {selectedDoctor.educationLevel && (
+                            <Tag color="cyan">
+                              {selectedDoctor.educationLevel}
                             </Tag>
                           )}
-                          {selectedDoctor.educationLevel && (
-                            <Tag color="cyan">{selectedDoctor.educationLevel}</Tag>
-                          )}
                         </div>
-                        
+
                         {selectedDoctor.yearsExperience && (
                           <div style={{ marginBottom: 8 }}>
                             <Text type="secondary">
@@ -2490,13 +2843,15 @@ const DatLichNhieuChuyenKhoa = () => {
                             </Text>
                           </div>
                         )}
-                        
+
                         {selectedDoctor.bio && (
-                          <Paragraph style={{ marginBottom: 8, fontSize: "14px" }}>
+                          <Paragraph
+                            style={{ marginBottom: 8, fontSize: "14px" }}
+                          >
                             {selectedDoctor.bio}
                           </Paragraph>
                         )}
-                        
+
                         <div className="doctor-rating" style={{ marginTop: 4 }}>
                           <Space>
                             <Rate
@@ -2518,7 +2873,11 @@ const DatLichNhieuChuyenKhoa = () => {
                                   setReviewDoctor(selectedDoctor);
                                   setShowReviewModal(true);
                                 }}
-                                style={{ padding: 0, height: 'auto', fontSize: "14px" }}
+                                style={{
+                                  padding: 0,
+                                  height: "auto",
+                                  fontSize: "14px",
+                                }}
                               >
                                 Xem đánh giá
                               </Button>
@@ -2607,18 +2966,20 @@ const DatLichNhieuChuyenKhoa = () => {
                           Không có thông tin phòng khám
                         </Text>
                       )}
-                      
+
                       {/* Map - Show when clinic is available */}
                       {defaultClinic && (
                         <div style={{ marginTop: 16 }}>
-                          <ClinicMap 
+                          <ClinicMap
                             clinic={defaultClinic}
                             onGetDirections={(clinic) => {
                               if (clinic?.latitude && clinic?.longitude) {
                                 const url = `https://www.google.com/maps/dir/?api=1&destination=${clinic.latitude},${clinic.longitude}`;
                                 window.open(url, "_blank");
                               } else if (clinic?.address) {
-                                const address = encodeURIComponent(clinic.address);
+                                const address = encodeURIComponent(
+                                  clinic.address
+                                );
                                 const url = `https://www.google.com/maps/dir/?api=1&destination=${address}`;
                                 window.open(url, "_blank");
                               }
@@ -2631,7 +2992,13 @@ const DatLichNhieuChuyenKhoa = () => {
 
                   {/* Price Table - Show when mode is selected */}
                   {selectedMode && visitDate && (
-                    <div style={{ marginBottom: 16, width: '100%', maxWidth: '100%' }}>
+                    <div
+                      style={{
+                        marginBottom: 16,
+                        width: "100%",
+                        maxWidth: "100%",
+                      }}
+                    >
                       <Text
                         strong
                         style={{ display: "block", marginBottom: 12 }}
@@ -2643,8 +3010,8 @@ const DatLichNhieuChuyenKhoa = () => {
                           border: "1px solid #d9d9d9",
                           borderRadius: "4px",
                           overflow: "hidden",
-                          width: '100%',
-                          maxWidth: '100%',
+                          width: "100%",
+                          maxWidth: "100%",
                         }}
                       >
                         <table
@@ -2694,9 +3061,7 @@ const DatLichNhieuChuyenKhoa = () => {
                                     : "#fff",
                               }}
                             >
-                              <td
-                                style={{ padding: "12px", fontWeight: 600 }}
-                              >
+                              <td style={{ padding: "12px", fontWeight: 600 }}>
                                 Khám online
                               </td>
                               <td
@@ -2732,9 +3097,7 @@ const DatLichNhieuChuyenKhoa = () => {
                                     : "#fff",
                               }}
                             >
-                              <td
-                                style={{ padding: "12px", fontWeight: 600 }}
-                              >
+                              <td style={{ padding: "12px", fontWeight: 600 }}>
                                 Khám tại phòng khám
                               </td>
                               <td
@@ -2776,7 +3139,10 @@ const DatLichNhieuChuyenKhoa = () => {
                       >
                         <Text strong>
                           💰 Tổng thanh toán:{" "}
-                          {calculatePrice(selectedMode, visitDate).toLocaleString("vi-VN")}
+                          {calculatePrice(
+                            selectedMode,
+                            visitDate
+                          ).toLocaleString("vi-VN")}
                           đ
                         </Text>
                       </div>
@@ -2793,55 +3159,82 @@ const DatLichNhieuChuyenKhoa = () => {
                       <Row gutter={[12, 12]} style={{ margin: 0 }}>
                         {selectedDoctor.availableSlots.map((slot) => {
                           // Check if this slot conflicts with existing appointments
-                          const slotStart = new Date(slot.startAt || slot.startTime);
-                          const slotEnd = new Date(slot.endAt || slot.endTime);
-                          
-                          // Check if this is the current slot being replaced
-                          const isCurrentSlot = appointmentToReplace && (
-                            (slot._id && appointmentToReplace.slotId && slot._id.toString() === appointmentToReplace.slotId.toString()) ||
-                            (appointmentToReplace.scheduledStart && 
-                             slot.startAt && 
-                             new Date(slot.startAt).getTime() === new Date(appointmentToReplace.scheduledStart).getTime())
+                          const slotStart = new Date(
+                            slot.startAt || slot.startTime
                           );
-                          
+                          const slotEnd = new Date(slot.endAt || slot.endTime);
+
+                          // Check if this is the current slot being replaced
+                          const isCurrentSlot =
+                            appointmentToReplace &&
+                            ((slot._id &&
+                              appointmentToReplace.slotId &&
+                              slot._id.toString() ===
+                                appointmentToReplace.slotId.toString()) ||
+                              (appointmentToReplace.scheduledStart &&
+                                slot.startAt &&
+                                new Date(slot.startAt).getTime() ===
+                                  new Date(
+                                    appointmentToReplace.scheduledStart
+                                  ).getTime()));
+
                           // Check if slot is already used in local appointments
-                          const existingAppointment = appointments.find((apt) => {
-                            // Skip the appointment being replaced
-                            if (appointmentToReplace && apt._id === appointmentToReplace._id) {
-                              return false;
+                          const existingAppointment = appointments.find(
+                            (apt) => {
+                              // Skip the appointment being replaced
+                              if (
+                                appointmentToReplace &&
+                                apt._id === appointmentToReplace._id
+                              ) {
+                                return false;
+                              }
+
+                              const aptStart = new Date(apt.scheduledStart);
+                              const aptEnd = new Date(apt.scheduledEnd);
+
+                              // Check if slot time overlaps with appointment time
+                              return (
+                                (slotStart >= aptStart && slotStart < aptEnd) ||
+                                (slotEnd > aptStart && slotEnd <= aptEnd) ||
+                                (slotStart <= aptStart && slotEnd >= aptEnd)
+                              );
                             }
-                            
-                            const aptStart = new Date(apt.scheduledStart);
-                            const aptEnd = new Date(apt.scheduledEnd);
-                            
-                            // Check if slot time overlaps with appointment time
-                            return (
-                              (slotStart >= aptStart && slotStart < aptEnd) ||
-                              (slotEnd > aptStart && slotEnd <= aptEnd) ||
-                              (slotStart <= aptStart && slotEnd >= aptEnd)
-                            );
-                          });
+                          );
 
                           // Slot is disabled if:
                           // 1. It's blocked by doctor
                           // 2. It's already used in local appointments (and not the current slot being replaced)
                           // 3. It's not available from API (booked by other patients in DB) - ALWAYS disable these
-                          const isDisabled = slot.isBlocked || 
+                          const isDisabled =
+                            slot.isBlocked ||
                             (existingAppointment && !isCurrentSlot) ||
                             (slot.available === false && !isCurrentSlot); // Disable if booked by others in DB (explicitly check for false)
 
-                          const slotTimeDisplay = slot.timeRange || 
-                            (slot.startAt && slot.endAt 
-                              ? `${dayjs(slot.startAt).format("HH:mm")} - ${dayjs(slot.endAt).format("HH:mm")}`
+                          const slotTimeDisplay =
+                            slot.timeRange ||
+                            (slot.startAt && slot.endAt
+                              ? `${dayjs(slot.startAt).format(
+                                  "HH:mm"
+                                )} - ${dayjs(slot.endAt).format("HH:mm")}`
                               : `${slot.startTime} - ${slot.endTime}`);
 
                           return (
-                            <Col xs={12} sm={12} md={8} lg={6} key={slot._id || `slot-${slot.startTime}`} style={{ padding: '6px' }}>
+                            <Col
+                              xs={12}
+                              sm={12}
+                              md={8}
+                              lg={6}
+                              key={slot._id || `slot-${slot.startTime}`}
+                              style={{ padding: "6px" }}
+                            >
                               <Button
                                 type={
                                   selectedSlot?._id === slot._id ||
-                                  (selectedSlot && slot.startAt && selectedSlot.startAt && 
-                                   new Date(selectedSlot.startAt).getTime() === new Date(slot.startAt).getTime())
+                                  (selectedSlot &&
+                                    slot.startAt &&
+                                    selectedSlot.startAt &&
+                                    new Date(selectedSlot.startAt).getTime() ===
+                                      new Date(slot.startAt).getTime())
                                     ? "primary"
                                     : "default"
                                 }
@@ -2849,26 +3242,41 @@ const DatLichNhieuChuyenKhoa = () => {
                                 disabled={isDisabled}
                                 block
                                 size="large"
-                                style={{ 
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  fontSize: '14px',
-                                  height: '45px',
-                                  fontWeight: 500
+                                style={{
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  fontSize: "14px",
+                                  height: "45px",
+                                  fontWeight: 500,
                                 }}
                                 onClick={() => {
                                   if (!isDisabled) {
                                     setSelectedSlot(slot);
                                   } else {
                                     if (slot.isBlocked) {
-                                      message.warning(`Slot này đã bị chặn bởi bác sĩ${slot.leaveReason ? `: ${slot.leaveReason}` : ""}. Vui lòng chọn slot khác.`);
+                                      message.warning(
+                                        `Slot này đã bị chặn bởi bác sĩ${
+                                          slot.leaveReason
+                                            ? `: ${slot.leaveReason}`
+                                            : ""
+                                        }. Vui lòng chọn slot khác.`
+                                      );
                                     } else if (existingAppointment) {
-                                      message.warning(`Slot này đã được chọn cho lịch hẹn với ${existingAppointment.doctor?.fullName || "bác sĩ"}. Vui lòng chọn slot khác.`);
+                                      message.warning(
+                                        `Slot này đã được chọn cho lịch hẹn với ${
+                                          existingAppointment.doctor
+                                            ?.fullName || "bác sĩ"
+                                        }. Vui lòng chọn slot khác.`
+                                      );
                                     } else if (!slot.available) {
-                                      message.warning("Slot này đã được đặt bởi bệnh nhân khác. Vui lòng chọn slot khác.");
+                                      message.warning(
+                                        "Slot này đã được đặt bởi bệnh nhân khác. Vui lòng chọn slot khác."
+                                      );
                                     } else {
-                                      message.warning("Slot này không khả dụng. Vui lòng chọn slot khác.");
+                                      message.warning(
+                                        "Slot này không khả dụng. Vui lòng chọn slot khác."
+                                      );
                                     }
                                   }
                                 }}
@@ -2876,9 +3284,15 @@ const DatLichNhieuChuyenKhoa = () => {
                                   isCurrentSlot
                                     ? "Slot hiện tại (đang được đổi)"
                                     : slot.isBlocked
-                                    ? `Slot bị chặn: ${slot.leaveReason || "Bác sĩ không có mặt"}`
+                                    ? `Slot bị chặn: ${
+                                        slot.leaveReason ||
+                                        "Bác sĩ không có mặt"
+                                      }`
                                     : existingAppointment
-                                    ? `Slot này đã được chọn cho lịch hẹn với ${existingAppointment.doctor?.fullName || "bác sĩ"}`
+                                    ? `Slot này đã được chọn cho lịch hẹn với ${
+                                        existingAppointment.doctor?.fullName ||
+                                        "bác sĩ"
+                                      }`
                                     : !slot.available
                                     ? "Slot này đã được đặt bởi người khác"
                                     : ""
@@ -2886,17 +3300,26 @@ const DatLichNhieuChuyenKhoa = () => {
                               >
                                 {slotTimeDisplay}
                                 {isCurrentSlot && " (Hiện tại)"}
-                                {existingAppointment && !isCurrentSlot && " (Đã chọn)"}
+                                {existingAppointment &&
+                                  !isCurrentSlot &&
+                                  " (Đã chọn)"}
                                 {slot.isBlocked && " (Đã chặn)"}
-                                {!slot.available && !existingAppointment && !slot.isBlocked && " (Đã đặt)"}
+                                {!slot.available &&
+                                  !existingAppointment &&
+                                  !slot.isBlocked &&
+                                  " (Đã đặt)"}
                               </Button>
                             </Col>
                           );
                         })}
                       </Row>
                       {appointments.some((apt) => {
-                        const slotStart = new Date(selectedSlot?.startAt || selectedSlot?.startTime);
-                        const slotEnd = new Date(selectedSlot?.endAt || selectedSlot?.endTime);
+                        const slotStart = new Date(
+                          selectedSlot?.startAt || selectedSlot?.startTime
+                        );
+                        const slotEnd = new Date(
+                          selectedSlot?.endAt || selectedSlot?.endTime
+                        );
                         const aptStart = new Date(apt.scheduledStart);
                         const aptEnd = new Date(apt.scheduledEnd);
                         return (
@@ -2904,15 +3327,22 @@ const DatLichNhieuChuyenKhoa = () => {
                           (slotEnd > aptStart && slotEnd <= aptEnd) ||
                           (slotStart <= aptStart && slotEnd >= aptEnd)
                         );
-                      }) && selectedSlot && (
-                        <Alert
-                          message="Cảnh báo"
-                          description={`Slot ${dayjs(selectedSlot.startAt || selectedSlot.startTime).format("HH:mm")} - ${dayjs(selectedSlot.endAt || selectedSlot.endTime).format("HH:mm")} trùng với một lịch hẹn đã chọn. Vui lòng chọn slot khác.`}
-                          type="warning"
-                          showIcon
-                          style={{ marginTop: 16 }}
-                        />
-                      )}
+                      }) &&
+                        selectedSlot && (
+                          <Alert
+                            message="Cảnh báo"
+                            description={`Slot ${dayjs(
+                              selectedSlot.startAt || selectedSlot.startTime
+                            ).format("HH:mm")} - ${dayjs(
+                              selectedSlot.endAt || selectedSlot.endTime
+                            ).format(
+                              "HH:mm"
+                            )} trùng với một lịch hẹn đã chọn. Vui lòng chọn slot khác.`}
+                            type="warning"
+                            showIcon
+                            style={{ marginTop: 16 }}
+                          />
+                        )}
                     </>
                   ) : (
                     <Empty description="Không có khung giờ trống" />
@@ -2920,7 +3350,7 @@ const DatLichNhieuChuyenKhoa = () => {
 
                   {/* Reason Input */}
                   <Divider />
-                  <div style={{ marginBottom: 16, width: '100%' }}>
+                  <div style={{ marginBottom: 16, width: "100%" }}>
                     <Title level={5}>Lý do khám</Title>
                     <TextArea
                       ref={textareaRef}
@@ -2930,10 +3360,13 @@ const DatLichNhieuChuyenKhoa = () => {
                       onChange={(e) => {
                         const newValue = e.target.value;
                         const newLength = newValue.length;
-                        
-                        // Cắt bớt nếu vượt quá 100 ký tự
-                        if (newLength > 100) {
-                          const truncatedValue = newValue.slice(0, 100);
+
+                        // Cắt bớt nếu vượt quá giới hạn ký tự
+                        if (newLength > REASON_MAX_LENGTH) {
+                          const truncatedValue = newValue.slice(
+                            0,
+                            REASON_MAX_LENGTH
+                          );
                           e.target.value = truncatedValue;
                           setAppointmentReason(truncatedValue);
                         } else {
@@ -2942,45 +3375,47 @@ const DatLichNhieuChuyenKhoa = () => {
                       }}
                       onKeyDown={(e) => {
                         const currentLength = appointmentReason.length;
-                        
-                        // Nếu đã có 100 ký tự
-                        if (currentLength >= 100) {
+
+                        // Nếu đã đạt giới hạn ký tự
+                        if (currentLength >= REASON_MAX_LENGTH) {
                           // Cho phép xóa (Backspace, Delete)
-                          if (e.key === 'Backspace' || e.key === 'Delete') {
+                          if (e.key === "Backspace" || e.key === "Delete") {
                             return;
                           }
-                          
+
                           // Cho phép điều hướng
                           const navigationKeys = [
-                            'ArrowLeft',
-                            'ArrowRight',
-                            'ArrowUp',
-                            'ArrowDown',
-                            'Home',
-                            'End',
-                            'Tab',
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "ArrowUp",
+                            "ArrowDown",
+                            "Home",
+                            "End",
+                            "Tab",
                           ];
                           if (navigationKeys.includes(e.key)) {
                             return;
                           }
-                          
+
                           // Cho phép Ctrl/Cmd + A, C, X, Z (nhưng chặn Ctrl+V)
                           if (e.ctrlKey || e.metaKey) {
-                            if (e.key === 'v' || e.key === 'V') {
+                            if (e.key === "v" || e.key === "V") {
                               e.preventDefault();
                               return false;
                             }
                             return;
                           }
-                          
+
                           // Chặn Enter
-                          if (e.key === 'Enter') {
+                          if (e.key === "Enter") {
                             e.preventDefault();
                             return false;
                           }
-                          
+
                           // Chặn các phím nhập khác
-                          const isCharacterKey = e.key.length === 1 && !navigationKeys.includes(e.key);
+                          const isCharacterKey =
+                            e.key.length === 1 &&
+                            !navigationKeys.includes(e.key);
                           if (isCharacterKey) {
                             e.preventDefault();
                             return false;
@@ -2988,18 +3423,18 @@ const DatLichNhieuChuyenKhoa = () => {
                         }
                       }}
                       onBeforeInput={(e) => {
-                        // Chặn input event nếu đã có 100 ký tự
+                        // Chặn input event nếu đã đạt giới hạn ký tự
                         const currentText = appointmentReason;
-                        if (currentText.length >= 100) {
+                        if (currentText.length >= REASON_MAX_LENGTH) {
                           // Kiểm tra xem có phải đang xóa không
                           const inputType = e.inputType;
-                          const isDeleteOperation = 
-                            inputType === 'deleteContentBackward' || 
-                            inputType === 'deleteContentForward' || 
-                            inputType === 'deleteByDrag' || 
-                            inputType === 'deleteCompositionText' ||
-                            inputType === 'deleteWordBackward' ||
-                            inputType === 'deleteWordForward';
+                          const isDeleteOperation =
+                            inputType === "deleteContentBackward" ||
+                            inputType === "deleteContentForward" ||
+                            inputType === "deleteByDrag" ||
+                            inputType === "deleteCompositionText" ||
+                            inputType === "deleteWordBackward" ||
+                            inputType === "deleteWordForward";
                           if (isDeleteOperation) {
                             // Đang xóa, cho phép
                             return;
@@ -3011,69 +3446,103 @@ const DatLichNhieuChuyenKhoa = () => {
                         }
                       }}
                       onInput={(e) => {
-                        // Cắt bớt nếu vượt quá 100 ký tự
+                        // Cắt bớt nếu vượt quá giới hạn ký tự
                         const newValue = e.target.value;
-                        if (newValue.length > 100) {
-                          const truncatedValue = newValue.slice(0, 100);
+                        if (newValue.length > REASON_MAX_LENGTH) {
+                          const truncatedValue = newValue.slice(
+                            0,
+                            REASON_MAX_LENGTH
+                          );
                           e.target.value = truncatedValue;
                           setAppointmentReason(truncatedValue);
                         }
                       }}
                       onPaste={(e) => {
                         const currentLength = appointmentReason.length;
-                        // Nếu đã có 100 ký tự, chặn paste hoàn toàn
-                        if (currentLength >= 100) {
+                        // Nếu đã đạt giới hạn ký tự, chặn paste hoàn toàn
+                        if (currentLength >= REASON_MAX_LENGTH) {
                           e.preventDefault();
                           e.stopPropagation();
                           return;
                         }
-                        // Nếu chưa đạt 100, xử lý paste
-                        const pastedText = e.clipboardData.getData('text/plain');
+                        // Nếu chưa đạt giới hạn, xử lý paste
+                        const pastedText =
+                          e.clipboardData.getData("text/plain");
                         const textarea = e.target;
                         const selectionStart = textarea.selectionStart || 0;
                         const selectionEnd = textarea.selectionEnd || 0;
-                        const textBefore = appointmentReason.substring(0, selectionStart);
-                        const textAfter = appointmentReason.substring(selectionEnd);
+                        const textBefore = appointmentReason.substring(
+                          0,
+                          selectionStart
+                        );
+                        const textAfter =
+                          appointmentReason.substring(selectionEnd);
                         const newText = textBefore + pastedText + textAfter;
-                        
-                        if (newText.length > 100) {
+
+                        if (newText.length > REASON_MAX_LENGTH) {
                           e.preventDefault();
                           // Chỉ paste phần vừa đủ
-                          const maxAllowedLength = 100;
-                          const availableLength = maxAllowedLength - (textBefore.length + textAfter.length);
+                          const maxAllowedLength = REASON_MAX_LENGTH;
+                          const availableLength =
+                            maxAllowedLength -
+                            (textBefore.length + textAfter.length);
                           if (availableLength > 0) {
-                            const truncatedPaste = pastedText.substring(0, availableLength);
-                            const finalText = textBefore + truncatedPaste + textAfter;
+                            const truncatedPaste = pastedText.substring(
+                              0,
+                              availableLength
+                            );
+                            const finalText =
+                              textBefore + truncatedPaste + textAfter;
                             setAppointmentReason(finalText);
                             // Set cursor position sau text vừa paste
                             setTimeout(() => {
-                              const newCursorPos = textBefore.length + truncatedPaste.length;
-                              textarea.setSelectionRange(newCursorPos, newCursorPos);
+                              const newCursorPos =
+                                textBefore.length + truncatedPaste.length;
+                              textarea.setSelectionRange(
+                                newCursorPos,
+                                newCursorPos
+                              );
                             }, 0);
                           }
                         }
                       }}
-                      maxLength={100}
+                      maxLength={REASON_MAX_LENGTH}
                       showCount
-                      style={{ 
-                        width: '100%', 
-                        maxWidth: '100%',
-                        ...(appointmentReason.length === 100 ? { 
-                          borderColor: '#faad14',
-                          backgroundColor: '#fffbe6'
-                        } : {})
+                      style={{
+                        width: "100%",
+                        maxWidth: "100%",
+                        ...(appointmentReason.length === REASON_MAX_LENGTH
+                          ? {
+                              borderColor: "#faad14",
+                              backgroundColor: "#fffbe6",
+                            }
+                          : {}),
                       }}
                     />
-                    {appointmentReason.length === 100 && (
+                    {appointmentReason.length === REASON_MAX_LENGTH && (
                       <div style={{ marginTop: 4 }}>
-                        <Text type="warning" style={{ fontSize: '12px', fontWeight: 500 }}>
-                          ⚠️ Bạn đã nhập đủ 100 ký tự (giới hạn tối đa)
+                        <Text
+                          type="warning"
+                          style={{ fontSize: "12px", fontWeight: 500 }}
+                        >
+                          ⚠️ Bạn đã nhập đủ {REASON_MAX_LENGTH} ký tự (giới hạn
+                          tối đa)
                         </Text>
                       </div>
                     )}
-                    {appointmentReason.length < 100 && (
-                      <Text type="secondary" style={{ fontSize: '12px', marginTop: 4, display: 'block' }}>
-                        Bạn có thể nhập tối đa 100 ký tự để mô tả lý do khám ({100 - appointmentReason.length} ký tự còn lại)
+                    {appointmentReason.length < REASON_MAX_LENGTH && (
+                      <Text
+                        type="secondary"
+                        style={{
+                          fontSize: "12px",
+                          marginTop: 4,
+                          display: "block",
+                        }}
+                      >
+                        Bạn có thể nhập tối đa {REASON_MAX_LENGTH} ký tự để mô
+                        tả lý do khám (
+                        {REASON_MAX_LENGTH - appointmentReason.length} ký tự còn
+                        lại)
                       </Text>
                     )}
                   </div>
@@ -3142,7 +3611,11 @@ const DatLichNhieuChuyenKhoa = () => {
                   style={{ marginBottom: 16 }}
                   size="small"
                 >
-                  <Space direction="vertical" style={{ width: "100%" }} size="small">
+                  <Space
+                    direction="vertical"
+                    style={{ width: "100%" }}
+                    size="small"
+                  >
                     <Space>
                       <Avatar
                         size="small"
@@ -3194,7 +3667,9 @@ const DatLichNhieuChuyenKhoa = () => {
                         </Paragraph>
                         {review.doctorResponseAt && (
                           <Text type="secondary" style={{ fontSize: "12px" }}>
-                            {dayjs(review.doctorResponseAt).format("DD/MM/YYYY HH:mm")}
+                            {dayjs(review.doctorResponseAt).format(
+                              "DD/MM/YYYY HH:mm"
+                            )}
                           </Text>
                         )}
                       </div>
@@ -3202,13 +3677,15 @@ const DatLichNhieuChuyenKhoa = () => {
                   </Space>
                 </Card>
               ))}
-              {reviewsPagination && reviewsPagination.total > reviewsPagination.limit && (
-                <div style={{ textAlign: "center", marginTop: 16 }}>
-                  <Text type="secondary">
-                    Hiển thị {doctorReviews.length} / {reviewsPagination.total} đánh giá
-                  </Text>
-                </div>
-              )}
+              {reviewsPagination &&
+                reviewsPagination.total > reviewsPagination.limit && (
+                  <div style={{ textAlign: "center", marginTop: 16 }}>
+                    <Text type="secondary">
+                      Hiển thị {doctorReviews.length} /{" "}
+                      {reviewsPagination.total} đánh giá
+                    </Text>
+                  </div>
+                )}
             </div>
           ) : (
             <Empty description="Chưa có đánh giá nào" />

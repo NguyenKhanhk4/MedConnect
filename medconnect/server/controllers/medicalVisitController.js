@@ -15,14 +15,15 @@ import Payment from "../models/payment.model.js";
 import EducationLevelPrice from "../models/educationLevelPrice.model.js";
 import { ok, fail } from "../utils/response.js";
 import { ERROR_CODES } from "../constants/index.js";
-import {
-  createAppointmentNotification,
-} from "../services/notificationService.js";
+import { createAppointmentNotification } from "../services/notificationService.js";
 
 /**
  * Helper: Find or create the "self" patient profile for a user
  */
-async function getSelfPatient(appUserId, { createIfMissing = false, populateUser = false } = {}) {
+async function getSelfPatient(
+  appUserId,
+  { createIfMissing = false, populateUser = false } = {}
+) {
   if (!appUserId) return null;
 
   const applyPopulate = (query) =>
@@ -124,12 +125,7 @@ export async function getOrCreateVisit(req, res) {
     // Get patient profile (self) or create if missing
     const patient = await getSelfPatient(appUserId, { createIfMissing: true });
     if (!patient) {
-      return fail(
-        res,
-        404,
-        ERROR_CODES.NOT_FOUND,
-        "Patient profile not found"
-      );
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
     }
 
     // Return temporary visit data (not saved to DB yet)
@@ -146,7 +142,12 @@ export async function getOrCreateVisit(req, res) {
     });
   } catch (error) {
     console.error("❌ Error in getOrCreateVisit:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
@@ -225,12 +226,7 @@ export async function getAvailableDoctorsAndSlots(req, res) {
         const appointments = await Appointment.find({
           slotId: { $in: slotIds },
           status: {
-            $in: [
-              "pending_doctor",
-              "accepted",
-              "in_progress",
-              "done",
-            ],
+            $in: ["pending_doctor", "accepted", "in_progress", "done"],
           },
         })
           .select("slotId status")
@@ -250,18 +246,28 @@ export async function getAvailableDoctorsAndSlots(req, res) {
             endAt: slot.endAt,
             startTime: slot.startAt.toTimeString().slice(0, 5), // HH:MM
             endTime: slot.endAt.toTimeString().slice(0, 5),
-            timeRange: `${slot.startAt.toTimeString().slice(0, 5)} - ${slot.endAt
+            timeRange: `${slot.startAt
               .toTimeString()
-              .slice(0, 5)}`,
+              .slice(0, 5)} - ${slot.endAt.toTimeString().slice(0, 5)}`,
             available: true,
           }));
 
         // Calculate rating from Review model if ratingAvg is null/undefined or if ratingCount is 0 but there are reviews
-        let ratingAvg = doctor.ratingAvg !== undefined && doctor.ratingAvg !== null ? doctor.ratingAvg : 0;
-        let ratingCount = doctor.ratingCount !== undefined && doctor.ratingCount !== null ? doctor.ratingCount : 0;
-        
+        let ratingAvg =
+          doctor.ratingAvg !== undefined && doctor.ratingAvg !== null
+            ? doctor.ratingAvg
+            : 0;
+        let ratingCount =
+          doctor.ratingCount !== undefined && doctor.ratingCount !== null
+            ? doctor.ratingCount
+            : 0;
+
         // If rating is missing or count is 0, check if there are reviews in database
-        if ((ratingAvg === 0 && ratingCount === 0) || ratingAvg === null || ratingAvg === undefined) {
+        if (
+          (ratingAvg === 0 && ratingCount === 0) ||
+          ratingAvg === null ||
+          ratingAvg === undefined
+        ) {
           // Calculate rating from Review model
           const ratingStats = await Review.aggregate([
             { $match: { doctorId: doctor._id } },
@@ -273,7 +279,7 @@ export async function getAvailableDoctorsAndSlots(req, res) {
               },
             },
           ]);
-          
+
           if (ratingStats.length > 0 && ratingStats[0].totalReviews > 0) {
             ratingAvg = Math.round(ratingStats[0].avgRating * 10) / 10; // Round to 1 decimal
             ratingCount = ratingStats[0].totalReviews;
@@ -308,7 +314,12 @@ export async function getAvailableDoctorsAndSlots(req, res) {
     });
   } catch (error) {
     console.error("❌ Error in getAvailableDoctorsAndSlots:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
@@ -316,13 +327,13 @@ export async function getAvailableDoctorsAndSlots(req, res) {
  * Calculate payment summary for a list of appointments (pre-creation)
  * POST /api/medical-visits/calculate-payment-summary
  * POST /api/medical-visits/complete-planning (redirects here)
- * 
+ *
  * Flow mới:
  * 1. User chọn appointments và bấm "Hoàn tất"
  * 2. Gọi endpoint này để tính toán và hiển thị hóa đơn (KHÔNG tạo visit/appointments)
  * 3. User bấm "Xác nhận thanh toán" → Gọi createPaymentForVisit với appointments data
  * 4. Sau khi thanh toán thành công (webhook), mới tạo visit và appointments với status "pending_doctor"
- * 
+ *
  * Body: { visitDate, appointments: [{ doctorId, slotId, mode, clinicId, reason }] }
  */
 export async function calculatePaymentSummary(req, res) {
@@ -348,12 +359,7 @@ export async function calculatePaymentSummary(req, res) {
     });
 
     if (!visitDate) {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.BAD_REQUEST,
-        "visitDate is required"
-      );
+      return fail(res, 400, ERROR_CODES.BAD_REQUEST, "visitDate is required");
     }
 
     if (!appointments || !Array.isArray(appointments)) {
@@ -377,12 +383,7 @@ export async function calculatePaymentSummary(req, res) {
     // Get patient profile (self)
     const patient = await getSelfPatient(appUserId, { createIfMissing: true });
     if (!patient) {
-      return fail(
-        res,
-        404,
-        ERROR_CODES.NOT_FOUND,
-        "Patient profile not found"
-      );
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
     }
 
     // Validate all appointments
@@ -422,7 +423,12 @@ export async function calculatePaymentSummary(req, res) {
       // Get slot information
       const slot = await DoctorTimeSlot.findById(slotId);
       if (!slot) {
-        return fail(res, 404, ERROR_CODES.NOT_FOUND, `Time slot ${slotId} not found`);
+        return fail(
+          res,
+          404,
+          ERROR_CODES.NOT_FOUND,
+          `Time slot ${slotId} not found`
+        );
       }
 
       // Check if slot belongs to the doctor
@@ -496,8 +502,14 @@ export async function calculatePaymentSummary(req, res) {
           (start1 <= start2 && end1 >= end2)
         ) {
           conflicts.push({
-            appointment1: { doctorId: apt1.doctorId, time: apt1.scheduledStart },
-            appointment2: { doctorId: apt2.doctorId, time: apt2.scheduledStart },
+            appointment1: {
+              doctorId: apt1.doctorId,
+              time: apt1.scheduledStart,
+            },
+            appointment2: {
+              doctorId: apt2.doctorId,
+              time: apt2.scheduledStart,
+            },
           });
         }
       }
@@ -509,7 +521,7 @@ export async function calculatePaymentSummary(req, res) {
         const doctor = await Doctor.findById(aptData.doctorId)
           .populate("specializationIds", "name")
           .lean();
-        
+
         if (!doctor) {
           console.warn(`Doctor ${aptData.doctorId} not found`);
           return null;
@@ -526,15 +538,18 @@ export async function calculatePaymentSummary(req, res) {
       })
     );
 
-    const validAppointments = appointmentsWithDetails.filter((apt) => apt !== null);
+    const validAppointments = appointmentsWithDetails.filter(
+      (apt) => apt !== null
+    );
 
     const appointmentSummaries = await Promise.all(
       validAppointments.map(async (apt) => {
         const price = await calculateAppointmentBookingFee(apt);
-        const specializationNames = apt.doctor?.specializationIds
-          ?.map((s) => (typeof s === "object" ? s.name : s))
-          .join(", ") || "";
-        
+        const specializationNames =
+          apt.doctor?.specializationIds
+            ?.map((s) => (typeof s === "object" ? s.name : s))
+            .join(", ") || "";
+
         return {
           doctorId: apt.doctorId,
           doctorName: apt.doctor?.fullName || "Unknown Doctor",
@@ -563,20 +578,26 @@ export async function calculatePaymentSummary(req, res) {
       appointmentSummaries,
       appointmentsCount: appointmentSummaries.length,
       conflicts: conflicts.length > 0 ? conflicts : undefined,
-      conflictWarning: conflicts.length > 0
-        ? "Phát hiện xung đột trùng giờ trong các lịch hẹn"
-        : undefined,
+      conflictWarning:
+        conflicts.length > 0
+          ? "Phát hiện xung đột trùng giờ trong các lịch hẹn"
+          : undefined,
     });
   } catch (error) {
     console.error("❌ Error in calculatePaymentSummary:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
 /**
  * Hoàn thành planning và tính toán payment summary (NEW FLOW)
  * POST /api/medical-visits/complete-planning
- * 
+ *
  * Flow mới:
  * 1. User chọn appointments và bấm "Hoàn tất"
  * 2. Gọi calculatePaymentSummary để tính toán và hiển thị hóa đơn
@@ -640,12 +661,7 @@ export async function addAppointmentToVisit(req, res) {
     // Get patient profile
     const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(
-        res,
-        404,
-        ERROR_CODES.NOT_FOUND,
-        "Patient profile not found"
-      );
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
     }
 
     // Get visit
@@ -779,7 +795,12 @@ export async function addAppointmentToVisit(req, res) {
     );
   } catch (error) {
     console.error("❌ Error in addAppointmentToVisit:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
@@ -831,16 +852,34 @@ export async function syncVisitStatus(visitId) {
     // Determine visit status based on appointment statuses
     let newStatus;
 
-    if (hasCancelled && !hasPending && !hasAccepted && !hasInProgress && !hasDone) {
+    if (
+      hasCancelled &&
+      !hasPending &&
+      !hasAccepted &&
+      !hasInProgress &&
+      !hasDone
+    ) {
       // All cancelled/rejected
       newStatus = "cancelled";
     } else if (hasInProgress) {
       // At least one appointment is in progress
       newStatus = "in_progress";
-    } else if (hasDone && !hasPending && !hasAccepted && !hasInProgress && !hasRejected) {
+    } else if (
+      hasDone &&
+      !hasPending &&
+      !hasAccepted &&
+      !hasInProgress &&
+      !hasRejected
+    ) {
       // All done
       newStatus = "completed";
-    } else if (hasAccepted && !hasPending && !hasRejected && !hasInProgress && !hasDone) {
+    } else if (
+      hasAccepted &&
+      !hasPending &&
+      !hasRejected &&
+      !hasInProgress &&
+      !hasDone
+    ) {
       // All accepted
       newStatus = "scheduled";
     } else if (hasRejected && (hasAccepted || hasPending)) {
@@ -994,7 +1033,12 @@ export async function doctorApproveAppointment(req, res) {
     });
   } catch (error) {
     console.error("❌ Error in doctorApproveAppointment:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
@@ -1025,12 +1069,7 @@ export async function checkTimeConflicts(req, res) {
     // Get patient profile
     const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(
-        res,
-        404,
-        ERROR_CODES.NOT_FOUND,
-        "Patient profile not found"
-      );
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
     }
 
     // Get visit with appointments
@@ -1189,7 +1228,12 @@ export async function checkTimeConflicts(req, res) {
     });
   } catch (error) {
     console.error("❌ Error in checkTimeConflicts:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
@@ -1225,12 +1269,7 @@ export async function replaceRejectedAppointment(req, res) {
     // Get patient profile
     const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(
-        res,
-        404,
-        ERROR_CODES.NOT_FOUND,
-        "Patient profile not found"
-      );
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
     }
 
     // Get original appointment
@@ -1283,7 +1322,9 @@ export async function replaceRejectedAppointment(req, res) {
     }
 
     // Check if new slot belongs to the same doctor
-    if (newSlot.doctorId.toString() !== originalAppointment.doctorId.toString()) {
+    if (
+      newSlot.doctorId.toString() !== originalAppointment.doctorId.toString()
+    ) {
       return fail(
         res,
         400,
@@ -1347,7 +1388,12 @@ export async function replaceRejectedAppointment(req, res) {
     });
   } catch (error) {
     console.error("❌ Error in replaceRejectedAppointment:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
@@ -1438,7 +1484,12 @@ export async function getDoctorPendingAppointments(req, res) {
     });
   } catch (error) {
     console.error("❌ Error in getDoctorPendingAppointments:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
@@ -1474,12 +1525,7 @@ export async function cancelAppointmentInVisit(req, res) {
     // Get patient profile
     const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(
-        res,
-        404,
-        ERROR_CODES.NOT_FOUND,
-        "Patient profile not found"
-      );
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
     }
 
     // Get appointment
@@ -1529,7 +1575,12 @@ export async function cancelAppointmentInVisit(req, res) {
     });
   } catch (error) {
     console.error("❌ Error in cancelAppointmentInVisit:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
@@ -1557,12 +1608,7 @@ export async function getPatientVisits(req, res) {
     // Get patient profile
     const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(
-        res,
-        404,
-        ERROR_CODES.NOT_FOUND,
-        "Patient profile not found"
-      );
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
     }
 
     // Build query
@@ -1611,7 +1657,12 @@ export async function getPatientVisits(req, res) {
     });
   } catch (error) {
     console.error("❌ Error in getPatientVisits:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
@@ -1638,12 +1689,7 @@ export async function getVisitDetails(req, res) {
     // Get patient profile
     const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(
-        res,
-        404,
-        ERROR_CODES.NOT_FOUND,
-        "Patient profile not found"
-      );
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
     }
 
     // Get visit
@@ -1717,7 +1763,12 @@ export async function getVisitDetails(req, res) {
     });
   } catch (error) {
     console.error("❌ Error in getVisitDetails:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
@@ -1743,7 +1794,9 @@ async function calculateAppointmentBookingFee(appointment) {
     }
 
     if (!doctor.educationLevel) {
-      console.warn(`Doctor ${doctorId} không có education level, sử dụng giá mặc định 0`);
+      console.warn(
+        `Doctor ${doctorId} không có education level, sử dụng giá mặc định 0`
+      );
       return 0;
     }
 
@@ -1762,7 +1815,9 @@ async function calculateAppointmentBookingFee(appointment) {
     }).lean();
 
     if (!priceRecord) {
-      console.warn(`Không tìm thấy giá cho educationLevel=${doctor.educationLevel}, mode=${mode}`);
+      console.warn(
+        `Không tìm thấy giá cho educationLevel=${doctor.educationLevel}, mode=${mode}`
+      );
       return 0;
     }
 
@@ -1774,7 +1829,9 @@ async function calculateAppointmentBookingFee(appointment) {
 
     const scheduledDate = new Date(appointment.scheduledStart);
     if (isNaN(scheduledDate.getTime())) {
-      console.warn(`Appointment ${appointment._id} có scheduledStart không hợp lệ: ${appointment.scheduledStart}`);
+      console.warn(
+        `Appointment ${appointment._id} có scheduledStart không hợp lệ: ${appointment.scheduledStart}`
+      );
       return priceRecord.weekdayPrice; // Default to weekday price
     }
 
@@ -1792,7 +1849,7 @@ async function calculateAppointmentBookingFee(appointment) {
 /**
  * Get payment summary for medical visit
  * GET /api/medical-visits/:visitId/payment-summary
- * 
+ *
  * DEPRECATED for new flow: Sử dụng calculatePaymentSummary thay vì endpoint này
  * Endpoint này vẫn hoạt động cho các visit đã tồn tại (backward compatibility)
  */
@@ -1817,7 +1874,7 @@ export async function getPaymentSummary(req, res) {
     }
 
     const { visitId } = req.params;
-    
+
     if (!visitId) {
       console.error("[getPaymentSummary] visitId is missing");
       return fail(res, 400, ERROR_CODES.BAD_REQUEST, "visitId is required");
@@ -1826,12 +1883,7 @@ export async function getPaymentSummary(req, res) {
     // Get patient profile
     const patient = await getSelfPatient(appUserId);
     if (!patient) {
-      return fail(
-        res,
-        404,
-        ERROR_CODES.NOT_FOUND,
-        "Patient profile not found"
-      );
+      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
     }
 
     // Get visit
@@ -1862,8 +1914,10 @@ export async function getPaymentSummary(req, res) {
     // Get all appointments to count statuses
     const allAppointments = await Appointment.find({
       _id: { $in: visit.appointmentIds || [] },
-    }).select("status").lean();
-    
+    })
+      .select("status")
+      .lean();
+
     const pendingCount = allAppointments.filter(
       (apt) => apt.status === "pending_doctor"
     ).length;
@@ -1906,10 +1960,11 @@ export async function getPaymentSummary(req, res) {
     const appointmentSummaries = await Promise.all(
       appointmentsWithDetails.map(async (apt) => {
         const price = await calculateAppointmentBookingFee(apt);
-        const specializationNames = apt.doctorId?.specializationIds
-          ?.map((s) => (typeof s === "object" ? s.name : s))
-          .join(", ") || "";
-        
+        const specializationNames =
+          apt.doctorId?.specializationIds
+            ?.map((s) => (typeof s === "object" ? s.name : s))
+            .join(", ") || "";
+
         return {
           _id: apt._id,
           appointmentId: apt._id,
@@ -1946,14 +2001,19 @@ export async function getPaymentSummary(req, res) {
     });
   } catch (error) {
     console.error("❌ Error in getPaymentSummary:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
 /**
  * Create payment for existing medical visit (BACKWARD COMPATIBILITY)
  * POST /api/medical-visits/:visitId/create-payment
- * 
+ *
  * Flow cũ: Visit và appointments đã tồn tại, chỉ tạo payment cho các appointments đã được chấp nhận
  */
 async function createPaymentForExistingVisit(req, res, visitId) {
@@ -1962,7 +2022,9 @@ async function createPaymentForExistingVisit(req, res, visitId) {
     const appUserId = claims.app_user_id;
 
     // Get patient profile
-    const patient = await Patient.findOne({ userId: appUserId }).populate("userId");
+    const patient = await Patient.findOne({ userId: appUserId }).populate(
+      "userId"
+    );
     if (!patient) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
     }
@@ -2012,10 +2074,12 @@ async function createPaymentForExistingVisit(req, res, visitId) {
     const appointmentItems = await Promise.all(
       appointments.map(async (apt) => {
         const price = await calculateAppointmentBookingFee(apt);
-        const specializationNames = apt.doctorId?.specializationIds
-          ?.map((s) => (typeof s === "object" ? s.name : s))
-          .join(", ") || "";
-        const modeText = apt.mode === "online" ? "Trực tuyến" : "Tại phòng khám";
+        const specializationNames =
+          apt.doctorId?.specializationIds
+            ?.map((s) => (typeof s === "object" ? s.name : s))
+            .join(", ") || "";
+        const modeText =
+          apt.mode === "online" ? "Trực tuyến" : "Tại phòng khám";
         const clinicText = apt.clinicId?.name ? ` - ${apt.clinicId.name}` : "";
         const timeText = apt.scheduledStart
           ? ` (${new Date(apt.scheduledStart).toLocaleTimeString("vi-VN", {
@@ -2023,9 +2087,11 @@ async function createPaymentForExistingVisit(req, res, visitId) {
               minute: "2-digit",
             })})`
           : "";
-        
+
         return {
-          description: `${apt.doctorId.fullName}${specializationNames ? ` - ${specializationNames}` : ""} (${modeText}${clinicText})${timeText}`,
+          description: `${apt.doctorId.fullName}${
+            specializationNames ? ` - ${specializationNames}` : ""
+          } (${modeText}${clinicText})${timeText}`,
           quantity: 1,
           unitPrice: price,
           lineTotal: price,
@@ -2105,7 +2171,9 @@ async function createPaymentForExistingVisit(req, res, visitId) {
     // Create PayOS payment link (if gateway is payos)
     if (gateway === "payos") {
       try {
-        const { createPayosPaymentLink } = await import("../services/payos.service.js");
+        const { createPayosPaymentLink } = await import(
+          "../services/payos.service.js"
+        );
         const payosResult = await createPayosPaymentLink(appUserId, {
           medicalVisitId: visit._id.toString(), // Pass medicalVisitId for existing visit
           amount: totalAmount,
@@ -2148,14 +2216,19 @@ async function createPaymentForExistingVisit(req, res, visitId) {
     }
   } catch (error) {
     console.error("❌ Error in createPaymentForExistingVisit:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
 
 /**
  * Create payment for medical visit (NEW FLOW: pre-payment)
  * POST /api/medical-visits/create-payment
- * 
+ *
  * Flow mới:
  * 1. Nhận visitDate và appointments data từ request body (chưa tạo visit/appointments)
  * 2. Validate appointments data
@@ -2164,7 +2237,7 @@ async function createPaymentForExistingVisit(req, res, visitId) {
  * 5. Tạo PayOS payment link
  * 6. Return payUrl để redirect user đến PayOS
  * 7. Sau khi thanh toán thành công (webhook), tạo visit và appointments từ payment.appointmentData
- * 
+ *
  * BACKWARD COMPATIBILITY:
  * POST /api/medical-visits/:visitId/create-payment
  * - Nếu có visitId trong params, xử lý flow cũ (visit đã tồn tại)
@@ -2191,7 +2264,12 @@ export async function createPaymentForVisit(req, res) {
     }
 
     // NEW FLOW: Pre-payment (visit/appointments not created yet)
-    const { visitDate, appointments, gateway = "payos", method = "qr" } = req.body;
+    const {
+      visitDate,
+      appointments,
+      gateway = "payos",
+      method = "qr",
+    } = req.body;
 
     // Validate gateway
     if (!["payos", "vnpay", "momo"].includes(gateway)) {
@@ -2204,15 +2282,14 @@ export async function createPaymentForVisit(req, res) {
     }
 
     if (!visitDate) {
-      return fail(
-        res,
-        400,
-        ERROR_CODES.BAD_REQUEST,
-        "visitDate is required"
-      );
+      return fail(res, 400, ERROR_CODES.BAD_REQUEST, "visitDate is required");
     }
 
-    if (!appointments || !Array.isArray(appointments) || appointments.length === 0) {
+    if (
+      !appointments ||
+      !Array.isArray(appointments) ||
+      appointments.length === 0
+    ) {
       return fail(
         res,
         400,
@@ -2222,7 +2299,9 @@ export async function createPaymentForVisit(req, res) {
     }
 
     // Get patient profile
-    const patient = await Patient.findOne({ userId: appUserId }).populate("userId");
+    const patient = await Patient.findOne({ userId: appUserId }).populate(
+      "userId"
+    );
     if (!patient) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
     }
@@ -2264,7 +2343,12 @@ export async function createPaymentForVisit(req, res) {
       // Get slot information
       const slot = await DoctorTimeSlot.findById(slotId);
       if (!slot) {
-        return fail(res, 404, ERROR_CODES.NOT_FOUND, `Time slot ${slotId} not found`);
+        return fail(
+          res,
+          404,
+          ERROR_CODES.NOT_FOUND,
+          `Time slot ${slotId} not found`
+        );
       }
 
       // Check if slot belongs to the doctor
@@ -2349,7 +2433,7 @@ export async function createPaymentForVisit(req, res) {
         const doctor = await Doctor.findById(aptData.doctorId)
           .populate("specializationIds", "name")
           .lean();
-        
+
         if (!doctor) {
           console.warn(`Doctor ${aptData.doctorId} not found`);
           return null;
@@ -2366,7 +2450,9 @@ export async function createPaymentForVisit(req, res) {
     );
 
     // Filter out null appointments
-    const validAppointments = appointmentsWithDetails.filter((apt) => apt !== null);
+    const validAppointments = appointmentsWithDetails.filter(
+      (apt) => apt !== null
+    );
 
     if (validAppointments.length === 0) {
       return fail(
@@ -2382,10 +2468,12 @@ export async function createPaymentForVisit(req, res) {
       validAppointments.map(async (apt) => {
         const price = await calculateAppointmentBookingFee(apt);
         const doctorName = apt.doctor?.fullName || "Unknown Doctor";
-        const specializationNames = apt.doctor?.specializationIds
-          ?.map((s) => (typeof s === "object" ? s.name : s))
-          .join(", ") || "";
-        const modeText = apt.mode === "online" ? "Trực tuyến" : "Tại phòng khám";
+        const specializationNames =
+          apt.doctor?.specializationIds
+            ?.map((s) => (typeof s === "object" ? s.name : s))
+            .join(", ") || "";
+        const modeText =
+          apt.mode === "online" ? "Trực tuyến" : "Tại phòng khám";
         const clinicText = apt.clinic?.name ? ` - ${apt.clinic.name}` : "";
         const timeText = apt.scheduledStart
           ? ` (${new Date(apt.scheduledStart).toLocaleTimeString("vi-VN", {
@@ -2393,9 +2481,11 @@ export async function createPaymentForVisit(req, res) {
               minute: "2-digit",
             })})`
           : "";
-        
+
         return {
-          description: `${doctorName}${specializationNames ? ` - ${specializationNames}` : ""} (${modeText}${clinicText})${timeText}`,
+          description: `${doctorName}${
+            specializationNames ? ` - ${specializationNames}` : ""
+          } (${modeText}${clinicText})${timeText}`,
           quantity: 1,
           unitPrice: price,
           lineTotal: price,
@@ -2429,11 +2519,13 @@ export async function createPaymentForVisit(req, res) {
     // Log để debug
     console.log("🔍 Creating payment with appointmentData:", {
       appointmentDataLength: appointmentData.length,
-      appointmentData: appointmentData.map(apt => ({
+      appointmentData: appointmentData.map((apt) => ({
         doctorId: apt.doctorId?.toString(),
         slotId: apt.slotId?.toString(),
         mode: apt.mode,
         scheduledStart: apt.scheduledStart,
+        patientId:
+          apt.patientId?.toString() || "NOT SET (will use self patient)",
       })),
       totalAmount,
       invoiceNumber,
@@ -2441,7 +2533,7 @@ export async function createPaymentForVisit(req, res) {
 
     // Determine billTo patient (use selected family member if provided, else owner's patient)
     let billToPatientId = patient._id;
-    const firstAptWithPatient = appointmentData.find(a => !!a.patientId);
+    const firstAptWithPatient = appointmentData.find((a) => !!a.patientId);
     if (firstAptWithPatient?.patientId) {
       billToPatientId = firstAptWithPatient.patientId;
     }
@@ -2511,7 +2603,9 @@ export async function createPaymentForVisit(req, res) {
     // Create PayOS payment link (if gateway is payos)
     if (gateway === "payos") {
       try {
-        const { createPayosPaymentLink } = await import("../services/payos.service.js");
+        const { createPayosPaymentLink } = await import(
+          "../services/payos.service.js"
+        );
         const payosResult = await createPayosPaymentLink(appUserId, {
           paymentId: payment._id.toString(), // Pass paymentId instead of medicalVisitId
           amount: totalAmount,
@@ -2554,7 +2648,11 @@ export async function createPaymentForVisit(req, res) {
     }
   } catch (error) {
     console.error("❌ Error in createPaymentForVisit:", error);
-    return fail(res, 500, ERROR_CODES.SERVER_ERROR, error.message || String(error));
+    return fail(
+      res,
+      500,
+      ERROR_CODES.SERVER_ERROR,
+      error.message || String(error)
+    );
   }
 }
-

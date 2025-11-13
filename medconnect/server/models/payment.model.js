@@ -3,7 +3,6 @@
  *  Hóa đơn/Thanh toán
  * ======================================================= */
 
-
 import mongoose from "mongoose";
 const { Schema, model } = mongoose;
 
@@ -59,22 +58,35 @@ const PaymentSchema = new Schema(
     },
 
     // Array of appointment IDs for multiple appointments payment
-    appointmentIds: [{
-      type: Schema.Types.ObjectId,
-      ref: "Appointment",
-    }],
+    appointmentIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Appointment",
+      },
+    ],
 
     // Appointment data (before creating appointments in DB) - for medical visit payment
     // This stores the appointment information that will be created after payment success
-    appointmentData: [{
-      doctorId: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
-      slotId: { type: Schema.Types.ObjectId, ref: "DoctorTimeSlot", required: true },
-      mode: { type: String, enum: ["online", "offline"], required: true },
-      clinicId: { type: Schema.Types.ObjectId, ref: "Clinic" },
-      scheduledStart: { type: Date, required: true },
-      scheduledEnd: { type: Date, required: true },
-      reason: { type: String, default: "" },
-    }],
+    appointmentData: [
+      {
+        doctorId: {
+          type: Schema.Types.ObjectId,
+          ref: "Doctor",
+          required: true,
+        },
+        slotId: {
+          type: Schema.Types.ObjectId,
+          ref: "DoctorTimeSlot",
+          required: true,
+        },
+        mode: { type: String, enum: ["online", "offline"], required: true },
+        clinicId: { type: Schema.Types.ObjectId, ref: "Clinic" },
+        scheduledStart: { type: Date, required: true },
+        scheduledEnd: { type: Date, required: true },
+        reason: { type: String, default: "" },
+        patientId: { type: Schema.Types.ObjectId, ref: "Patient" }, // Optional: for family member booking
+      },
+    ],
 
     invoiceType: {
       type: String,
@@ -104,16 +116,16 @@ const PaymentSchema = new Schema(
       enum: ["vnpay", "momo", "vietqr", "payos", "cash"],
       required: false, // Không required khi pending_manager
     },
-    method: { 
-      type: String, 
-      enum: ["qr", "card", "bank", "cash"], 
+    method: {
+      type: String,
+      enum: ["qr", "card", "bank", "cash"],
       required: false, // Không required khi pending_manager
     },
 
     status: {
       type: String,
       enum: [
-        "pending_manager", // Chờ manager xử lý 
+        "pending_manager", // Chờ manager xử lý
         "initiated", // Đã tạo link PayOS, chờ thanh toán
         "authorized",
         "captured",
@@ -126,19 +138,19 @@ const PaymentSchema = new Schema(
     },
 
     // Số tiền đã thanh toán (cho thanh toán một phần)
-    amountPaid: { 
-      type: Number, 
-      min: 0, 
-      default: 0, 
-      validate: isInt 
+    amountPaid: {
+      type: Number,
+      min: 0,
+      default: 0,
+      validate: isInt,
     },
 
     // PayOS orderCode để tracking và webhook lookup
     orderCode: { type: Number, unique: true, sparse: true, index: true },
-    
+
     // Lưu tạm orderCode khi tạo payment link (chưa thanh toán) - cho service payment
     pendingOrderCode: { type: Number, sparse: true, index: true },
-    
+
     providerTxnId: String,
     authorizedAt: Date,
     authorizationExpiresAt: Date,
@@ -170,24 +182,27 @@ PaymentSchema.pre("validate", function (next) {
   // 1. appointmentId (single appointment - backward compatible)
   // 2. medicalVisitId + appointmentIds (multiple appointments - existing visits)
   // 3. appointmentData (pre-payment - appointments will be created after payment)
-  
+
   // Check if appointmentData array exists and has items (pre-payment flow - highest priority)
   // This is the primary indicator for pre-payment flow
-  const hasPrePaymentData = this.appointmentData && 
-    Array.isArray(this.appointmentData) && 
+  const hasPrePaymentData =
+    this.appointmentData &&
+    Array.isArray(this.appointmentData) &&
     this.appointmentData.length > 0;
-  
+
   // Check if appointmentId is set (single appointment - backward compatible)
   // Only check if NOT in pre-payment flow
-  const hasSingleAppointment = !hasPrePaymentData && 
-    this.appointmentId !== undefined && 
+  const hasSingleAppointment =
+    !hasPrePaymentData &&
+    this.appointmentId !== undefined &&
     this.appointmentId !== null;
-  
+
   // Check if medicalVisitId exists and appointmentIds array is populated (multiple appointments)
   // Only check if NOT in pre-payment flow
-  const hasMultipleAppointments = !hasPrePaymentData && 
-    this.medicalVisitId && 
-    Array.isArray(this.appointmentIds) && 
+  const hasMultipleAppointments =
+    !hasPrePaymentData &&
+    this.medicalVisitId &&
+    Array.isArray(this.appointmentIds) &&
     this.appointmentIds.length > 0;
 
   // Log để debug
@@ -196,7 +211,8 @@ PaymentSchema.pre("validate", function (next) {
     hasMultipleAppointments,
     hasPrePaymentData,
     appointmentId: this.appointmentId?.toString(),
-    appointmentIdExists: this.appointmentId !== undefined && this.appointmentId !== null,
+    appointmentIdExists:
+      this.appointmentId !== undefined && this.appointmentId !== null,
     medicalVisitId: this.medicalVisitId?.toString(),
     appointmentIdsLength: this.appointmentIds?.length || 0,
     appointmentDataLength: this.appointmentData?.length || 0,
@@ -209,15 +225,15 @@ PaymentSchema.pre("validate", function (next) {
     // to avoid any validation conflicts
     if (this.appointmentId !== undefined) {
       delete this.appointmentId;
-      this.unmarkModified('appointmentId');
+      this.unmarkModified("appointmentId");
     }
     if (this.medicalVisitId !== undefined) {
       delete this.medicalVisitId;
-      this.unmarkModified('medicalVisitId');
+      this.unmarkModified("medicalVisitId");
     }
     if (this.appointmentIds !== undefined) {
       this.appointmentIds = undefined;
-      this.unmarkModified('appointmentIds');
+      this.unmarkModified("appointmentIds");
     }
     // Skip to calculation step - pre-payment flow is valid
     // Don't check appointmentId or medicalVisitId in this case
@@ -226,18 +242,27 @@ PaymentSchema.pre("validate", function (next) {
     // Validate that at least one of the required fields is present
     if (!hasSingleAppointment && !hasMultipleAppointments) {
       // If none of the required fields are present, this is invalid
-      const error = new Error("Payment must have either appointmentId (single) OR medicalVisitId + appointmentIds (multiple) OR appointmentData (pre-payment)");
+      const error = new Error(
+        "Payment must have either appointmentId (single) OR medicalVisitId + appointmentIds (multiple) OR appointmentData (pre-payment)"
+      );
       return next(error);
     }
 
     // If medicalVisitId is provided without appointmentIds, it's invalid
-    if (this.medicalVisitId && (!Array.isArray(this.appointmentIds) || this.appointmentIds.length === 0)) {
-      const error = new Error("If medicalVisitId is provided, appointmentIds must be a non-empty array");
+    if (
+      this.medicalVisitId &&
+      (!Array.isArray(this.appointmentIds) || this.appointmentIds.length === 0)
+    ) {
+      const error = new Error(
+        "If medicalVisitId is provided, appointmentIds must be a non-empty array"
+      );
       return next(error);
     }
-    
+
     // Validation passed - at least one valid combination is present
-    console.log("✅ Payment validation passed (single or multiple appointments)");
+    console.log(
+      "✅ Payment validation passed (single or multiple appointments)"
+    );
   }
 
   // Calculate subtotal from items
