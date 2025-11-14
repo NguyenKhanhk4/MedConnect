@@ -5,6 +5,7 @@ import {
   getConversationMessages,
   getUserConversations,
   deleteConversation,
+  suggestTreatment,
 } from "../controllers/aiController.js";
 import { authGuard, optionalAuth } from "../middleware/auth.js";
 
@@ -27,6 +28,9 @@ aiRouter.get("/conversations", authGuard, getUserConversations);
 
 // Xóa conversation
 aiRouter.delete("/conversations/:conversationId", deleteConversation);
+
+// AI gợi ý phương pháp điều trị (chỉ dành cho bác sĩ)
+aiRouter.post("/suggest-treatment", authGuard, suggestTreatment);
 
 export default aiRouter;
 

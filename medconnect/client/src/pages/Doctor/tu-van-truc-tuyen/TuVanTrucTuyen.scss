@@ -139,6 +139,13 @@ $success: #10B981;
     }
   }
 
+  .section-title-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
   .section-title {
     margin: 0 0 1.25rem 0;
     font-size: 1.35rem;

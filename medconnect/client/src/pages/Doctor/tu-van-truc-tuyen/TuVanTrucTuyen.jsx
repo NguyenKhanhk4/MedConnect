@@ -20,9 +20,14 @@ export default function TuVanTrucTuyen() {
     attachmentFileType: "",
     diagnoses: [{ name: "" }],
     medications: [{ name: "", instruction: "", quantity: "" }],
+    treatmentMethod: "",
   });
   const [alertMessage, setAlertMessage] = useState(null);
   const [confirmConfig, setConfirmConfig] = useState(null);
+  const [aiSuggestion, setAiSuggestion] = useState(null);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [isAIVerified, setIsAIVerified] = useState(false);
+  const [aiSuggested, setAiSuggested] = useState(false);
 
   // Helper function to show custom alert
   const showAlert = (message) => {
@@ -177,6 +182,80 @@ export default function TuVanTrucTuyen() {
     });
   };
 
+  // Hàm gọi AI để gợi ý điều trị
+  const handleAISuggestTreatment = async () => {
+    // Kiểm tra có chẩn đoán chưa
+    const validDiagnoses = formData.diagnoses.filter(
+      (d) => d.name && d.name.trim()
+    );
+    if (validDiagnoses.length === 0) {
+      showAlert("Vui lòng nhập ít nhất một chẩn đoán trước khi yêu cầu AI gợi ý!");
+      return;
+    }
+
+    setIsLoadingAI(true);
+    try {
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_API_URL || "http://localhost:3000"
+        }/api/ai/suggest-treatment`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            appointmentId: appointmentId,
+            diagnoses: validDiagnoses,
+            existingMedications: formData.medications.filter(
+              (m) => m.name && m.name.trim()
+            ),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Không thể lấy gợi ý từ AI");
+      }
+
+      const data = await response.json();
+      if (data.success && data.data?.suggestion) {
+        const suggestion = data.data.suggestion;
+        setAiSuggestion(suggestion);
+        setIsAIVerified(false); // Reset verify khi có gợi ý mới
+        setAiSuggested(true);
+
+        // Tự động điền vào form (bác sĩ có thể chỉnh sửa)
+        setFormData({
+          ...formData,
+          treatmentMethod: suggestion.treatmentMethod || "",
+          medications:
+            suggestion.suggestedMedications && suggestion.suggestedMedications.length > 0
+              ? suggestion.suggestedMedications
+              : formData.medications,
+          notes: suggestion.notes
+            ? `${formData.notes ? formData.notes + "\n\n" : ""}${suggestion.notes}\n\n${suggestion.followUpInstructions || ""}`
+            : formData.notes,
+        });
+
+        showAlert("AI đã đưa ra gợi ý điều trị. Vui lòng xem xét và verify trước khi lưu!");
+      }
+    } catch (error) {
+      console.error("Error getting AI suggestion:", error);
+      showAlert("Có lỗi xảy ra: " + error.message);
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
+
+  // Hàm verify gợi ý từ AI
+  const handleVerifyAI = () => {
+    setIsAIVerified(true);
+    showAlert("Bạn đã xác nhận đã xem xét gợi ý từ AI. Có thể tiếp tục lưu hồ sơ.");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -201,9 +280,19 @@ export default function TuVanTrucTuyen() {
       return;
     }
 
+    // Kiểm tra nếu có AI suggestion nhưng chưa verify
+    if (aiSuggestion && !isAIVerified) {
+      showAlert("Vui lòng xác nhận đã xem xét gợi ý từ AI trước khi lưu hồ sơ!");
+      return;
+    }
+
     // Thêm thông báo xác nhận
+    const confirmMessage = aiSuggested
+      ? `Bạn có chắc chắn muốn lưu hồ sơ cho ${patientName}? (Đã sử dụng gợi ý từ AI)`
+      : `Bạn có chắc chắn muốn lưu hồ sơ cho ${patientName}?`;
+
     showConfirm(
-      `Bạn có chắc chắn muốn lưu hồ sơ cho ${patientName}?`,
+      confirmMessage,
       async () => {
 
         const submitData = {
@@ -213,6 +302,8 @@ export default function TuVanTrucTuyen() {
           diagnoses: validDiagnoses,
           medications:
             formData.medications.length > 0 ? formData.medications : undefined,
+          treatmentMethod: formData.treatmentMethod || undefined,
+          aiSuggested: aiSuggested, // Đánh dấu nếu có sử dụng AI
         };
 
         try {
@@ -367,7 +458,27 @@ export default function TuVanTrucTuyen() {
 
             {/* Diagnosis Section - Show by default */}
             <div className="form-section">
-              <h3 className="section-title">🔍 Chẩn Đoán sơ bộ *</h3>
+              <div className="section-title-wrapper">
+                <h3 className="section-title">🔍 Chẩn Đoán sơ bộ *</h3>
+                <Button
+                  type="button"
+                  onClick={handleAISuggestTreatment}
+                  disabled={isLoadingAI || formData.diagnoses.filter((d) => d.name && d.name.trim()).length === 0}
+                  className="btn-ai-suggest"
+                  style={{
+                    marginLeft: "auto",
+                    backgroundColor: "#1890ff",
+                    color: "white",
+                    border: "none",
+                    padding: "8px 16px",
+                    borderRadius: "4px",
+                    cursor: isLoadingAI ? "not-allowed" : "pointer",
+                    opacity: isLoadingAI ? 0.6 : 1,
+                  }}
+                >
+                  {isLoadingAI ? "⏳ Đang xử lý..." : "🤖 AI gợi ý điều trị"}
+                </Button>
+              </div>
               {formData.diagnoses.map((diagnosis, index) => (
                 <div key={index} className="array-item">
                   <div className="item-header">
@@ -402,7 +513,113 @@ export default function TuVanTrucTuyen() {
                   </div>
                 </div>
               ))}
+              <Button
+                type="button"
+                onClick={() =>
+                  addArrayItem("diagnoses", { name: "" })
+                }
+                className="btn-add"
+              >
+                + Thêm chẩn đoán
+              </Button>
+
+              {/* Hiển thị gợi ý từ AI */}
+              {aiSuggestion && (
+                <div className="ai-suggestion-box" style={{
+                  marginTop: "20px",
+                  padding: "16px",
+                  backgroundColor: "#fff7e6",
+                  border: "2px solid #ffc53d",
+                  borderRadius: "8px",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                    <h4 style={{ margin: 0, color: "#d46b08" }}>
+                      ⚠️ Gợi ý từ AI - Cần xác nhận
+                    </h4>
+                    {!isAIVerified && (
+                      <Button
+                        type="button"
+                        onClick={handleVerifyAI}
+                        style={{
+                          backgroundColor: "#52c41a",
+                          color: "white",
+                          border: "none",
+                          padding: "6px 12px",
+                          borderRadius: "4px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        ✓ Đã xem xét
+                      </Button>
+                    )}
+                    {isAIVerified && (
+                      <span style={{ color: "#52c41a", fontWeight: "bold" }}>
+                        ✓ Đã verify
+                      </span>
+                    )}
+                  </div>
+                  
+                  {aiSuggestion.treatmentMethod && (
+                    <div style={{ marginBottom: "12px" }}>
+                      <strong>Phương pháp điều trị:</strong>
+                      <p style={{ margin: "8px 0", whiteSpace: "pre-wrap" }}>
+                        {aiSuggestion.treatmentMethod}
+                      </p>
+                    </div>
+                  )}
+
+                  {aiSuggestion.suggestedMedications && aiSuggestion.suggestedMedications.length > 0 && (
+                    <div style={{ marginBottom: "12px" }}>
+                      <strong>Gợi ý thuốc:</strong>
+                      <ul style={{ margin: "8px 0", paddingLeft: "20px" }}>
+                        {aiSuggestion.suggestedMedications.map((med, idx) => (
+                          <li key={idx}>
+                            {med.name} - {med.quantity || ""} - {med.instruction || ""}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {aiSuggestion.followUpInstructions && (
+                    <div style={{ marginBottom: "12px" }}>
+                      <strong>Hướng dẫn theo dõi:</strong>
+                      <p style={{ margin: "8px 0", whiteSpace: "pre-wrap" }}>
+                        {aiSuggestion.followUpInstructions}
+                      </p>
+                    </div>
+                  )}
+
+                  <div style={{
+                    marginTop: "12px",
+                    padding: "8px",
+                    backgroundColor: "#fff1f0",
+                    border: "1px solid #ffccc7",
+                    borderRadius: "4px",
+                    fontSize: "13px",
+                    color: "#cf1322",
+                  }}>
+                    <strong>⚠️ Lưu ý:</strong> Đây chỉ là gợi ý từ AI. Bác sĩ PHẢI xem xét, chỉnh sửa và xác nhận trước khi lưu hồ sơ.
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Treatment Method Section - Nếu có treatmentMethod từ AI */}
+            {formData.treatmentMethod && (
+              <div className="form-section">
+                <h3 className="section-title">💊 Phương Pháp Điều Trị</h3>
+                <div className="form-group">
+                  <textarea
+                    className="form-textarea"
+                    rows="4"
+                    value={formData.treatmentMethod}
+                    onChange={(e) => handleFieldChange("treatmentMethod", e.target.value)}
+                    placeholder="Phương pháp điều trị (có thể từ AI gợi ý hoặc tự nhập)"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Medications Section - Show by default */}
             <div className="form-section">

@@ -45,6 +45,12 @@ const ConsultationAdviceSchema = new Schema(
     attachmentUrl: String,
     notes: String,
 
+    // 💊 Phương pháp điều trị (có thể từ AI gợi ý)
+    treatmentMethod: String,
+
+    // 🤖 Đánh dấu nếu có sử dụng gợi ý từ AI
+    aiSuggested: { type: Boolean, default: false },
+
     // 👨‍⚕️ Bác sĩ phụ trách
     createdBy: { type: Schema.Types.ObjectId, ref: "Doctor" },
   },

@@ -37,6 +37,10 @@ export default function KhamTrucTiep() {
   });
   const [alertMessage, setAlertMessage] = useState(null);
   const [confirmConfig, setConfirmConfig] = useState(null);
+  const [aiSuggestion, setAiSuggestion] = useState(null);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [isAIVerified, setIsAIVerified] = useState(false);
+  const [aiSuggested, setAiSuggested] = useState(false);
 
   // Helper function to show custom alert
   const showAlert = (message) => {
@@ -53,6 +57,95 @@ export default function KhamTrucTiep() {
       },
       onCancel: () => setConfirmConfig(null),
     });
+  };
+
+  // Hàm gọi AI để gợi ý điều trị
+  const handleAISuggestTreatment = async () => {
+    // Kiểm tra có chẩn đoán chưa
+    const validDiagnoses = formData.diagnoses.filter(
+      (d) => d.name && d.name.trim()
+    );
+    if (validDiagnoses.length === 0) {
+      showAlert(
+        "Vui lòng nhập ít nhất một chẩn đoán trước khi yêu cầu AI gợi ý!"
+      );
+      return;
+    }
+
+    setIsLoadingAI(true);
+    try {
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_API_URL || "http://localhost:3000"
+        }/api/ai/suggest-treatment`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            appointmentId: appointmentId,
+            diagnoses: validDiagnoses,
+            existingMedications: formData.medications.filter(
+              (m) => m.name && m.name.trim()
+            ),
+            context: {
+              vitals: formData.vitals,
+              labResults: formData.labResults.filter(
+                (l) => l.testName || l.result
+              ),
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Không thể lấy gợi ý từ AI");
+      }
+
+      const data = await response.json();
+      if (data.success && data.data?.suggestion) {
+        const suggestion = data.data.suggestion;
+        setAiSuggestion(suggestion);
+        setIsAIVerified(false); // Reset verify khi có gợi ý mới
+        setAiSuggested(true);
+
+        // Tự động điền vào form (bác sĩ có thể chỉnh sửa)
+        setFormData({
+          ...formData,
+          treatmentMethod: suggestion.treatmentMethod || "",
+          medications:
+            suggestion.suggestedMedications &&
+            suggestion.suggestedMedications.length > 0
+              ? suggestion.suggestedMedications
+              : formData.medications,
+          followUpInstructions:
+            suggestion.followUpInstructions || formData.followUpInstructions,
+        });
+
+        // Chuyển sang tab summary để bác sĩ xem
+        setActiveTab("summary");
+
+        showAlert(
+          "AI đã đưa ra gợi ý điều trị. Vui lòng xem xét và verify trước khi lưu!"
+        );
+      }
+    } catch (error) {
+      console.error("Error getting AI suggestion:", error);
+      showAlert("Có lỗi xảy ra: " + error.message);
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
+
+  // Hàm verify gợi ý từ AI
+  const handleVerifyAI = () => {
+    setIsAIVerified(true);
+    showAlert(
+      "Bạn đã xác nhận đã xem xét gợi ý từ AI. Có thể tiếp tục lưu hồ sơ."
+    );
   };
 
   useEffect(() => {
@@ -185,7 +278,9 @@ export default function KhamTrucTiep() {
         }
       } else {
         const errorData = await response.json();
-        showAlert(`Lỗi upload: ${errorData.message || "Không thể upload file"}`);
+        showAlert(
+          `Lỗi upload: ${errorData.message || "Không thể upload file"}`
+        );
       }
     } catch (error) {
       console.error("Error uploading file:", error);
@@ -244,101 +339,111 @@ export default function KhamTrucTiep() {
       return;
     }
 
+    // Kiểm tra nếu có AI suggestion nhưng chưa verify
+    if (aiSuggestion && !isAIVerified) {
+      showAlert(
+        "Vui lòng xác nhận đã xem xét gợi ý từ AI trước khi lưu hồ sơ!"
+      );
+      return;
+    }
+
     // Thêm thông báo xác nhận
-    showConfirm(
-      `Bạn có chắc chắn muốn lưu hồ sơ cho ${patientName}?`,
-      async () => {
+    const confirmMessage = aiSuggested
+      ? `Bạn có chắc chắn muốn lưu hồ sơ cho ${patientName}? (Đã sử dụng gợi ý từ AI)`
+      : `Bạn có chắc chắn muốn lưu hồ sơ cho ${patientName}?`;
 
-        const submitData = {
-          appointmentId: appointment._id,
-          summaryText: formData.summaryText,
-          reasonForVisit: formData.reasonForVisit,
-          visitDate: formData.visitDate ? new Date(formData.visitDate) : undefined,
-          treatmentResult: formData.treatmentResult,
-          consultationCategory: formData.consultationCategory,
-          diagnoses: validDiagnoses,
-          vitals: formData.vitals,
-          labResults: formData.labResults.filter((l) => l.testName || l.result),
-          imagingResults: formData.imagingResults
-            .filter((img) => img.imageUrl)
-            .map((img) => ({
-              type: img.type || "",
-              conclusion: img.conclusion || "",
-              imageUrl: img.imageUrl || "",
-              performedAt: new Date(),
-            })),
-          medications: formData.medications.filter((m) => m.name),
-          procedures: formData.procedures,
-          treatmentMethod: formData.treatmentMethod,
-          nextAppointmentDate: formData.nextAppointmentDate
-            ? new Date(formData.nextAppointmentDate)
-            : undefined,
-          followUpInstructions: formData.followUpInstructions,
-        };
+    showConfirm(confirmMessage, async () => {
+      const submitData = {
+        appointmentId: appointment._id,
+        summaryText: formData.summaryText,
+        reasonForVisit: formData.reasonForVisit,
+        visitDate: formData.visitDate
+          ? new Date(formData.visitDate)
+          : undefined,
+        treatmentResult: formData.treatmentResult,
+        consultationCategory: formData.consultationCategory,
+        diagnoses: validDiagnoses,
+        vitals: formData.vitals,
+        labResults: formData.labResults.filter((l) => l.testName || l.result),
+        imagingResults: formData.imagingResults
+          .filter((img) => img.imageUrl)
+          .map((img) => ({
+            type: img.type || "",
+            conclusion: img.conclusion || "",
+            imageUrl: img.imageUrl || "",
+            performedAt: new Date(),
+          })),
+        medications: formData.medications.filter((m) => m.name),
+        procedures: formData.procedures,
+        treatmentMethod: formData.treatmentMethod,
+        nextAppointmentDate: formData.nextAppointmentDate
+          ? new Date(formData.nextAppointmentDate)
+          : undefined,
+        followUpInstructions: formData.followUpInstructions,
+      };
 
-        // Debug logging
-        console.log(
-          "🔍 Submitting imagingResults:",
-          JSON.stringify(submitData.imagingResults, null, 2)
+      // Debug logging
+      console.log(
+        "🔍 Submitting imagingResults:",
+        JSON.stringify(submitData.imagingResults, null, 2)
+      );
+
+      try {
+        const response = await fetch(
+          `${
+            import.meta.env.VITE_API_URL || "http://localhost:3000"
+          }/api/doctors/me/consultation-summaries`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify(submitData),
+          }
         );
 
-        try {
-          const response = await fetch(
-            `${
-              import.meta.env.VITE_API_URL || "http://localhost:3000"
-            }/api/doctors/me/consultation-summaries`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              credentials: "include",
-              body: JSON.stringify(submitData),
-            }
-          );
-
-          if (!response.ok) {
-            let errorMessage = "Failed to submit consultation";
-            try {
-              const error = await response.json();
-              errorMessage = error.message || errorMessage;
-            } catch (e) {
-              errorMessage = `Server error: ${response.status}`;
-            }
-            throw new Error(errorMessage);
-          }
-
-          // Offline: KHÔNG update status thành "done" sau khi lưu hồ sơ
-          // Status chỉ chuyển thành "done" sau khi thanh toán dịch vụ thành công (trong webhook)
-
-          // End video call if it exists
+        if (!response.ok) {
+          let errorMessage = "Failed to submit consultation";
           try {
-            const VideoCallAPI = await import("../../../services/videoCallAPI");
-            console.log(
-              "🔍 KhamTrucTiep - Attempting to end video call for appointmentId:",
-              appointmentId
-            );
-            await VideoCallAPI.default.endCallByAppointmentId(appointmentId);
-            console.log("✅ KhamTrucTiep - Video call ended successfully");
-          } catch (videoCallError) {
-            console.warn(
-              "⚠️ KhamTrucTiep - Could not end video call:",
-              videoCallError.message
-            );
-            console.error("⚠️ KhamTrucTiep - Full error:", videoCallError);
-            // Don't fail the whole process if video call ending fails
+            const error = await response.json();
+            errorMessage = error.message || errorMessage;
+          } catch (e) {
+            errorMessage = `Server error: ${response.status}`;
           }
-
-          showAlert(
-            "Đã lưu hồ sơ thành công! Bạn có thể ghi hóa đơn dịch vụ cho bệnh nhân."
-          );
-          setTimeout(() => navigate("/bac-si/lich-hen"), 1000);
-        } catch (error) {
-          console.error("Error submitting consultation:", error);
-          showAlert("Có lỗi xảy ra: " + error.message);
+          throw new Error(errorMessage);
         }
+
+        // Offline: KHÔNG update status thành "done" sau khi lưu hồ sơ
+        // Status chỉ chuyển thành "done" sau khi thanh toán dịch vụ thành công (trong webhook)
+
+        // End video call if it exists
+        try {
+          const VideoCallAPI = await import("../../../services/videoCallAPI");
+          console.log(
+            "🔍 KhamTrucTiep - Attempting to end video call for appointmentId:",
+            appointmentId
+          );
+          await VideoCallAPI.default.endCallByAppointmentId(appointmentId);
+          console.log("✅ KhamTrucTiep - Video call ended successfully");
+        } catch (videoCallError) {
+          console.warn(
+            "⚠️ KhamTrucTiep - Could not end video call:",
+            videoCallError.message
+          );
+          console.error("⚠️ KhamTrucTiep - Full error:", videoCallError);
+          // Don't fail the whole process if video call ending fails
+        }
+
+        showAlert(
+          "Đã lưu hồ sơ thành công! Bạn có thể ghi hóa đơn dịch vụ cho bệnh nhân."
+        );
+        setTimeout(() => navigate("/bac-si/lich-hen"), 1000);
+      } catch (error) {
+        console.error("Error submitting consultation:", error);
+        showAlert("Có lỗi xảy ra: " + error.message);
       }
-    );
+    });
   };
 
   if (loading) {
@@ -539,7 +644,31 @@ export default function KhamTrucTiep() {
             {/* Diagnosis Tab */}
             {activeTab === "diagnosis" && (
               <div className="form-section">
-                <h3 className="section-title">🔍 Chẩn Đoán Sơ Bộ *</h3>
+                <div className="section-title-wrapper">
+                  <h3 className="section-title">🔍 Chẩn Đoán Sơ Bộ *</h3>
+                  <Button
+                    type="button"
+                    onClick={handleAISuggestTreatment}
+                    disabled={
+                      isLoadingAI ||
+                      formData.diagnoses.filter((d) => d.name && d.name.trim())
+                        .length === 0
+                    }
+                    className="btn-ai-suggest"
+                    style={{
+                      marginLeft: "auto",
+                      backgroundColor: "#1890ff",
+                      color: "white",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "4px",
+                      cursor: isLoadingAI ? "not-allowed" : "pointer",
+                      opacity: isLoadingAI ? 0.6 : 1,
+                    }}
+                  >
+                    {isLoadingAI ? "⏳ Đang xử lý..." : "🤖 AI gợi ý điều trị"}
+                  </Button>
+                </div>
                 {formData.diagnoses.map((diagnosis, index) => (
                   <div key={index} className="array-item">
                     <div className="item-header">
@@ -574,6 +703,111 @@ export default function KhamTrucTiep() {
                     </div>
                   </div>
                 ))}
+                <Button
+                  type="button"
+                  onClick={() => addArrayItem("diagnoses", { name: "" })}
+                  className="btn-add"
+                >
+                  + Thêm chẩn đoán
+                </Button>
+
+                {/* Hiển thị gợi ý từ AI */}
+                {aiSuggestion && (
+                  <div
+                    className="ai-suggestion-box"
+                    style={{
+                      marginTop: "20px",
+                      padding: "16px",
+                      backgroundColor: "#fff7e6",
+                      border: "2px solid #ffc53d",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      <h4 style={{ margin: 0, color: "#d46b08" }}>
+                        ⚠️ Gợi ý từ AI - Cần xác nhận
+                      </h4>
+                      {!isAIVerified && (
+                        <Button
+                          type="button"
+                          onClick={handleVerifyAI}
+                          style={{
+                            backgroundColor: "#52c41a",
+                            color: "white",
+                            border: "none",
+                            padding: "6px 12px",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          ✓ Đã xem xét
+                        </Button>
+                      )}
+                      {isAIVerified && (
+                        <span style={{ color: "#52c41a", fontWeight: "bold" }}>
+                          ✓ Đã verify
+                        </span>
+                      )}
+                    </div>
+
+                    {aiSuggestion.treatmentMethod && (
+                      <div style={{ marginBottom: "12px" }}>
+                        <strong>Phương pháp điều trị:</strong>
+                        <p style={{ margin: "8px 0", whiteSpace: "pre-wrap" }}>
+                          {aiSuggestion.treatmentMethod}
+                        </p>
+                      </div>
+                    )}
+
+                    {aiSuggestion.suggestedMedications &&
+                      aiSuggestion.suggestedMedications.length > 0 && (
+                        <div style={{ marginBottom: "12px" }}>
+                          <strong>Gợi ý thuốc:</strong>
+                          <ul style={{ margin: "8px 0", paddingLeft: "20px" }}>
+                            {aiSuggestion.suggestedMedications.map(
+                              (med, idx) => (
+                                <li key={idx}>
+                                  {med.name} - {med.quantity || ""} -{" "}
+                                  {med.instruction || ""}
+                                </li>
+                              )
+                            )}
+                          </ul>
+                        </div>
+                      )}
+
+                    {aiSuggestion.followUpInstructions && (
+                      <div style={{ marginBottom: "12px" }}>
+                        <strong>Hướng dẫn theo dõi:</strong>
+                        <p style={{ margin: "8px 0", whiteSpace: "pre-wrap" }}>
+                          {aiSuggestion.followUpInstructions}
+                        </p>
+                      </div>
+                    )}
+
+                    <div
+                      style={{
+                        marginTop: "12px",
+                        padding: "8px",
+                        backgroundColor: "#fff1f0",
+                        border: "1px solid #ffccc7",
+                        borderRadius: "4px",
+                        fontSize: "13px",
+                        color: "#cf1322",
+                      }}
+                    >
+                      <strong>⚠️ Lưu ý:</strong> Đây chỉ là gợi ý từ AI. Bác sĩ
+                      PHẢI xem xét, chỉnh sửa và xác nhận trước khi lưu hồ sơ.
+                    </div>
+                  </div>
+                )}
 
                 <h3 className="section-title" style={{ marginTop: "2rem" }}>
                   Hình ảnh chẩn đoán (nếu có)

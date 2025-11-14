@@ -5,7 +5,9 @@ import Patient from "../models/patient.model.js";
 import User from "../models/user.model.js";
 import Specialization from "../models/specialization.model.js";
 import Faq from "../models/Faq.model.js";
-import { callMedConnectAI } from "../services/openaiService.js";
+import { callMedConnectAI, suggestTreatmentMethod } from "../services/openaiService.js";
+import Appointment from "../models/appointment.model.js";
+import Doctor from "../models/doctor.model.js";
 
 /**
  * Tạo conversation mới
@@ -332,6 +334,101 @@ export async function deleteConversation(req, res) {
     return ok(res, {}, {}, 200, "Conversation deleted successfully");
   } catch (error) {
     console.error("Error deleting conversation:", error);
+    return fail(res, 500, "INTERNAL_ERROR", error.message);
+  }
+}
+
+/**
+ * AI gợi ý phương pháp điều trị dựa trên chẩn đoán
+ * Yêu cầu: Bác sĩ phải đăng nhập và có quyền truy cập appointment
+ */
+export async function suggestTreatment(req, res) {
+  try {
+    // Kiểm tra authentication - chỉ bác sĩ mới được dùng
+    const appUserId = req.user?.app_user_id;
+    if (!appUserId) {
+      return fail(res, 401, "UNAUTHORIZED", "Cần đăng nhập với tài khoản bác sĩ");
+    }
+
+    // Kiểm tra là bác sĩ
+    const doctor = await Doctor.findOne({ userId: appUserId });
+    if (!doctor) {
+      return fail(res, 403, "FORBIDDEN", "Chỉ bác sĩ mới có thể sử dụng tính năng này");
+    }
+
+    const { appointmentId, diagnoses, patientInfo, existingMedications, context } = req.body;
+
+    // Kiểm tra input
+    if (!diagnoses || !Array.isArray(diagnoses) || diagnoses.length === 0) {
+      return fail(
+        res,
+        400,
+        "BAD_REQUEST",
+        "Cần có ít nhất một chẩn đoán để gợi ý điều trị"
+      );
+    }
+
+    // Kiểm tra appointment nếu có appointmentId
+    if (appointmentId) {
+      const appointment = await Appointment.findById(appointmentId)
+        .populate("patientId")
+        .populate("doctorId");
+      
+      if (!appointment) {
+        return fail(res, 404, "NOT_FOUND", "Không tìm thấy lịch hẹn");
+      }
+
+      // Kiểm tra quyền truy cập - appointment phải thuộc về bác sĩ này
+      if (appointment.doctorId._id.toString() !== doctor._id.toString()) {
+        return fail(res, 403, "FORBIDDEN", "Bạn không có quyền truy cập lịch hẹn này");
+      }
+
+      // Nếu có appointment, lấy thông tin bệnh nhân từ đó
+      if (appointment.patientId && !patientInfo) {
+        const patient = appointment.patientId;
+        // Tính tuổi từ DOB nếu có
+        let age = null;
+        if (patient.dob) {
+          const today = new Date();
+          const birthDate = new Date(patient.dob);
+          age = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+          }
+        }
+
+        const enhancedPatientInfo = {
+          age: age,
+          gender: patient.gender,
+          allergyNotes: patient.allergyNotes,
+          medicalHistory: patient.medicalHistory || [],
+        };
+
+        // Gọi AI với thông tin đầy đủ
+        const suggestion = await suggestTreatmentMethod(
+          diagnoses,
+          enhancedPatientInfo,
+          existingMedications || [],
+          context || {}
+        );
+
+        return ok(res, { suggestion }, {}, 200, "Gợi ý điều trị từ AI");
+      }
+    }
+
+    // Nếu không có appointmentId hoặc không lấy được patientInfo từ appointment
+    // Gọi AI với thông tin có sẵn
+    const suggestion = await suggestTreatmentMethod(
+      diagnoses,
+      patientInfo || {},
+      existingMedications || [],
+      context || {}
+    );
+
+    return ok(res, { suggestion }, {}, 200, "Gợi ý điều trị từ AI");
+  } catch (error) {
+    console.error("Error suggesting treatment:", error);
     return fail(res, 500, "INTERNAL_ERROR", error.message);
   }
 }

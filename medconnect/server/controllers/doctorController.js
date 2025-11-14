@@ -2448,7 +2448,7 @@ export async function createConsultationAdvice(req, res) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Doctor profile not found");
     }
 
-    const { appointmentId, notes, attachmentUrl, diagnoses, medications } =
+    const { appointmentId, notes, attachmentUrl, diagnoses, medications, treatmentMethod, aiSuggested } =
       req.body;
 
     if (!appointmentId || !notes) {
@@ -2495,6 +2495,8 @@ export async function createConsultationAdvice(req, res) {
     if (attachmentUrl) adviceData.attachmentUrl = attachmentUrl;
     if (diagnoses) adviceData.diagnoses = diagnoses;
     if (medications) adviceData.medications = medications;
+    if (treatmentMethod) adviceData.treatmentMethod = treatmentMethod;
+    if (aiSuggested !== undefined) adviceData.aiSuggested = aiSuggested;
 
     const advice = await ConsultationAdvice.create(adviceData);
 

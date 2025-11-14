@@ -424,3 +424,171 @@ export async function callMedConnectAI(
     }
   }
 }
+
+/**
+ * AI gợi ý phương pháp điều trị dựa trên chẩn đoán
+ * @param {Array} diagnoses - Danh sách chẩn đoán
+ * @param {Object} patientInfo - Thông tin bệnh nhân (tuổi, giới tính, tiền sử...)
+ * @param {Array} existingMedications - Thuốc đang dùng (nếu có)
+ * @param {Object} context - Thông tin bổ sung (vitals, labResults...)
+ * @returns {Promise<Object>} - Gợi ý điều trị từ AI
+ */
+export async function suggestTreatmentMethod(
+  diagnoses = [],
+  patientInfo = {},
+  existingMedications = [],
+  context = {}
+) {
+  // Kiểm tra API key
+  if (!apiKey || !client) {
+    console.error("❌ OpenAI API key chưa được cấu hình");
+    throw new Error("OpenAI API key chưa được cấu hình");
+  }
+
+  if (!diagnoses || diagnoses.length === 0) {
+    throw new Error("Cần có ít nhất một chẩn đoán để gợi ý điều trị");
+  }
+
+  try {
+    // Xây dựng system prompt cho AI
+    const systemPrompt = `Bạn là trợ lý AI hỗ trợ bác sĩ trong việc đưa ra phương pháp điều trị.
+
+NHIỆM VỤ CỦA BẠN:
+1. Dựa trên chẩn đoán của bác sĩ, đưa ra phương pháp điều trị phù hợp
+2. Gợi ý thuốc (nếu cần) với liều lượng và hướng dẫn sử dụng
+3. Đưa ra hướng dẫn theo dõi và tái khám
+
+QUAN TRỌNG:
+- Đây CHỈ là gợi ý tham khảo, KHÔNG thay thế quyết định của bác sĩ
+- Bác sĩ PHẢI xem xét và verify trước khi áp dụng
+- Luôn cân nhắc thông tin bệnh nhân (tuổi, giới tính, tiền sử, dị ứng...)
+- Tránh gợi ý thuốc có thể tương tác với thuốc đang dùng
+- Đưa ra phương pháp điều trị theo chuẩn y tế hiện đại
+
+FORMAT TRẢ VỀ (JSON):
+{
+  "treatmentMethod": "Mô tả chi tiết phương pháp điều trị...",
+  "suggestedMedications": [
+    {
+      "name": "Tên thuốc",
+      "instruction": "Cách sử dụng",
+      "quantity": "Liều lượng"
+    }
+  ],
+  "followUpInstructions": "Hướng dẫn theo dõi và tái khám...",
+  "notes": "Ghi chú bổ sung (nếu có)"
+}
+
+LƯU Ý:
+- Trả về JSON hợp lệ, dễ parse
+- Nếu không chắc chắn, hãy đề xuất bác sĩ tham khảo thêm tài liệu
+- Luôn nhấn mạnh rằng đây là gợi ý, cần bác sĩ verify`;
+
+    // Xây dựng user prompt với thông tin đầy đủ
+    let userPrompt = `Dựa trên thông tin sau, hãy đưa ra gợi ý phương pháp điều trị:\n\n`;
+
+    // Chẩn đoán
+    userPrompt += `CHẨN ĐOÁN:\n`;
+    diagnoses.forEach((diag, index) => {
+      userPrompt += `${index + 1}. ${diag.name}\n`;
+    });
+    userPrompt += `\n`;
+
+    // Thông tin bệnh nhân
+    if (patientInfo.age || patientInfo.gender || patientInfo.medicalHistory) {
+      userPrompt += `THÔNG TIN BỆNH NHÂN:\n`;
+      if (patientInfo.age) userPrompt += `- Tuổi: ${patientInfo.age}\n`;
+      if (patientInfo.gender) userPrompt += `- Giới tính: ${patientInfo.gender}\n`;
+      if (patientInfo.allergyNotes) userPrompt += `- Dị ứng: ${patientInfo.allergyNotes}\n`;
+      if (patientInfo.medicalHistory && patientInfo.medicalHistory.length > 0) {
+        userPrompt += `- Tiền sử: ${patientInfo.medicalHistory.join(", ")}\n`;
+      }
+      userPrompt += `\n`;
+    }
+
+    // Thuốc đang dùng
+    if (existingMedications && existingMedications.length > 0) {
+      userPrompt += `THUỐC ĐANG DÙNG:\n`;
+      existingMedications.forEach((med, index) => {
+        userPrompt += `${index + 1}. ${med.name} - ${med.instruction || ""}\n`;
+      });
+      userPrompt += `\n`;
+    }
+
+    // Context bổ sung (vitals, lab results...)
+    if (context.vitals) {
+      userPrompt += `CHỈ SỐ SINH TỒN:\n`;
+      if (context.vitals.bloodPressure) userPrompt += `- Huyết áp: ${context.vitals.bloodPressure}\n`;
+      if (context.vitals.heartRate) userPrompt += `- Nhịp tim: ${context.vitals.heartRate} bpm\n`;
+      if (context.vitals.temperature) userPrompt += `- Nhiệt độ: ${context.vitals.temperature}°C\n`;
+      userPrompt += `\n`;
+    }
+
+    if (context.labResults && context.labResults.length > 0) {
+      userPrompt += `KẾT QUẢ XÉT NGHIỆM:\n`;
+      context.labResults.forEach((lab, index) => {
+        userPrompt += `${index + 1}. ${lab.testName}: ${lab.result}\n`;
+      });
+      userPrompt += `\n`;
+    }
+
+    userPrompt += `Hãy đưa ra gợi ý phương pháp điều trị phù hợp dựa trên thông tin trên.`;
+
+    // Gọi OpenAI API
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 1500,
+      response_format: { type: "json_object" }, // Yêu cầu trả về JSON
+    });
+
+    // Parse response
+    const aiResponse = response.choices[0].message.content;
+    let treatmentSuggestion;
+
+    try {
+      treatmentSuggestion = JSON.parse(aiResponse);
+    } catch (parseError) {
+      console.error("❌ Lỗi parse JSON từ AI:", parseError);
+      // Fallback: thử extract JSON từ text
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        treatmentSuggestion = JSON.parse(jsonMatch[0]);
+      } else {
+        // Nếu không parse được, trả về format mặc định
+        treatmentSuggestion = {
+          treatmentMethod: aiResponse,
+          suggestedMedications: [],
+          followUpInstructions: "Vui lòng tham khảo thêm tài liệu y tế.",
+          notes: "Lưu ý: Đây là gợi ý từ AI, bác sĩ cần verify trước khi áp dụng.",
+        };
+      }
+    }
+
+    // Đảm bảo có các trường cần thiết
+    return {
+      treatmentMethod: treatmentSuggestion.treatmentMethod || "Không có gợi ý cụ thể. Vui lòng tham khảo tài liệu y tế.",
+      suggestedMedications: treatmentSuggestion.suggestedMedications || [],
+      followUpInstructions: treatmentSuggestion.followUpInstructions || "Theo dõi tình trạng bệnh nhân và tái khám khi cần.",
+      notes: treatmentSuggestion.notes || "⚠️ Đây là gợi ý từ AI, bác sĩ PHẢI xem xét và verify trước khi áp dụng.",
+      aiSuggested: true, // Flag để đánh dấu đây là gợi ý từ AI
+    };
+  } catch (error) {
+    console.error("❌ Lỗi gọi OpenAI để gợi ý điều trị:", error);
+
+    // Phân biệt các loại lỗi
+    if (error.status === 429) {
+      throw new Error("Quá nhiều yêu cầu. Vui lòng đợi một chút rồi thử lại.");
+    } else if (error.status === 401) {
+      throw new Error("OpenAI API key không hợp lệ.");
+    } else if (error.status === 500 || error.status >= 500) {
+      throw new Error("Dịch vụ AI đang gặp sự cố. Vui lòng thử lại sau.");
+    } else {
+      throw new Error(`Lỗi: ${error.message || "Không thể kết nối với dịch vụ AI"}`);
+    }
+  }
+}
