@@ -1276,13 +1276,6 @@ const ChonThoiGian = () => {
                     trước khi xác nhận.
                   </Paragraph>
 
-                  <Alert
-                    message="Thông tin quan trọng"
-                    description="Sau khi thanh toán thành công, lịch hẹn sẽ được tạo với trạng thái 'Chờ bác sĩ duyệt'. Bác sĩ sẽ xem xét và chấp nhận hoặc từ chối lịch hẹn của bạn."
-                    type="info"
-                    showIcon
-                    style={{ marginBottom: 16 }}
-                  />
 
                   <Divider />
 
@@ -1420,8 +1413,7 @@ const ChonThoiGian = () => {
                         style={{ marginTop: 12, marginBottom: 0 }}
                       >
                         Bạn sẽ được chuyển đến trang thanh toán PayOS. Sau khi
-                        thanh toán thành công, lịch hẹn sẽ được tạo và chờ bác
-                        sĩ duyệt.
+                        thanh toán thành công, lịch hẹn sẽ được tạo.
                       </Paragraph>
                       <Button
                         onClick={() => {
