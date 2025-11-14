@@ -11,6 +11,7 @@ export function calculateAppointmentStats(appointments) {
   const stats = {
     confirmed: 0,
     pending: 0,
+    in_progress: 0,
     completed: 0,
     cancelled: 0,
   };
@@ -21,6 +22,8 @@ export function calculateAppointmentStats(appointments) {
       stats.confirmed++;
     } else if (status === "pending_doctor") {
       stats.pending++;
+    } else if (status === "in_progress") {
+      stats.in_progress++;
     } else if (status === "done") {
       stats.completed++;
     } else if (status === "cancelled") {

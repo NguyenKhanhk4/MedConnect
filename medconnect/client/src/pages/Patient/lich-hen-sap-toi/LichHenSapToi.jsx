@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Clock, MapPin, User } from "lucide-react";
 import { Spin } from "antd";
 import ChiTietLichHen from "../chi-tiet-lich-hen/ChiTietLichHen";
-import { RescheduleButton } from "../../../components/RescheduleButton/RescheduleButton";
 import { useAppointments } from "../../../hooks/useAppointments";
 import {
   filterByStatuses,
@@ -354,25 +353,6 @@ export function LichHenSapToi() {
                 >
                   Chi tiết
                 </button>
-
-                {/* Reschedule Button */}
-                <div style={{ width: "100%", minWidth: "120px" }}>
-                  <RescheduleButton
-                    appointment={{
-                      _id: appointment.id,
-                      scheduledStart:
-                        appointment.scheduledStart ||
-                        new Date(appointment.date + " " + appointment.time),
-                      status: appointment.status,
-                      doctorId: { fullName: appointment.doctor },
-                      mode: appointment.mode || "offline",
-                    }}
-                    onSuccess={() => {
-                      // Refresh appointments after successful reschedule request
-                      refreshAppointments();
-                    }}
-                  />
-                </div>
               </div>
             </div>
           ))

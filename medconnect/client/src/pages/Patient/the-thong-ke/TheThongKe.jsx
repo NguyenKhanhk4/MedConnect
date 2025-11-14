@@ -21,13 +21,13 @@ const STAT_CONFIG = [
     trendUp: (count) => count > 0,
   },
   {
-    title: "Đang chờ",
+    title: "ĐANG KHÁM",
     icon: Clock,
     iconColor: "#f97316", // Orange
-    description: "Chờ xác nhận",
-    key: "pending",
-    positiveText: "{count} lịch chờ",
-    negativeText: "Không có lịch chờ",
+    description: "Đang khám",
+    key: "in_progress",
+    positiveText: "{count} lịch đang khám",
+    negativeText: "Không có lịch đang khám",
     trendUp: () => null,
   },
   {
@@ -75,6 +75,8 @@ const StatCard = ({ stat }) => {
       case "confirmed":
         return "#bfdbfe"; // Blue border
       case "pending":
+        return "#fed7aa"; // Orange border
+      case "in_progress":
         return "#fed7aa"; // Orange border
       case "completed":
         return "#bbf7d0"; // Green border

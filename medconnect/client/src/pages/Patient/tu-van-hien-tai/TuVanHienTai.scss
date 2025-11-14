@@ -10,138 +10,186 @@
 
 .current-consultation {
   background-color: #ffffff;
-  border: 2px solid #3b82f6;
+  border: 2px solid #e2e8f0;
   border-radius: 1rem;
   padding: 1.5rem;
-  box-shadow: 0 4px 12px 0 rgba(59, 130, 246, 0.15);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
 }
 
 .consultation-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
 }
 
-.consultation-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #3b82f6;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.title-icon {
-  color: #3b82f6;
-}
-
-.status-indicator {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #10b981;
-  animation: pulse 2s infinite;
-}
-
-.status-text {
-  font-size: 0.875rem;
-  color: #10b981;
-  font-weight: 600;
-}
-
-.consultation-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem;
-  border: 2px solid #cbd5e1;
-  border-radius: 0.75rem;
-  background-color: #f9fafb;
-}
-
-.appointment-info {
+.title-wrapper {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex: 1;
 }
 
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #3b82f6;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.consultation-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.status-text {
+  font-size: 0.875rem;
+  color: #3b82f6;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.consultation-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+
+  @media (min-width: 1024px) {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}
+
+.doctor-info-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  flex: 1;
+}
+
+.doctor-avatar-container {
+  position: relative;
+  flex-shrink: 0;
+  width: 4rem;
+  height: 4rem;
+}
+
+.doctor-avatar-fallback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  .avatar-emoji {
+    font-size: 1.5rem;
+  }
+}
+
 .doctor-avatar {
-  width: 3rem;
-  height: 3rem;
+  position: relative;
+  width: 4rem;
+  height: 4rem;
   border-radius: 50%;
   object-fit: cover;
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  border: none;
+  display: block;
+  z-index: 1;
 }
 
 .doctor-details {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
   flex: 1;
 }
 
 .doctor-name {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.25rem;
+  font-weight: 700;
   color: #1e293b;
+  line-height: 1.4;
+  margin-bottom: 0.25rem;
 }
 
 .doctor-specialty {
   font-size: 0.875rem;
-  color: #1e293b;
+  color: #64748b;
+  line-height: 1.4;
+  margin-bottom: 0.75rem;
 }
 
 .appointment-meta {
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 0.25rem;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .meta-item {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.5rem;
   font-size: 0.875rem;
-  color: #1e293b;
+  color: #64748b;
 }
 
 .meta-icon {
-  width: 0.875rem;
-  height: 0.875rem;
-  color: #6b7280;
+  width: 1rem;
+  height: 1rem;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.action-button-wrapper {
+  width: 100%;
+
+  @media (min-width: 1024px) {
+    width: auto;
+  }
 }
 
 .join-call-button {
-  padding: 0.75rem 1.5rem;
-  background-color: #10b981;
+  width: 100%;
+  padding: 0.75rem 2rem;
+  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
   color: #ffffff;
   border: none;
   border-radius: 0.5rem;
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+  white-space: nowrap;
+
+  @media (min-width: 1024px) {
+    width: auto;
+  }
 
   &:hover {
-    background-color: #059669;
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    transform: scale(1.05);
   }
 
   &:active {
-    transform: translateY(0) scale(1);
+    transform: scale(0.98);
+  }
+
+  .button-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    stroke-width: 2;
   }
 }

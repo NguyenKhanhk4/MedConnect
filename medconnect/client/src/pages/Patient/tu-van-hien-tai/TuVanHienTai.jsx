@@ -1,6 +1,6 @@
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, MapPin, Video } from "lucide-react";
+import { Clock, MapPin, Video, Calendar } from "lucide-react";
 import { useAppointments } from "../../../hooks/useAppointments";
 import {
   formatDateTime,
@@ -12,13 +12,34 @@ import {
 } from "../../../utils/doctorUtils";
 import "./TuVanHienTai.scss";
 
-// Status Indicator Component
-const StatusIndicator = () => (
-  <div className="status-indicator">
-    <div className="status-dot"></div>
-    <span className="status-text">Đang diễn ra</span>
-  </div>
-);
+// Doctor Avatar Component
+const DoctorAvatar = ({ appointment }) => {
+  const avatarUrl = appointment?.doctorId?.avatarUrl;
+  const doctorName = getFullName(appointment?.doctorId || {});
+
+  return (
+    <div className="doctor-avatar-container">
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt={doctorName}
+          className="doctor-avatar"
+          onError={(e) => {
+            e.target.style.display = "none";
+            const fallback = e.target.nextElementSibling;
+            if (fallback) fallback.style.display = "flex";
+          }}
+        />
+      ) : null}
+      <div 
+        className="doctor-avatar-fallback" 
+        style={{ display: avatarUrl ? "none" : "flex" }}
+      >
+        <span className="avatar-emoji">👨‍⚕️</span>
+      </div>
+    </div>
+  );
+};
 
 // Appointment Info Component
 const AppointmentInfo = ({ appointment }) => {
@@ -32,48 +53,41 @@ const AppointmentInfo = ({ appointment }) => {
   const location = getAppointmentModeText(appointment.mode);
 
   return (
-    <div className="appointment-info">
-      <img
-        src={appointment.doctorId?.avatarUrl || "/default-avatar.png"}
-        alt={doctorName}
-        className="doctor-avatar"
-        onError={(e) => {
-          e.target.src = "/default-avatar.png";
-          e.target.onerror = null;
-        }}
-      />
-      <div className="doctor-details">
-        <div className="doctor-name">{doctorName}</div>
-        <div className="doctor-specialty">{specialty}</div>
-        <div className="appointment-meta">
-          <div className="meta-item">
-            <Clock className="meta-icon" />
-            <span>
-              {date} - {time}
-            </span>
-          </div>
-          <div className="meta-item">
-            <MapPin className="meta-icon" />
-            <span>{location}</span>
-          </div>
+    <div className="doctor-details">
+      <h3 className="doctor-name">{doctorName}</h3>
+      <p className="doctor-specialty">{specialty}</p>
+      <div className="appointment-meta">
+        <div className="meta-item">
+          <Calendar className="meta-icon" />
+          <span>
+            {date} - {time}
+          </span>
+        </div>
+        <div className="meta-item">
+          <MapPin className="meta-icon" />
+          <span>{location}</span>
         </div>
       </div>
     </div>
   );
 };
 
-// Join Call Button Component
-const JoinCallButton = ({ appointmentId, onJoin }) => (
-  <button className="join-call-button" onClick={onJoin}>
-    <Video size={16} />
-    Tham gia Video Call
-  </button>
-);
-
 export function TuVanHienTai() {
   const navigate = useNavigate();
   const { appointments, loading, refreshAppointments } = useAppointments();
-
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
+  // Get avatar URL for current appointment
+  const currentAppointment = useMemo(() => {
+    if (!appointments || appointments.length === 0) {
+      return null;
+    }
+    const inProgressOnline = appointments.find(
+      (apt) => apt.status === "in_progress" && apt.mode === "online"
+    );
+    return inProgressOnline || null;
+  }, [appointments]);
+  
   // Poll for updates every 10 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -82,13 +96,12 @@ export function TuVanHienTai() {
     return () => clearInterval(interval);
   }, [refreshAppointments]);
 
-  // Filter for in_progress ONLINE appointments
-  const currentAppointment = useMemo(() => {
-    const inProgressOnline = appointments.find(
-      (apt) => apt.status === "in_progress" && apt.mode === "online"
-    );
-    return inProgressOnline || null;
-  }, [appointments]);
+  // Track initial load to prevent flickering
+  useEffect(() => {
+    if (!loading) {
+      setIsInitialLoad(false);
+    }
+  }, [loading]);
 
   const handleJoinCall = () => {
     if (currentAppointment?._id) {
@@ -96,27 +109,43 @@ export function TuVanHienTai() {
     }
   };
 
-  if (loading || !currentAppointment) {
+  // Only show loading state on initial load, not on subsequent refreshes
+  if (isInitialLoad && loading) {
+    return null;
+  }
+
+  // Don't render if no appointment (but don't show loading after initial load)
+  if (!currentAppointment) {
     return null;
   }
 
   return (
     <div className="current-consultation">
+      {/* Header with title and status */}
       <div className="consultation-header">
-        <h3 className="consultation-title">
-          <Video size={20} className="title-icon" />
-          Đang khám online
-        </h3>
-        <StatusIndicator />
+        <div className="title-wrapper">
+          <div className="pulse-dot"></div>
+          <h2 className="consultation-title">Đang khám</h2>
+        </div>
+        <span className="status-text">● Đang diễn ra</span>
       </div>
 
+      {/* Appointment Details */}
       <div className="consultation-content">
-        <AppointmentInfo appointment={currentAppointment} />
+        {/* Doctor Info */}
+        <div className="doctor-info-section">
+          <DoctorAvatar appointment={currentAppointment} />
+          <AppointmentInfo appointment={currentAppointment} />
+        </div>
+
+        {/* Action Button */}
         {currentAppointment.mode === "online" && (
-          <JoinCallButton
-            appointmentId={currentAppointment._id}
-            onJoin={handleJoinCall}
-          />
+          <div className="action-button-wrapper">
+            <button className="join-call-button" onClick={handleJoinCall}>
+              <Video className="button-icon" />
+              Tham gia Video Call
+            </button>
+          </div>
         )}
       </div>
     </div>
