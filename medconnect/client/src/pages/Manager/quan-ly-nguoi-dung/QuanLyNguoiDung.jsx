@@ -564,7 +564,7 @@ const QuanLyNguoiDung = () => {
             name="role"
             rules={[{ required: true, message: "Vui lòng chọn vai trò" }]}
           >
-            <Select placeholder="Chọn vai trò">
+            <Select placeholder="Chọn vai trò" disabled>
               <Select.Option value="patient">Bệnh nhân</Select.Option>
               <Select.Option value="doctor">Bác sĩ</Select.Option>
               <Select.Option value="manager">Quản lý</Select.Option>

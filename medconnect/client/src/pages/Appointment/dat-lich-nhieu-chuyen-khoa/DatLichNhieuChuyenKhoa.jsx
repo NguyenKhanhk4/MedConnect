@@ -771,16 +771,24 @@ const DatLichNhieuChuyenKhoa = () => {
       return;
     }
 
+    // Use state patientIdForBooking directly, not a local variable (giống đặt lịch đơn)
+    let currentPatientIdForBooking = patientIdForBooking;
+
+    // Validate profile if booking for "me" (giống đặt lịch đơn)
+    if (bookingFor === "me") {
+      // IMPORTANT: Đảm bảo reset patientIdForBooking ngay khi booking for "me"
+      setPatientIdForBooking(null);
+      currentPatientIdForBooking = null;
+    }
+
     // Validate and create family member if booking for family
-    let currentPatientIdForBooking = null;
     if (bookingFor === "family") {
       try {
         // Create or get family member
-        if (selectedFamilyMember && selectedFamilyMember._id) {
-          // Use existing family member - allergyNotes sẽ lấy từ form (có thể đã được sửa)
-          currentPatientIdForBooking = selectedFamilyMember._id;
-          setPatientIdForBooking(selectedFamilyMember._id);
-          // Note: allergyNotes từ form sẽ được dùng khi tạo appointment, không cần update vào DB
+        // If patientIdForBooking is already set (selected from dropdown), use it
+        if (currentPatientIdForBooking && selectedFamilyMember) {
+          // Using existing family member, no need to create new
+          console.log("Using existing family member:", currentPatientIdForBooking);
         } else {
           // Validate family form for new member
           let familyValues;

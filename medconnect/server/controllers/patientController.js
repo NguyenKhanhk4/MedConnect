@@ -3471,8 +3471,12 @@ export async function createPaymentForSingleAppointment(req, res) {
     }
 
     // Get patient profile
+    // IMPORTANT: Nếu không có patientId hoặc patientId là undefined/null, lấy self patient (đặt cho chính mình)
     let patient;
+    let isFamilyMemberBooking = false;
+    
     if (patientId) {
+      // Có patientId - có thể là đặt cho người thân
       patient = await Patient.findOne({
         _id: patientId,
         userId: appUserId,
@@ -3486,8 +3490,26 @@ export async function createPaymentForSingleAppointment(req, res) {
           "Patient not found or does not belong to you"
         );
       }
+      
+      // Kiểm tra xem có phải là người thân không
+      if (patient.relationshipToOwner && patient.relationshipToOwner !== "self") {
+        isFamilyMemberBooking = true;
+      } else {
+        // patientId được gửi lên nhưng là self patient - coi như đặt cho chính mình
+        isFamilyMemberBooking = false;
+      }
     } else {
-      patient = await Patient.findOne({ userId: appUserId }).populate("userId");
+      // Không có patientId - đặt cho chính mình
+      patient = await Patient.findOne({ 
+        userId: appUserId,
+        relationshipToOwner: "self" // Ưu tiên lấy self patient
+      }).populate("userId");
+      
+      // Nếu không tìm thấy self patient, lấy bất kỳ patient nào của user
+      if (!patient) {
+        patient = await Patient.findOne({ userId: appUserId }).populate("userId");
+      }
+      
       if (!patient) {
         const user = await User.findById(appUserId);
         if (!user) {
@@ -3499,12 +3521,15 @@ export async function createPaymentForSingleAppointment(req, res) {
           fullName: user.fullName || "Chưa cập nhật",
           phone: user.phone || "",
           isComplete: false,
+          relationshipToOwner: "self", // Đánh dấu là self patient
         });
 
         await newPatient.save();
         await newPatient.populate("userId");
         patient = newPatient;
       }
+      
+      isFamilyMemberBooking = false;
     }
 
     // Verify the time slot exists and is available
@@ -3652,6 +3677,46 @@ export async function createPaymentForSingleAppointment(req, res) {
     const orderCode = Number(String(Date.now()).slice(-10));
     const invoiceNumber = `INV-APT-${orderCode}`;
 
+    // Lấy thông tin owner (người đặt) để set billTo email/phone
+    // Nếu patient là người thân, lấy email/phone từ owner (self patient)
+    // Nếu patient là chính mình, lấy từ patient.userId
+    let billToEmail = patient.userId?.email;
+    let billToPhone = patient.userId?.phoneNumber || patient.phone;
+    let billToName = patient.fullName || patient.userId?.fullName || "Unknown";
+    
+    // Kiểm tra xem có phải đặt cho người thân không
+    if (isFamilyMemberBooking) {
+      // Đây là người thân, cần lấy email/phone từ owner (self patient)
+      const selfPatient = await Patient.findOne({
+        userId: patient.userId?._id || patient.userId,
+        relationshipToOwner: "self",
+      }).populate("userId");
+      
+      if (selfPatient && selfPatient.userId) {
+        billToEmail = selfPatient.userId.email;
+        billToPhone = selfPatient.userId.phoneNumber || selfPatient.phone;
+        // Name vẫn giữ là tên người thân (người khám)
+        billToName = patient.fullName || "Unknown";
+      }
+    } else {
+      // Đặt cho chính mình - đảm bảo lấy đúng thông tin từ self patient
+      // Nếu patient không phải là self, tìm self patient
+      if (patient.relationshipToOwner !== "self") {
+        const selfPatient = await Patient.findOne({
+          userId: appUserId,
+          relationshipToOwner: "self",
+        }).populate("userId");
+        
+        if (selfPatient) {
+          billToEmail = selfPatient.userId?.email || patient.userId?.email;
+          billToPhone = selfPatient.userId?.phoneNumber || selfPatient.phone || patient.phone;
+          billToName = selfPatient.fullName || patient.userId?.fullName || "Unknown";
+          // Cập nhật patient để dùng cho appointmentData
+          patient = selfPatient;
+        }
+      }
+    }
+
     // Tạo payment object - Đảm bảo appointmentId KHÔNG được set
     const paymentData = {
       // KHÔNG có appointmentId - chỉ có appointmentData (pre-payment flow)
@@ -3662,10 +3727,10 @@ export async function createPaymentForSingleAppointment(req, res) {
       currency: "VND",
       issueDate: new Date(),
       billTo: {
-        patientId: patient._id,
-        name: patient.fullName || patient.userId?.fullName || "Unknown",
-        email: patient.userId?.email,
-        phone: patient.userId?.phoneNumber || patient.phone,
+        patientId: patient._id, // Vẫn giữ patientId là người khám (có thể là người thân)
+        name: billToName, // Tên người khám
+        email: billToEmail, // Email người đặt (owner)
+        phone: billToPhone, // Phone người đặt (owner)
       },
       billFrom: {
         doctorId: doctor._id,
