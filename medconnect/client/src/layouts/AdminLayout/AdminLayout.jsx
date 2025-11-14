@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Layout, Menu, Avatar, Badge, Button, Dropdown } from "antd";
 import {
@@ -23,6 +23,28 @@ const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+  // Fetch unread notification count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const { api } = await import("../../lib/api");
+        const response = await api.get("/api/notifications/unread-count");
+        if (response.success) {
+          setUnreadNotificationCount(response.data.unreadCount || 0);
+        }
+      } catch (error) {
+        console.error("Error fetching unread count:", error);
+      }
+    };
+
+    fetchUnreadCount();
+    // Refresh count every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Menu items
   const menuItems = [
@@ -56,7 +78,11 @@ const AdminLayout = () => {
       icon: <FileTextOutlined />,
       label: "Thống kê",
     },
-    
+    {
+      key: "/admin/thong-bao",
+      icon: <BellOutlined />,
+      label: "Thông báo",
+    },
   ];
 
   const handleMenuClick = ({ key }) => {
@@ -151,11 +177,15 @@ const AdminLayout = () => {
           <div className="header-left"></div>
 
           <div className="header-right">
-            <Button
-              type="text"
-              icon={<BellOutlined />}
+            <button
               className="notification-btn"
-            />
+              onClick={() => navigate("/admin/thong-bao")}
+            >
+              <BellOutlined className="bell-icon" />
+              {unreadNotificationCount > 0 && (
+                <span className="unread-badge">{unreadNotificationCount}</span>
+              )}
+            </button>
 
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <Button type="text" className="user-btn">

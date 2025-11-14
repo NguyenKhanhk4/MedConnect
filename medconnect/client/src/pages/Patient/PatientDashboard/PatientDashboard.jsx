@@ -4,7 +4,6 @@ import { PhanChaoMung } from "../phan-chao-mung/PhanChaoMung";
 import { TheThongKe } from "../the-thong-ke/TheThongKe";
 import { LichHenSapToi } from "../lich-hen-sap-toi/LichHenSapToi";
 import { TuVanHienTai } from "../tu-van-hien-tai/TuVanHienTai";
-import { LichKham } from "../lich-kham/LichKham";
 import { HanhDongNhanh } from "../hanh-dong-nhanh/HanhDongNhanh";
 import { TimKiemBacSi } from "../tim-kiem-bac-si/TimKiemBacSi";
 import { LichHenCuaToi } from "../lich-hen-cua-toi/LichHenCuaToi";
@@ -59,11 +58,10 @@ const DefaultDashboard = () => (
       <PhanChaoMung />
       <TheThongKe />
       <TuVanHienTai />
-      {/* Main grid: Calendar, Quick Actions, and Upcoming Appointments */}
+      {/* Main grid: Quick Actions, and Upcoming Appointments */}
       <div className="dashboard-main-grid">
-        {/* Left column: Calendar and Upcoming Appointments (2/3 width on desktop) */}
+        {/* Left column: Upcoming Appointments (2/3 width on desktop) */}
         <div className="dashboard-left-column">
-          <LichKham />
           <LichHenSapToi />
         </div>
         {/* Right column: Quick Actions (1/3 width on desktop) */}

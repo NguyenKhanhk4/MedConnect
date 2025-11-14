@@ -626,7 +626,8 @@ const ChonThoiGian = () => {
     try {
       setLoading(true);
 
-      let patientIdForBooking = null;
+      // Use state patientIdForBooking directly, not a local variable
+      let currentPatientIdForBooking = patientIdForBooking;
 
       // Validate profile if booking for "me"
       if (bookingFor === "me") {
@@ -645,16 +646,15 @@ const ChonThoiGian = () => {
 
         // IMPORTANT: Đảm bảo reset patientIdForBooking ngay khi booking for "me"
         setPatientIdForBooking(null);
-        // IMPORTANT: patientIdForBooking local variable = null (đặt cho chính mình)
-        patientIdForBooking = null;
+        currentPatientIdForBooking = null;
       }
 
       // If booking for family, check if using existing member or create new
       if (bookingFor === "family") {
         // If patientIdForBooking is already set (selected from dropdown), use it
-        if (patientIdForBooking && selectedFamilyMember) {
+        if (currentPatientIdForBooking && selectedFamilyMember) {
           // Using existing family member, no need to create new
-          console.log("Using existing family member:", patientIdForBooking);
+          console.log("Using existing family member:", currentPatientIdForBooking);
         } else {
           // Create new family member
           try {
@@ -679,7 +679,7 @@ const ChonThoiGian = () => {
             if (familyResponse.success) {
               message.success("Thêm người thân thành công!");
               const newPatientId = familyResponse.data.patient._id;
-              patientIdForBooking = newPatientId;
+              currentPatientIdForBooking = newPatientId;
               setPatientIdForBooking(newPatientId); // Store in state
               await fetchFamilyMembers();
             } else {
@@ -722,8 +722,8 @@ const ChonThoiGian = () => {
 
       // ONLY add patientId for family member booking
       // IMPORTANT: Check bookingFor instead of just patientIdForBooking to be absolutely sure
-      if (bookingFor === "family" && patientIdForBooking) {
-        appointmentData.patientId = patientIdForBooking;
+      if (bookingFor === "family" && currentPatientIdForBooking) {
+        appointmentData.patientId = currentPatientIdForBooking;
       } else {
         // IMPORTANT: Explicitly delete patientId if booking for "me" to prevent backend from adding it
         delete appointmentData.patientId;
@@ -732,7 +732,7 @@ const ChonThoiGian = () => {
       // Debug log để kiểm tra
       console.log("🔍 handleBookingSubmit - Debug Info:");
       console.log("bookingFor:", bookingFor);
-      console.log("patientIdForBooking (local):", patientIdForBooking);
+      console.log("currentPatientIdForBooking:", currentPatientIdForBooking);
       console.log(
         "appointmentData BEFORE sending to API:",
         JSON.parse(JSON.stringify(appointmentData))
@@ -1276,13 +1276,6 @@ const ChonThoiGian = () => {
                     trước khi xác nhận.
                   </Paragraph>
 
-                  <Alert
-                    message="Thông tin quan trọng"
-                    description="Sau khi thanh toán thành công, lịch hẹn sẽ được tạo với trạng thái 'Chờ bác sĩ duyệt'. Bác sĩ sẽ xem xét và chấp nhận hoặc từ chối lịch hẹn của bạn."
-                    type="info"
-                    showIcon
-                    style={{ marginBottom: 16 }}
-                  />
 
                   <Divider />
 
@@ -1420,8 +1413,7 @@ const ChonThoiGian = () => {
                         style={{ marginTop: 12, marginBottom: 0 }}
                       >
                         Bạn sẽ được chuyển đến trang thanh toán PayOS. Sau khi
-                        thanh toán thành công, lịch hẹn sẽ được tạo và chờ bác
-                        sĩ duyệt.
+                        thanh toán thành công, lịch hẹn sẽ được tạo.
                       </Paragraph>
                       <Button
                         onClick={() => {
@@ -1653,10 +1645,13 @@ const ChonThoiGian = () => {
                                   return Promise.resolve();
                                 }
                                 // Check duplicate citizenId in family members
+                                // Exclude selectedFamilyMember if editing existing member
                                 const duplicate = familyMembers.find(
                                   (member) =>
-                                    member.citizenId === value ||
-                                    member.nationalId === value
+                                    // Skip if this is the selected family member being edited
+                                    (!selectedFamilyMember || member._id !== selectedFamilyMember._id) &&
+                                    (member.citizenId === value ||
+                                    member.nationalId === value)
                                 );
                                 if (duplicate) {
                                   return Promise.reject(
@@ -1866,8 +1861,13 @@ const ChonThoiGian = () => {
                                 }
 
                                 // Check duplicate phone in family members
+                                // Exclude selectedFamilyMember if editing existing member
                                 const duplicate = familyMembers.find(
                                   (member) => {
+                                    // Skip if this is the selected family member being edited
+                                    if (selectedFamilyMember && member._id === selectedFamilyMember._id) {
+                                      return false;
+                                    }
                                     const memberPhone = member.phone
                                       ?.replace(/\s/g, "")
                                       .replace(/^\+84/, "0")
@@ -2203,7 +2203,7 @@ const ChonThoiGian = () => {
                       label="Lý do khám"
                       rules={[
                         {
-                          max: 100,
+                          max: 250,
                           message: "Lý do khám không được vượt quá 100 ký tự",
                         },
                       ]}

@@ -162,3 +162,35 @@ export async function getUnreadCount(req, res) {
     return fail(res, 500, ERROR_CODES.SERVER_ERROR, e.message || String(e));
   }
 }
+
+/**
+ * Test endpoint: Create a test notification for current user
+ * POST /api/notifications/test
+ */
+export async function createTestNotification(req, res) {
+  try {
+    const appUserId = req.user?.app_user_id;
+    if (!appUserId) {
+      return fail(res, 401, ERROR_CODES.UNAUTHORIZED, "User not authenticated");
+    }
+
+    const { type = "appointment", title, message } = req.body;
+
+    const testNotification = await Notification.create({
+      userId: appUserId,
+      type: type,
+      title: title || "🧪 Test Notification",
+      message: message || "Đây là thông báo test để kiểm tra hệ thống thông báo hoạt động.",
+      priority: "medium",
+      isRead: false,
+    });
+
+    return ok(res, {
+      message: "Test notification created successfully",
+      notification: testNotification,
+    });
+  } catch (e) {
+    console.error("❌ createTestNotification error:", e);
+    return fail(res, 500, ERROR_CODES.SERVER_ERROR, e.message || String(e));
+  }
+}

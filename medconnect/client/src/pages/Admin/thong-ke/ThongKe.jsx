@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Row, Col, Button, Space, DatePicker, Spin, Alert } from "antd";
 import {
@@ -71,6 +71,23 @@ const ThongKe = () => {
       }
 
       setStatistics(data);
+      
+      // Debug: Log revenue trend data
+      if (data.revenueTrend) {
+        console.log("📊 Revenue Trend Data:", data.revenueTrend);
+        console.log("📊 Revenue Trend Length:", data.revenueTrend.length);
+        if (data.revenueTrend.length > 0) {
+          console.log("📊 First item:", data.revenueTrend[0]);
+          console.log("📊 Sample items:", data.revenueTrend.slice(0, 3));
+          // Check if there's any non-zero revenue
+          const hasRevenue = data.revenueTrend.some(item => 
+            (item.online && item.online > 0) || 
+            (item.offline && item.offline > 0) || 
+            (item.total && item.total > 0)
+          );
+          console.log("📊 Has any revenue:", hasRevenue);
+        }
+      }
     } catch (err) {
       console.error("Error fetching statistics:", err);
       setError(err.message || "Không thể tải dữ liệu thống kê");
@@ -93,6 +110,91 @@ const ThongKe = () => {
     return dayjs(date).format("DD/MM/YYYY");
   };
 
+  // Custom hook to measure container size
+  const useContainerSize = (defaultHeight) => {
+    const containerRef = useRef(null);
+    const [size, setSize] = useState({ width: 0, height: defaultHeight });
+
+    useEffect(() => {
+      const updateSize = () => {
+        if (containerRef.current) {
+          const { width, height } = containerRef.current.getBoundingClientRect();
+          if (width > 0 && height > 0) {
+            setSize({ width, height });
+          }
+        }
+      };
+
+      updateSize();
+      window.addEventListener("resize", updateSize);
+      // Use ResizeObserver if available for better performance
+      let resizeObserver;
+      if (containerRef.current && window.ResizeObserver) {
+        resizeObserver = new ResizeObserver(updateSize);
+        resizeObserver.observe(containerRef.current);
+      }
+
+      return () => {
+        window.removeEventListener("resize", updateSize);
+        if (resizeObserver) {
+          resizeObserver.disconnect();
+        }
+      };
+    }, [defaultHeight]);
+
+    return [containerRef, size];
+  };
+
+  // Chart Wrapper Component with size measurement
+  const ChartWrapper = ({ height, children, emptyMessage }) => {
+    const [containerRef, size] = useContainerSize(height);
+
+    return (
+      <div 
+        ref={containerRef}
+        className="chart-container" 
+        style={{ height: `${height}px`, width: "100%", minWidth: 0, position: "relative" }}
+      >
+        {size.width > 0 && size.height > 0 ? (
+          <ResponsiveContainer width={size.width} height={size.height} minWidth={0} minHeight={height}>
+            {children}
+          </ResponsiveContainer>
+        ) : (
+          <div style={{ width: "100%", height: `${height}px`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Spin />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // StatCard Component
+  const StatCard = ({ label, value, icon, colorClass, onClick }) => {
+    return (
+      <div
+        className={`stat-card-modern ${colorClass} ${onClick ? "clickable" : ""}`}
+        onClick={onClick}
+      >
+        {/* Background Gradient Accent */}
+        <div className="stat-card-bg-accent" />
+
+        {/* Content */}
+        <div className="stat-card-content-wrapper">
+          <div className="stat-card-header-modern">
+            <p className="stat-card-label">{label}</p>
+            {icon && <span className="stat-card-icon-modern">{icon}</span>}
+          </div>
+          <div className="stat-card-value-wrapper">
+            <p className="stat-card-value-modern">{value}</p>
+          </div>
+        </div>
+
+        {/* Border Accent */}
+        <div className="stat-card-border-accent" />
+      </div>
+    );
+  };
+
   const statCards =
     statistics &&
     statistics.totalDoctors &&
@@ -101,7 +203,7 @@ const ThongKe = () => {
     statistics.monthRevenue
       ? [
           {
-            title: "Tổng Bác Sĩ",
+            title: "TỔNG BÁC SĨ",
             value: (statistics.totalDoctors.value || 0).toLocaleString(),
             change:
               statistics.totalDoctors.changeLabel || "0 so với tháng trước",
@@ -110,9 +212,10 @@ const ThongKe = () => {
             textColor: "text-blue",
             path: "/admin/users",
             clickable: true,
+            showChange: true,
           },
           {
-            title: "Tổng Bệnh Nhân",
+            title: "TỔNG BỆNH NHÂN",
             value: (statistics.totalPatients.value || 0).toLocaleString(),
             change:
               statistics.totalPatients.changeLabel || "0 so với tuần trước",
@@ -121,9 +224,10 @@ const ThongKe = () => {
             textColor: "text-cyan",
             path: "/admin/users",
             clickable: true,
+            showChange: true,
           },
           {
-            title: "Lịch Hẹn",
+            title: "LỊCH HẸN",
             value: (statistics.todayAppointments.value || 0).toLocaleString(),
             change:
               statistics.todayAppointments.changeLabel || "0 so với hôm qua",
@@ -132,29 +236,31 @@ const ThongKe = () => {
             textColor: "text-emerald",
             path: "/admin/lich-hen",
             clickable: true,
+            showChange: true,
           },
           {
             title: (() => {
               const periodLabels = {
-                today: "Doanh Thu (Hôm Nay)",
-                week: "Doanh Thu (Tuần)",
-                month: "Doanh Thu (Tháng)",
-                year: "Doanh Thu (Năm)",
-                custom: "Doanh Thu (Tùy Chỉnh)",
+                today: "DOANH THU (HÔM NAY)",
+                week: "DOANH THU (TUẦN)",
+                month: "DOANH THU (THÁNG)",
+                year: "DOANH THU (NĂM)",
+                custom: "DOANH THU (TÙY CHỈNH)",
               };
-              return periodLabels[selectedPeriod] || "Doanh Thu (Tháng)";
+              return periodLabels[selectedPeriod] || "DOANH THU (THÁNG)";
             })(),
             value: formatCurrency(statistics.monthRevenue.value || 0),
             change:
               statistics.monthRevenue.changeLabel || "0% so với tháng trước",
-            icon: <RiseOutlined />,
+            icon: null,
             cardClass: "stat-card-violet",
             textColor: "text-violet",
+            showChange: false,
           },
         ]
       : [
           {
-            title: "Tổng Bác Sĩ",
+            title: "TỔNG BÁC SĨ",
             value: "0",
             change: "+0 so với tháng trước",
             icon: <MedicineBoxOutlined />,
@@ -162,9 +268,10 @@ const ThongKe = () => {
             textColor: "text-blue",
             path: "/admin/users",
             clickable: true,
+            showChange: true,
           },
           {
-            title: "Tổng Bệnh Nhân",
+            title: "TỔNG BỆNH NHÂN",
             value: "0",
             change: "+0 so với tuần trước",
             icon: <TeamOutlined />,
@@ -172,9 +279,10 @@ const ThongKe = () => {
             textColor: "text-cyan",
             path: "/admin/users",
             clickable: true,
+            showChange: true,
           },
           {
-            title: "Lịch Hẹn",
+            title: "LỊCH HẸN",
             value: "0",
             change: "+0 so với hôm qua",
             icon: <CalendarOutlined />,
@@ -182,23 +290,25 @@ const ThongKe = () => {
             textColor: "text-emerald",
             path: "/admin/lich-hen",
             clickable: true,
+            showChange: true,
           },
           {
             title: (() => {
               const periodLabels = {
-                today: "Doanh Thu (Hôm Nay)",
-                week: "Doanh Thu (Tuần)",
-                month: "Doanh Thu (Tháng)",
-                year: "Doanh Thu (Năm)",
-                custom: "Doanh Thu (Tùy Chỉnh)",
+                today: "DOANH THU (HÔM NAY)",
+                week: "DOANH THU (TUẦN)",
+                month: "DOANH THU (THÁNG)",
+                year: "DOANH THU (NĂM)",
+                custom: "DOANH THU (TÙY CHỈNH)",
               };
-              return periodLabels[selectedPeriod] || "Doanh Thu (Tháng)";
+              return periodLabels[selectedPeriod] || "DOANH THU (THÁNG)";
             })(),
             value: "₫0",
             change: "+0% so với tháng trước",
-            icon: <RiseOutlined />,
+            icon: null,
             cardClass: "stat-card-violet",
             textColor: "text-violet",
+            showChange: false,
           },
         ];
 
@@ -329,34 +439,17 @@ const ThongKe = () => {
         <Row gutter={[16, 16]} className="stat-cards-row">
           {statCards.map((card, index) => (
             <Col xs={24} sm={12} lg={6} key={index}>
-              <Card
-                className={`stat-card ${card.cardClass} ${
-                  card.clickable ? "clickable" : ""
-                }`}
-                onClick={() => {
-                  if (card.clickable && card.path) {
-                    navigate(card.path);
-                  }
-                }}
-                style={card.clickable ? { cursor: "pointer" } : {}}
-              >
-                <div className="stat-card-header">
-                  <span className={`stat-card-title ${card.textColor}`}>
-                    {card.title}
-                  </span>
-                  <div className={`stat-card-icon ${card.textColor}`}>
-                    {card.icon}
-                  </div>
-                </div>
-                <div className="stat-card-content">
-                  <div className={`stat-card-value ${card.textColor}`}>
-                    {card.value}
-                  </div>
-                  <p className={`stat-card-change ${card.textColor}`}>
-                    {card.change}
-                  </p>
-                </div>
-              </Card>
+              <StatCard
+                label={card.title}
+                value={card.value}
+                icon={card.icon}
+                colorClass={card.textColor}
+                onClick={
+                  card.clickable && card.path
+                    ? () => navigate(card.path)
+                    : undefined
+                }
+              />
             </Col>
           ))}
         </Row>
@@ -376,10 +469,9 @@ const ThongKe = () => {
               }
             >
               <div className="pie-chart-placeholder">
-                <div className="chart-container" style={{ height: "250px" }}>
-                  {statistics?.userDistribution ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
+                {statistics?.userDistribution ? (
+                  <ChartWrapper height={250}>
+                    <PieChart>
                         <Pie
                           data={[
                             {
@@ -416,11 +508,12 @@ const ThongKe = () => {
                           formatter={(value, name) => [`${value} người`, name]}
                         />
                       </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
+                  </ChartWrapper>
+                ) : (
+                  <div className="chart-container" style={{ height: "250px", width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <div className="chart-empty">Chưa có dữ liệu</div>
-                  )}
-                </div>
+                  </div>
+                )}
                 <div className="pie-legend">
                   {statistics?.userDistribution && (
                     <>
@@ -490,10 +583,9 @@ const ThongKe = () => {
               }
             >
               <div className="pie-chart-placeholder">
-                <div className="chart-container" style={{ height: "200px" }}>
-                  {statistics?.appointmentRatio ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
+                {statistics?.appointmentRatio ? (
+                  <ChartWrapper height={200}>
+                    <PieChart>
                         <Pie
                           data={[
                             {
@@ -520,11 +612,12 @@ const ThongKe = () => {
                           formatter={(value, name) => [`${value}%`, name]}
                         />
                       </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
+                  </ChartWrapper>
+                ) : (
+                  <div className="chart-container" style={{ height: "200px", width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <div className="chart-empty">Chưa có dữ liệu</div>
-                  )}
-                </div>
+                  </div>
+                )}
                 <div className="pie-legend">
                   <div className="legend-item-center">
                     <span className="legend-dot legend-dot-blue"></span>
@@ -575,12 +668,6 @@ const ThongKe = () => {
                             {formatDate(patient.lastVisit)}
                           </div>
                         </div>
-                        <div className="patient-spending">
-                          <div className="spending-amount">
-                            {formatCurrency(patient.totalSpending)}
-                          </div>
-                          <div className="spending-label">Chi tiêu</div>
-                        </div>
                       </div>
                     ))
                   : [1, 2, 3].map((index) => (
@@ -590,10 +677,6 @@ const ThongKe = () => {
                           <div className="patient-detail">
                             Khám: 0 lần | Lần cuối: --
                           </div>
-                        </div>
-                        <div className="patient-spending">
-                          <div className="spending-amount">₫0</div>
-                          <div className="spending-label">Chi tiêu</div>
                         </div>
                       </div>
                     ))}
@@ -620,32 +703,32 @@ const ThongKe = () => {
               }
             >
               <div className="chart-placeholder">
-                <div className="chart-container" style={{ height: "300px" }}>
-                  {statistics?.topDoctorsOnline?.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={statistics.topDoctorsOnline.map((doctor) => ({
-                          name: doctor.name,
-                          count: doctor.count,
-                        }))}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="name"
-                          angle={-45}
-                          textAnchor="end"
-                          height={80}
-                        />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#1890ff" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
+                {statistics?.topDoctorsOnline?.length > 0 ? (
+                  <ChartWrapper height={300}>
+                    <BarChart
+                      data={statistics.topDoctorsOnline.map((doctor) => ({
+                        name: doctor.name,
+                        count: doctor.count,
+                      }))}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="name"
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#1890ff" />
+                    </BarChart>
+                  </ChartWrapper>
+                ) : (
+                  <div className="chart-container" style={{ height: "300px", width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <div className="chart-empty">Chưa có dữ liệu</div>
-                  )}
-                </div>
+                  </div>
+                )}
                 <div className="chart-legend-list">
                   {statistics?.topDoctorsOnline?.length > 0
                     ? statistics.topDoctorsOnline.map((doctor) => (
@@ -685,32 +768,32 @@ const ThongKe = () => {
               }
             >
               <div className="chart-placeholder">
-                <div className="chart-container" style={{ height: "300px" }}>
-                  {statistics?.topDoctorsOffline?.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={statistics.topDoctorsOffline.map((doctor) => ({
-                          name: doctor.name,
-                          count: doctor.count,
-                        }))}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="name"
-                          angle={-45}
-                          textAnchor="end"
-                          height={80}
-                        />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#13c2c2" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
+                {statistics?.topDoctorsOffline?.length > 0 ? (
+                  <ChartWrapper height={300}>
+                    <BarChart
+                      data={statistics.topDoctorsOffline.map((doctor) => ({
+                        name: doctor.name,
+                        count: doctor.count,
+                      }))}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="name"
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#13c2c2" />
+                    </BarChart>
+                  </ChartWrapper>
+                ) : (
+                  <div className="chart-container" style={{ height: "300px", width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <div className="chart-empty">Chưa có dữ liệu</div>
-                  )}
-                </div>
+                  </div>
+                )}
                 <div className="chart-legend-list">
                   {statistics?.topDoctorsOffline?.length > 0
                     ? statistics.topDoctorsOffline.map((doctor) => (
@@ -766,19 +849,25 @@ const ThongKe = () => {
                     <span>Tổng</span>
                   </div>
                 </div>
-                <div className="chart-container" style={{ height: "400px" }}>
-                  {statistics?.revenueTrend &&
+                {statistics?.revenueTrend &&
                   statistics.revenueTrend.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ChartWrapper height={400}>
                       <LineChart
                         data={statistics.revenueTrend}
                         margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" />
-                        <YAxis />
+                        <YAxis 
+                          tickFormatter={(value) => {
+                            if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                            if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                            return value.toString();
+                          }}
+                        />
                         <Tooltip
-                          formatter={(value) => `${formatCurrency(value)}`}
+                          formatter={(value) => formatCurrency(value)}
+                          labelFormatter={(label) => `Thời gian: ${label}`}
                         />
                         <Legend />
                         <Line
@@ -804,11 +893,12 @@ const ThongKe = () => {
                           name="Tổng"
                         />
                       </LineChart>
-                    </ResponsiveContainer>
+                    </ChartWrapper>
                   ) : (
-                    <div className="chart-empty">Chưa có dữ liệu</div>
+                    <div className="chart-container" style={{ height: "400px", width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div className="chart-empty">Chưa có dữ liệu</div>
+                    </div>
                   )}
-                </div>
               </div>
             </Card>
           </Col>

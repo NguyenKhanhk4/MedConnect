@@ -371,12 +371,30 @@ export const handlePayosWebhook = async (
     } else {
       // Booking payment: Tìm payment bằng orderCode hoặc pendingOrderCode
       // Có thể là single appointment hoặc medical visit (multiple appointments)
+      // IMPORTANT: Tìm cả khi orderCode là string hoặc number
       existingPayment = await Payment.findOne({
         $or: [
           { orderCode: orderCode, invoiceType: "booking" },
+          { orderCode: String(orderCode), invoiceType: "booking" },
+          { orderCode: Number(orderCode), invoiceType: "booking" },
           { pendingOrderCode: orderCode, invoiceType: "booking" },
+          { pendingOrderCode: String(orderCode), invoiceType: "booking" },
+          { pendingOrderCode: Number(orderCode), invoiceType: "booking" },
         ],
       }).lean();
+      
+      // Log để debug
+      if (!existingPayment) {
+        console.log(`⚠️ Payment not found for orderCode: ${orderCode} (type: ${typeof orderCode})`);
+        // Thử tìm tất cả payments với status initiated để debug
+        const initiatedPayments = await Payment.find({
+          status: "initiated",
+          invoiceType: "booking",
+        })
+          .select("_id orderCode pendingOrderCode invoiceNumber createdAt")
+          .lean();
+        console.log(`🔍 Found ${initiatedPayments.length} initiated payments:`, initiatedPayments);
+      }
 
       if (existingPayment) {
         console.log(`✅ Found booking payment: ${existingPayment._id}`);
@@ -545,6 +563,57 @@ export const handlePayosWebhook = async (
           console.log(
             `✅ Service payment confirmation email sent successfully for appointment ${appointment._id}`
           );
+
+          // Create in-app notification for patient about successful service payment
+          try {
+            const Notification = (await import("../models/notification.model.js")).default;
+            const patientUserId = patient?.userId?._id || patient?.userId;
+            
+            if (patientUserId) {
+              // Format payment amount
+              const formattedAmount = new Intl.NumberFormat("vi-VN", {
+                style: "currency",
+                currency: "VND",
+              }).format(payment.total);
+
+              // Format services list
+              const servicesList = payment.items
+                .map((item) => item.description)
+                .join(", ");
+
+              const doctorName = doctor?.fullName || "Bác sĩ";
+
+              await Notification.create({
+                userId: patientUserId,
+                type: "payment",
+                title: "Thanh toán dịch vụ thành công",
+                message: `Bạn đã thanh toán thành công ${formattedAmount} cho dịch vụ: ${servicesList}. Mã hóa đơn: ${payment.invoiceNumber}.`,
+                priority: "high",
+                relatedId: payment._id,
+                relatedType: "payment",
+                metadata: {
+                  paymentId: payment._id.toString(),
+                  invoiceNumber: payment.invoiceNumber,
+                  total: payment.total,
+                  services: payment.items,
+                  appointmentId: appointment?._id?.toString(),
+                  doctorName,
+                  status: "paid",
+                  paymentType: "service",
+                },
+              });
+
+              console.log(
+                `✅ Created service payment success notification for patient ${patientUserId}`
+              );
+            }
+          } catch (notificationError) {
+            console.error(
+              "❌ Error creating service payment success notification:",
+              notificationError
+            );
+            // Don't fail the whole process if notification fails
+          }
         } catch (emailError) {
           console.error(
             "❌ Error sending service payment confirmation email:",
@@ -679,6 +748,11 @@ export const handlePayosWebhook = async (
         };
       } else {
         // Booking payment: Update existing payment if found, or create new (legacy flow)
+        // Khai báo các biến ở phạm vi rộng hơn để có thể sử dụng sau này
+        let isPrePaymentFlow = false;
+        let visitCreated = false;
+        let createdAppointments = []; // Khai báo ở scope rộng để dùng khi gửi email
+        
         if (existingPayment) {
           // Update existing payment
           payment = await Payment.findById(existingPayment._id);
@@ -687,11 +761,40 @@ export const handlePayosWebhook = async (
           }
 
           // Check if this is a pre-payment flow (has appointmentData but no medicalVisitId)
-          const isPrePaymentFlow =
+          isPrePaymentFlow =
             payment.appointmentData &&
             payment.appointmentData.length > 0 &&
-            !payment.medicalVisitId;
-          let visitCreated = false;
+            !payment.medicalVisitId &&
+            !payment.appointmentId &&
+            (!payment.appointmentIds || payment.appointmentIds.length === 0);
+
+          // IMPORTANT: Kiểm tra xem payment đã được xử lý chưa (idempotent check)
+          // Nếu đã có medicalVisitId hoặc appointmentId/appointmentIds, nghĩa là đã được xử lý rồi
+          if (payment.medicalVisitId || payment.appointmentId || (payment.appointmentIds && payment.appointmentIds.length > 0)) {
+            console.log(`ℹ️ Payment already processed - has appointments/visit. Updating status only.`);
+            // Chỉ cập nhật status nếu chưa captured
+            if (payment.status !== "captured") {
+              payment.status = "captured";
+              payment.orderCode = orderCode;
+              payment.providerTxnId = String(orderCode);
+              payment.amountPaid = payment.total;
+              payment.paidAt = new Date();
+              payment.capturedAt = new Date();
+              payment.pendingOrderCode = undefined;
+              payment.gateway = "payos";
+              payment.method = "qr";
+              await payment.save();
+              console.log(`✅ Payment status updated to captured: ${payment._id}`);
+            }
+            // Return success để tránh xử lý lại
+            return {
+              paid: true,
+              orderCode,
+              paymentId: payment._id,
+              already: true,
+              invoiceType: "booking",
+            };
+          }
 
           if (isPrePaymentFlow) {
             // Pre-payment flow: Create appointments after payment success
@@ -873,25 +976,76 @@ export const handlePayosWebhook = async (
               console.log(`✅ MedicalVisit created: ${visit._id}`);
 
               // Create all appointments from appointmentData
-              const createdAppointments = [];
+              // IMPORTANT: Với multiple appointments, KHÔNG set paymentId cho từng appointment
+              // vì unique index chỉ cho phép 1 appointment có cùng paymentId
+              // Thay vào đó, chỉ lưu paymentId trong payment.appointmentIds và payment.medicalVisitId
+              // Sử dụng biến createdAppointments đã khai báo ở scope rộng hơn
+              createdAppointments = [];
               for (const aptData of payment.appointmentData) {
                 const targetPatientId = aptData.patientId || selfPatient._id;
-                const newAppointment = new Appointment({
+                
+                // Kiểm tra xem đã có appointment với visitId và slotId này chưa (idempotent)
+                let existingAppointment = await Appointment.findOne({
                   visitId: visit._id,
-                  patientId: targetPatientId,
-                  doctorId: aptData.doctorId,
                   slotId: aptData.slotId,
-                  mode: aptData.mode,
-                  clinicId: aptData.clinicId,
-                  scheduledStart: aptData.scheduledStart,
-                  scheduledEnd: aptData.scheduledEnd,
-                  status: "accepted",
-                  reason: aptData.reason || "",
-                  paymentStatus: "paid",
-                  paymentId: payment._id,
                 });
-                await newAppointment.save();
-                visit.appointmentIds.push(newAppointment._id);
+                
+                let newAppointment;
+                if (existingAppointment) {
+                  console.log(`ℹ️ Appointment already exists for visit ${visit._id} and slot ${aptData.slotId}, skipping creation`);
+                  newAppointment = existingAppointment;
+                  // Đảm bảo paymentStatus được set
+                  if (newAppointment.paymentStatus !== "paid") {
+                    newAppointment.paymentStatus = "paid";
+                    await newAppointment.save();
+                  }
+                } else {
+                  newAppointment = new Appointment({
+                    visitId: visit._id,
+                    patientId: targetPatientId,
+                    doctorId: aptData.doctorId,
+                    slotId: aptData.slotId,
+                    mode: aptData.mode,
+                    clinicId: aptData.clinicId,
+                    scheduledStart: aptData.scheduledStart,
+                    scheduledEnd: aptData.scheduledEnd,
+                    status: "accepted",
+                    reason: aptData.reason || "",
+                    paymentStatus: "paid",
+                    // KHÔNG set paymentId cho multiple appointments (unique index conflict)
+                    // paymentId sẽ được lưu trong payment.appointmentIds
+                  });
+                  try {
+                    await newAppointment.save();
+                  } catch (error) {
+                    // Nếu lỗi duplicate key hoặc lỗi khác, tìm appointment đã tồn tại
+                    if (error.code === 11000) {
+                      console.log(`⚠️ Duplicate key detected, finding existing appointment`);
+                      existingAppointment = await Appointment.findOne({
+                        visitId: visit._id,
+                        slotId: aptData.slotId,
+                      });
+                      if (existingAppointment) {
+                        newAppointment = existingAppointment;
+                        // Đảm bảo paymentStatus được set
+                        if (newAppointment.paymentStatus !== "paid") {
+                          newAppointment.paymentStatus = "paid";
+                          await newAppointment.save();
+                        }
+                        console.log(`✅ Found existing appointment: ${newAppointment._id}`);
+                      } else {
+                        throw error; // Re-throw nếu không tìm thấy
+                      }
+                    } else {
+                      throw error; // Re-throw các lỗi khác
+                    }
+                  }
+                }
+                
+                // Chỉ thêm vào visit.appointmentIds nếu chưa có
+                if (!visit.appointmentIds.includes(newAppointment._id)) {
+                  visit.appointmentIds.push(newAppointment._id);
+                }
                 createdAppointments.push(newAppointment);
 
                 // Mark slot as "booked"
@@ -921,16 +1075,47 @@ export const handlePayosWebhook = async (
               payment.method = "qr";
               await payment.save();
 
+              // IMPORTANT: Populate appointments để có đầy đủ thông tin cho email
+              const appointmentIds = createdAppointments.map(apt => apt._id);
+              createdAppointments = await Appointment.find({
+                _id: { $in: appointmentIds }
+              })
+                .populate("doctorId", "fullName specializationIds")
+                .populate("patientId")
+                .populate("clinicId", "name")
+                .sort({ scheduledStart: 1 });
+
               console.log(
                 `✅ Multiple appointments pre-payment flow completed: Visit ${visit._id} with ${createdAppointments.length} appointments`
               );
+              console.log(`🔍 Populated appointments for email:`, {
+                count: createdAppointments.length,
+                appointmentIds: createdAppointments.map(apt => ({
+                  id: apt._id,
+                  doctor: apt.doctorId?.fullName || "N/A",
+                  scheduledStart: apt.scheduledStart,
+                })),
+              });
 
-              // Get first appointment and doctor for email
+              // Get first appointment and doctor for email (backward compatibility)
               const firstAppointment = createdAppointments[0];
               if (firstAppointment) {
                 doctor = await Doctor.findById(firstAppointment.doctorId);
                 appointment = firstAppointment;
               }
+              
+              // IMPORTANT: Đảm bảo payment đã được save với appointmentIds trước khi gửi email
+              // Log để debug
+              console.log(`🔍 Payment after creating appointments:`, {
+                paymentId: payment._id,
+                medicalVisitId: payment.medicalVisitId,
+                appointmentIdsLength: payment.appointmentIds?.length || 0,
+                appointmentIds: payment.appointmentIds,
+                createdAppointmentsLength: createdAppointments.length,
+              });
+              
+              // Đảm bảo payment object có đầy đủ thông tin (không reload vì có thể mất dữ liệu)
+              // Payment đã được save ở trên với medicalVisitId và appointmentIds
 
               // Send notifications for all appointments
               try {
@@ -1153,24 +1338,138 @@ export const handlePayosWebhook = async (
           }
         }
 
-        // Gửi email thông báo thanh toán thành công cho khách hàng (only if appointment exists)
-        if (appointment && patient && doctor) {
+        // Gửi email thông báo thanh toán thành công cho khách hàng
+        // Với multiple appointments, lấy tất cả appointments để hiển thị trong email
+        if (payment && patient) {
           try {
-            await sendPaymentConfirmationEmail(
-              appointment,
-              payment,
-              patient,
-              doctor
-            );
-            console.log(
-              `📧 Payment confirmation email sent for appointment ${appointment._id}`
-            );
+            let appointmentsForEmail = [];
+            let doctorForEmail = doctor;
+            
+            // Kiểm tra xem có multiple appointments không
+            // Ưu tiên 1: Pre-payment flow với createdAppointments đã có sẵn
+            if (createdAppointments && createdAppointments.length > 0) {
+              // Pre-payment flow: dùng createdAppointments đã có sẵn (đã populate)
+              appointmentsForEmail = createdAppointments;
+              console.log(`📧 Using createdAppointments for email: ${appointmentsForEmail.length} appointments`);
+              
+              // Lấy doctor đầu tiên cho backward compatibility
+              if (appointmentsForEmail.length > 0 && appointmentsForEmail[0].doctorId) {
+                doctorForEmail = appointmentsForEmail[0].doctorId;
+              }
+            } 
+            // Ưu tiên 2: Payment có medicalVisitId và appointmentIds
+            else if (payment.medicalVisitId && payment.appointmentIds && payment.appointmentIds.length > 0) {
+              // Multiple appointments - existing flow: lấy từ database
+              const Appointment = (await import("../models/appointment.model.js")).default;
+              appointmentsForEmail = await Appointment.find({
+                _id: { $in: payment.appointmentIds }
+              })
+                .populate("doctorId", "fullName specializationIds")
+                .populate("patientId")
+                .populate("clinicId", "name")
+                .sort({ scheduledStart: 1 }); // Sắp xếp theo thời gian
+              
+              console.log(`📧 Loaded appointments from database: ${appointmentsForEmail.length} appointments`);
+              
+              // Lấy doctor đầu tiên cho backward compatibility
+              if (appointmentsForEmail.length > 0 && appointmentsForEmail[0].doctorId) {
+                doctorForEmail = appointmentsForEmail[0].doctorId;
+              }
+            } 
+            // Ưu tiên 3: Single appointment
+            else if (appointment) {
+              // Single appointment
+              appointmentsForEmail = [appointment];
+              console.log(`📧 Using single appointment for email`);
+            }
+            
+            if (appointmentsForEmail.length > 0) {
+              await sendPaymentConfirmationEmail(
+                appointmentsForEmail,
+                payment,
+                patient,
+                doctorForEmail
+              );
+              console.log(
+                `📧 Payment confirmation email sent for ${appointmentsForEmail.length} appointment(s)`
+              );
+
+              // Create in-app notification for patient about successful payment
+              try {
+                const Notification = (await import("../models/notification.model.js")).default;
+                const patientUserId = patient?.userId?._id || patient?.userId;
+                
+                if (patientUserId) {
+                  // Format payment amount
+                  const formattedAmount = new Intl.NumberFormat("vi-VN", {
+                    style: "currency",
+                    currency: "VND",
+                  }).format(payment.total);
+
+                  // Get appointment info for notification
+                  const firstAppointment = appointmentsForEmail[0];
+                  const doctorName = firstAppointment?.doctorId?.fullName || "Bác sĩ";
+                  const appointmentTime = firstAppointment?.scheduledStart 
+                    ? new Date(firstAppointment.scheduledStart).toLocaleString("vi-VN", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "";
+
+                  await Notification.create({
+                    userId: patientUserId,
+                    type: "payment",
+                    title: "Thanh toán thành công",
+                    message: `Bạn đã thanh toán thành công ${formattedAmount} cho lịch hẹn khám với BS. ${doctorName}${appointmentTime ? ` vào ${appointmentTime}` : ""}. Mã hóa đơn: ${payment.invoiceNumber}. Lịch hẹn đã được xác nhận.`,
+                    priority: "high",
+                    relatedId: payment._id,
+                    relatedType: "payment",
+                    metadata: {
+                      paymentId: payment._id.toString(),
+                      invoiceNumber: payment.invoiceNumber,
+                      total: payment.total,
+                      appointmentIds: appointmentsForEmail.map(apt => apt._id.toString()),
+                      doctorName,
+                      appointmentTime,
+                      status: "paid",
+                    },
+                  });
+
+                  console.log(
+                    `✅ Created payment success notification for patient ${patientUserId}`
+                  );
+                }
+              } catch (notificationError) {
+                console.error(
+                  "❌ Error creating payment success notification:",
+                  notificationError
+                );
+                // Don't fail the whole process if notification fails
+              }
+            } else {
+              console.log(`⚠️ No appointments found for email - payment:`, {
+                paymentId: payment._id,
+                hasMedicalVisitId: !!payment.medicalVisitId,
+                appointmentIdsLength: payment.appointmentIds?.length || 0,
+                hasAppointment: !!appointment,
+                createdAppointmentsLength: createdAppointments?.length || 0,
+              });
+            }
           } catch (emailError) {
             console.error(
               "❌ Error sending payment confirmation email:",
               emailError
             );
           }
+        } else {
+          console.log(`⚠️ Cannot send email - missing payment or patient:`, {
+            hasPayment: !!payment,
+            hasPatient: !!patient,
+          });
         }
 
         // Gửi notification cho doctor về lịch hẹn mới (sau khi thanh toán thành công)
@@ -1399,47 +1698,226 @@ export const cancelPaymentLink = async (orderCode) => {
 
 /**
  * Gửi email xác nhận thanh toán và thông tin lịch hẹn cho khách hàng
- * @param {object} appointment - Appointment object
+ * @param {array|object} appointments - Appointment object hoặc array of appointments
  * @param {object} payment - Payment object
- * @param {object} patient - Patient object
- * @param {object} doctor - Doctor object
+ * @param {object} patient - Patient object (có thể là người thân)
+ * @param {object} doctor - Doctor object (cho backward compatibility)
  */
 async function sendPaymentConfirmationEmail(
-  appointment,
+  appointments,
   payment,
   patient,
   doctor
 ) {
+  // Normalize: nếu là single appointment, convert thành array
+  const appointmentsArray = Array.isArray(appointments) ? appointments : [appointments];
+  const firstAppointment = appointmentsArray[0];
+  
+  if (!firstAppointment) {
+    console.log("⚠️ No appointments provided for email");
+    return;
+  }
   try {
-    const patientEmail = patient.userId?.email;
+    // Lấy email từ người đặt (owner), không phải từ người thân
+    let patientEmail = null;
+    let ownerName = null;
+    let isFamilyMemberBooking = false;
+    let familyMemberName = null;
+
+    // Kiểm tra xem patient có phải là người thân không
+    // Lấy patient từ appointment đầu tiên để đảm bảo đúng patient của appointment
+    let actualPatient = patient;
+    if (firstAppointment && firstAppointment.patientId) {
+      const Patient = (await import("../models/patient.model.js")).default;
+      const appointmentPatientId = firstAppointment.patientId._id || firstAppointment.patientId;
+      const appointmentPatient = await Patient.findById(appointmentPatientId).populate("userId");
+      if (appointmentPatient) {
+        actualPatient = appointmentPatient;
+      }
+    }
+
+    // Kiểm tra relationshipToOwner - chỉ khi có giá trị VÀ không phải "self" thì mới là người thân
+    // Nếu relationshipToOwner là undefined, null, hoặc "self" → đặt cho chính mình
+    const relationship = actualPatient.relationshipToOwner;
+    const isFamilyMember = relationship && relationship !== "self";
+
+    // Debug log
+    console.log("📧 Email debug - Patient info:", {
+      patientId: actualPatient._id?.toString(),
+      fullName: actualPatient.fullName,
+      relationshipToOwner: relationship,
+      isFamilyMember: isFamilyMember,
+      hasUserId: !!actualPatient.userId,
+      userIdEmail: actualPatient.userId?.email,
+    });
+
+    if (isFamilyMember) {
+      // Đây là người thân, cần lấy email từ owner
+      isFamilyMemberBooking = true;
+      familyMemberName = actualPatient.fullName;
+      
+      // Lấy owner (self patient) từ userId
+      if (actualPatient.userId && actualPatient.userId._id) {
+        const Patient = (await import("../models/patient.model.js")).default;
+        const selfPatient = await Patient.findOne({
+          userId: actualPatient.userId._id,
+          relationshipToOwner: "self",
+        }).populate("userId");
+        
+        if (selfPatient && selfPatient.userId && selfPatient.userId.email) {
+          patientEmail = selfPatient.userId.email;
+          ownerName = selfPatient.fullName || selfPatient.userId.fullName || "Khách hàng";
+        } else {
+          // Fallback: thử lấy từ actualPatient.userId trực tiếp
+          patientEmail = actualPatient.userId.email;
+          ownerName = actualPatient.userId.fullName || "Khách hàng";
+        }
+      }
+    } else {
+      // Đây là đặt cho chính mình
+      patientEmail = actualPatient.userId?.email;
+      ownerName = actualPatient.fullName || actualPatient.userId?.fullName || "Khách hàng";
+    }
+
     if (!patientEmail) {
       console.log("⚠️ No email address found for patient, skipping email");
       return;
     }
 
-    // Lấy thông tin specialization
+    // Lấy thông tin specialization cho doctor đầu tiên (backward compatibility)
     const Specialization = (await import("../models/specialization.model.js"))
       .default;
     let specializationName = "Chuyên khoa";
-    if (doctor.specializationIds && doctor.specializationIds.length > 0) {
+    if (doctor && doctor.specializationIds && doctor.specializationIds.length > 0) {
       const spec = await Specialization.findById(doctor.specializationIds[0]);
       if (spec) {
         specializationName = spec.name;
       }
     }
 
-    // Format ngày giờ
-    const appointmentDate = new Date(appointment.scheduledStart);
-    const formattedDate = appointmentDate.toLocaleDateString("vi-VN", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    const formattedTime = appointmentDate.toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    // Kiểm tra xem có nhiều appointments không
+    const hasMultipleAppointments = appointmentsArray.length > 1;
+    
+    // Format appointments để hiển thị trong email
+    let appointmentsHtml = "";
+    
+    // Populate specialization cho tất cả appointments
+    for (const apt of appointmentsArray) {
+      if (apt.doctorId && apt.doctorId.specializationIds && apt.doctorId.specializationIds.length > 0) {
+        const spec = await Specialization.findById(apt.doctorId.specializationIds[0]);
+        if (spec) {
+          apt.specializationName = spec.name;
+        }
+      }
+    }
+    
+    if (hasMultipleAppointments) {
+      // Hiển thị tất cả appointments
+      appointmentsHtml = appointmentsArray.map((apt, index) => {
+        const aptDate = new Date(apt.scheduledStart);
+        const formattedAptDate = aptDate.toLocaleDateString("vi-VN", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+        const formattedAptTime = aptDate.toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        
+        // Lấy thông tin doctor
+        const aptDoctor = apt.doctorId?._id ? apt.doctorId : apt.doctorId;
+        const aptDoctorName = aptDoctor?.fullName || "Unknown Doctor";
+        const aptSpecializationName = apt.specializationName || "Chuyên khoa";
+        
+        return `
+          <div style="background-color: #f0f0f0; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #667eea;">
+            <h4 style="margin-top: 0; color: #667eea;">Lịch hẹn ${index + 1}</h4>
+            <div class="info-row">
+              <span class="info-label">Bác sĩ:</span>
+              <span class="info-value">${aptDoctorName}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Chuyên khoa:</span>
+              <span class="info-value">${aptSpecializationName}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Ngày hẹn:</span>
+              <span class="info-value">${formattedAptDate}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Giờ hẹn:</span>
+              <span class="info-value">${formattedAptTime}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Hình thức:</span>
+              <span class="info-value">${apt.mode === "online" ? "Khám trực tuyến" : "Khám tại phòng khám"}</span>
+            </div>
+            ${apt.clinicId?.name ? `
+            <div class="info-row">
+              <span class="info-label">Phòng khám:</span>
+              <span class="info-value">${apt.clinicId.name}</span>
+            </div>
+            ` : ""}
+            ${apt.reason ? `
+            <div class="info-row">
+              <span class="info-label">Lý do khám:</span>
+              <span class="info-value">${apt.reason}</span>
+            </div>
+            ` : ""}
+          </div>
+        `;
+      }).join("");
+    } else {
+      // Single appointment - format như cũ
+      const appointmentDate = new Date(firstAppointment.scheduledStart);
+      const formattedDate = appointmentDate.toLocaleDateString("vi-VN", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      const formattedTime = appointmentDate.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      
+      appointmentsHtml = `
+        <div class="info-row">
+          <span class="info-label">Ngày hẹn:</span>
+          <span class="info-value">${formattedDate}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Giờ hẹn:</span>
+          <span class="info-value">${formattedTime}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Bác sĩ:</span>
+          <span class="info-value">${doctor?.fullName || "Unknown Doctor"}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Chuyên khoa:</span>
+          <span class="info-value">${specializationName}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Hình thức khám:</span>
+          <span class="info-value">${firstAppointment.mode === "online" ? "Khám trực tuyến" : "Khám tại phòng khám"}</span>
+        </div>
+        ${firstAppointment.clinicId?.name ? `
+        <div class="info-row">
+          <span class="info-label">Phòng khám:</span>
+          <span class="info-value">${firstAppointment.clinicId.name}</span>
+        </div>
+        ` : ""}
+        ${firstAppointment.reason ? `
+        <div class="info-row">
+          <span class="info-label">Lý do khám:</span>
+          <span class="info-value">${firstAppointment.reason}</span>
+        </div>
+        ` : ""}
+      `;
+    }
 
     // Format số tiền
     const formattedAmount = new Intl.NumberFormat("vi-VN", {
@@ -1580,60 +2058,27 @@ async function sendPaymentConfirmationEmail(
           <div class="content">
             <div class="success-badge">✓ Thanh toán thành công</div>
             
-            <p>Xin chào <strong>${
-              patient.fullName || "Khách hàng"
-            }</strong>,</p>
+            <p>Xin chào <strong>${ownerName}</strong>,</p>
             
-            <p>Cảm ơn bạn đã sử dụng dịch vụ của MedConnect. Thanh toán của bạn đã được xác nhận thành công. Lịch hẹn khám của bạn đã được đặt và đang chờ bác sĩ xác nhận.</p>
+            ${
+              isFamilyMemberBooking
+                ? `<p>Cảm ơn bạn đã sử dụng dịch vụ của MedConnect. Thanh toán của bạn đã được xác nhận thành công. Lịch hẹn khám cho <strong>${familyMemberName}</strong> đã được đặt và đang chờ bác sĩ xác nhận.</p>`
+                : `<p>Cảm ơn bạn đã sử dụng dịch vụ của MedConnect. Thanh toán của bạn đã được xác nhận thành công. Lịch hẹn khám của bạn đã được đặt và đang chờ bác sĩ xác nhận.</p>`
+            }
             
             <div class="info-section">
-              <h3>📅 Thông tin lịch hẹn</h3>
-              <div class="info-row">
-                <span class="info-label">Ngày hẹn:</span>
-                <span class="info-value">${formattedDate}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Giờ hẹn:</span>
-                <span class="info-value">${formattedTime}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Bác sĩ:</span>
-                <span class="info-value">${
-                  doctor.fullName || "Unknown Doctor"
-                }</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Chuyên khoa:</span>
-                <span class="info-value">${specializationName}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Hình thức khám:</span>
-                <span class="info-value">${
-                  appointment.mode === "online"
-                    ? "Khám trực tuyến"
-                    : "Khám tại phòng khám"
-                }</span>
-              </div>
+              <h3>📅 Thông tin lịch hẹn${hasMultipleAppointments ? ` (${appointmentsArray.length} lịch hẹn)` : ""}</h3>
               ${
-                appointment.clinicId && appointment.clinicId.name
+                isFamilyMemberBooking
                   ? `
               <div class="info-row">
-                <span class="info-label">Phòng khám:</span>
-                <span class="info-value">${appointment.clinicId.name}</span>
+                <span class="info-label">Người khám:</span>
+                <span class="info-value">${familyMemberName}</span>
               </div>
               `
                   : ""
               }
-              ${
-                appointment.reason
-                  ? `
-              <div class="info-row">
-                <span class="info-label">Lý do khám:</span>
-                <span class="info-value">${appointment.reason}</span>
-              </div>
-              `
-                  : ""
-              }
+              ${appointmentsHtml}
             </div>
             
             <div class="invoice-section">

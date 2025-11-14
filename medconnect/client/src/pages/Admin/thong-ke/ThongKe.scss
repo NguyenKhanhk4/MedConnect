@@ -115,26 +115,226 @@
   .stat-cards-row {
     margin-bottom: 24px;
 
+    // Modern Stat Card Component
+    .stat-card-modern {
+      position: relative;
+      overflow: hidden;
+      border-radius: 16px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      height: 100%;
+
+      &.clickable {
+        cursor: pointer;
+
+        &:hover {
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+          border-color: #cbd5e1;
+          transform: translateY(-2px);
+        }
+      }
+
+      // Background Gradient Accent
+      .stat-card-bg-accent {
+        position: absolute;
+        right: -32px;
+        top: -32px;
+        width: 128px;
+        height: 128px;
+        border-radius: 50%;
+        opacity: 0.1;
+        filter: blur(32px);
+        transition: opacity 0.3s ease;
+
+        .stat-card-modern.clickable:hover & {
+          opacity: 0.2;
+        }
+      }
+
+      // Color variants for background accent
+      &.text-blue .stat-card-bg-accent {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+      }
+
+      &.text-cyan .stat-card-bg-accent {
+        background: linear-gradient(135deg, #cffafe 0%, #a5f3fc 100%);
+      }
+
+      &.text-emerald .stat-card-bg-accent {
+        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+      }
+
+      &.text-violet .stat-card-bg-accent {
+        background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+      }
+
+      // Content Wrapper
+      .stat-card-content-wrapper {
+        position: relative;
+        z-index: 10;
+      }
+
+      // Header
+      .stat-card-header-modern {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 16px;
+
+        .stat-card-label {
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: #64748b;
+          margin: 0;
+        }
+
+        .stat-card-icon-modern {
+          font-size: 24px;
+          line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+
+          svg {
+            width: 24px;
+            height: 24px;
+            display: block;
+          }
+        }
+      }
+
+      // Icon colors
+      &.text-blue .stat-card-header-modern .stat-card-icon-modern {
+        color: #3b82f6;
+      }
+
+      &.text-cyan .stat-card-header-modern .stat-card-icon-modern {
+        color: #06b6d4;
+      }
+
+      &.text-emerald .stat-card-header-modern .stat-card-icon-modern {
+        color: #10b981;
+      }
+
+      &.text-violet .stat-card-header-modern .stat-card-icon-modern {
+        color: #8b5cf6;
+      }
+
+      // Value
+      .stat-card-value-wrapper {
+        margin-bottom: 16px;
+
+        .stat-card-value-modern {
+          font-size: 36px;
+          font-weight: 700;
+          color: #1e293b;
+          line-height: 1.2;
+          margin: 0;
+          letter-spacing: -0.5px;
+
+          @media (min-width: 768px) {
+            font-size: 40px;
+          }
+        }
+      }
+
+      // Trend
+      .stat-card-trend-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .stat-card-trend-badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 12px;
+          border-radius: 9999px;
+          font-size: 11px;
+          font-weight: 600;
+          color: #ffffff;
+        }
+
+        .stat-card-trend-label {
+          font-size: 11px;
+          color: #64748b;
+        }
+      }
+
+      // Badge gradient colors
+      &.text-blue .stat-card-trend-wrapper .stat-card-trend-badge {
+        background: linear-gradient(to right, #3b82f6, #2563eb);
+      }
+
+      &.text-cyan .stat-card-trend-wrapper .stat-card-trend-badge {
+        background: linear-gradient(to right, #06b6d4, #0891b2);
+      }
+
+      &.text-emerald .stat-card-trend-wrapper .stat-card-trend-badge {
+        background: linear-gradient(to right, #10b981, #059669);
+      }
+
+      &.text-violet .stat-card-trend-wrapper .stat-card-trend-badge {
+        background: linear-gradient(to right, #8b5cf6, #7c3aed);
+      }
+
+      // Border Accent
+      .stat-card-border-accent {
+        position: absolute;
+        inset: 0;
+        border-radius: 16px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+
+      &.clickable:hover .stat-card-border-accent {
+        opacity: 0.05;
+      }
+
+      // Border accent colors
+      &.text-blue .stat-card-border-accent {
+        background: linear-gradient(to right, #dbeafe, #bfdbfe);
+      }
+
+      &.text-cyan .stat-card-border-accent {
+        background: linear-gradient(to right, #cffafe, #a5f3fc);
+      }
+
+      &.text-emerald .stat-card-border-accent {
+        background: linear-gradient(to right, #d1fae5, #a7f3d0);
+      }
+
+      &.text-violet .stat-card-border-accent {
+        background: linear-gradient(to right, #ede9fe, #ddd6fe);
+      }
+    }
+
     .stat-card {
       border-radius: 12px;
       border: none;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       height: 100%;
+      background: #ffffff;
 
       &.stat-card-blue {
-        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        background: #ffffff;
       }
 
       &.stat-card-cyan {
-        background: linear-gradient(135deg, #cffafe 0%, #a5f3fc 100%);
+        background: #ffffff;
       }
 
       &.stat-card-emerald {
-        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        background: #ffffff;
       }
 
       &.stat-card-violet {
-        background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+        background: #ffffff;
       }
 
       &.clickable {
@@ -164,34 +364,37 @@
         z-index: 1;
 
         .stat-card-title {
-          font-size: 14px;
-          font-weight: 500;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: #595959;
 
           &.text-blue {
-            color: #1e40af;
+            color: #595959;
           }
 
           &.text-cyan {
-            color: #0e7490;
+            color: #595959;
           }
 
           &.text-emerald {
-            color: #065f46;
+            color: #595959;
           }
 
           &.text-violet {
-            color: #5b21b6;
+            color: #595959;
           }
         }
 
         .stat-card-icon {
-          font-size: 32px;
-          opacity: 0.9;
+          font-size: 24px;
+          opacity: 0.8;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 32px;
-          height: 32px;
+          width: 24px;
+          height: 24px;
           line-height: 1;
           flex-shrink: 0;
           background: transparent !important;
@@ -200,51 +403,82 @@
           margin: 0 !important;
 
           svg {
-            width: 32px !important;
-            height: 32px !important;
+            width: 24px !important;
+            height: 24px !important;
             display: block !important;
             fill: currentColor;
             background: transparent !important;
           }
 
           &.text-blue {
-            color: #1e40af;
+            color: #3b82f6;
           }
 
           &.text-cyan {
-            color: #0e7490;
+            color: #06b6d4;
           }
 
           &.text-emerald {
-            color: #065f46;
+            color: #10b981;
           }
 
           &.text-violet {
-            color: #5b21b6;
+            color: #8b5cf6;
           }
         }
       }
 
       .stat-card-content {
         .stat-card-value {
-          font-size: 32px;
+          font-size: 28px;
           font-weight: 700;
-          margin-bottom: 8px;
+          margin-bottom: 12px;
           line-height: 1.2;
+          color: #262626;
 
           &.text-blue {
+            color: #262626;
+          }
+
+          &.text-cyan {
+            color: #262626;
+          }
+
+          &.text-emerald {
+            color: #262626;
+          }
+
+          &.text-violet {
+            color: #262626;
+          }
+        }
+
+        .stat-card-change-badge {
+          display: inline-block;
+          font-size: 11px;
+          font-weight: 500;
+          padding: 4px 10px;
+          border-radius: 12px;
+          margin: 0;
+          line-height: 1.4;
+
+          &.text-blue {
+            background: #dbeafe;
             color: #1e40af;
           }
 
           &.text-cyan {
+            background: #cffafe;
             color: #0e7490;
           }
 
           &.text-emerald {
+            background: #d1fae5;
             color: #065f46;
           }
 
           &.text-violet {
+            background: #ede9fe;
             color: #5b21b6;
           }
         }
@@ -319,16 +553,36 @@
   .pie-chart-placeholder,
   .trend-chart-placeholder {
     .chart-container {
-      display: flex;
-      align-items: center;
-      justify-content: center;
       background: #fafafa;
       border-radius: 8px;
       border: 1px dashed #d9d9d9;
+      width: 100%;
+      min-width: 0;
+      position: relative;
+      overflow: hidden;
+
+      // When empty, center the message
+      &:has(.chart-empty) {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
 
       .chart-empty {
         color: #8c8c8c;
         font-size: 14px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      // Ensure ResponsiveContainer has valid dimensions
+      > div {
+        width: 100% !important;
+        height: 100% !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
       }
     }
   }

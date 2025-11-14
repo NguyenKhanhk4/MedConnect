@@ -372,6 +372,7 @@ export default function QuanLyThanhToanDichVu() {
             <table className="payments-table">
               <thead>
                 <tr>
+                  <th>STT</th>
                   <th>Mã hóa đơn</th>
                   <th>Loại</th>
                   <th>Bệnh nhân</th>
@@ -382,8 +383,9 @@ export default function QuanLyThanhToanDichVu() {
                 </tr>
               </thead>
               <tbody>
-                {filteredPayments.map((payment) => (
+                {filteredPayments.map((payment, index) => (
                   <tr key={payment._id}>
+                    <td>{(page - 1) * 20 + index + 1}</td>
                     <td>{payment.invoiceNumber}</td>
                     <td>
                       {payment.invoiceType === "booking"

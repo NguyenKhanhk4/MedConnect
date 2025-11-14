@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Tabs, Button, Avatar, Modal, message, Spin, Alert, Input } from "antd";
+import React, { useState, useEffect, useMemo } from "react";
+import { Tabs, Button, Avatar, Modal, message, Spin, Alert, Input, Pagination } from "antd";
 const { Search } = Input;
 import {
   CheckOutlined,
@@ -33,10 +33,96 @@ const XacMinhBacSi = () => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 when tab or searchTerm changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchTerm]);
 
   useEffect(() => {
     fetchDoctors();
   }, []);
+
+  // Filter doctors based on search term - must be before early returns
+  const filteredPendingDoctors = useMemo(() => {
+    if (!searchTerm.trim()) return pendingDoctors;
+    const term = searchTerm.toLowerCase().trim();
+    return pendingDoctors.filter((doctor) => {
+      const name = (doctor.name || doctor.fullName || "").toLowerCase();
+      const specialty = (
+        doctor.specialty ||
+        doctor.specializationName ||
+        ""
+      ).toLowerCase();
+      const email = (doctor.email || doctor.userId?.email || "").toLowerCase();
+      const phone = (doctor.phone || doctor.userId?.phone || "").toLowerCase();
+      return (
+        name.includes(term) ||
+        specialty.includes(term) ||
+        email.includes(term) ||
+        phone.includes(term)
+      );
+    });
+  }, [pendingDoctors, searchTerm]);
+
+  const filteredVerifiedDoctors = useMemo(() => {
+    if (!searchTerm.trim()) return verifiedDoctors;
+    const term = searchTerm.toLowerCase().trim();
+    return verifiedDoctors.filter((doctor) => {
+      const name = (doctor.name || doctor.fullName || "").toLowerCase();
+      const specialty = (
+        doctor.specialty ||
+        doctor.specializationName ||
+        ""
+      ).toLowerCase();
+      const email = (doctor.email || doctor.userId?.email || "").toLowerCase();
+      const phone = (doctor.phone || doctor.userId?.phone || "").toLowerCase();
+      return (
+        name.includes(term) ||
+        specialty.includes(term) ||
+        email.includes(term) ||
+        phone.includes(term)
+      );
+    });
+  }, [verifiedDoctors, searchTerm]);
+
+  const filteredRejectedDoctors = useMemo(() => {
+    if (!searchTerm.trim()) return rejectedDoctors;
+    const term = searchTerm.toLowerCase().trim();
+    return rejectedDoctors.filter((doctor) => {
+      const name = (doctor.name || doctor.fullName || "").toLowerCase();
+      const specialty = (
+        doctor.specialty ||
+        doctor.specializationName ||
+        ""
+      ).toLowerCase();
+      const email = (doctor.email || doctor.userId?.email || "").toLowerCase();
+      const phone = (doctor.phone || doctor.userId?.phone || "").toLowerCase();
+      return (
+        name.includes(term) ||
+        specialty.includes(term) ||
+        email.includes(term) ||
+        phone.includes(term)
+      );
+    });
+  }, [rejectedDoctors, searchTerm]);
+
+  // Get current filtered doctors based on active tab
+  const currentFilteredDoctors = useMemo(() => {
+    if (activeTab === "pending") return filteredPendingDoctors;
+    if (activeTab === "verified") return filteredVerifiedDoctors;
+    if (activeTab === "rejected") return filteredRejectedDoctors;
+    return [];
+  }, [activeTab, filteredPendingDoctors, filteredVerifiedDoctors, filteredRejectedDoctors]);
+
+  // Calculate paginated doctors
+  const paginatedDoctors = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return currentFilteredDoctors.slice(startIndex, endIndex);
+  }, [currentFilteredDoctors, currentPage, pageSize]);
 
   const fetchDoctors = async () => {
     try {
@@ -109,7 +195,14 @@ const XacMinhBacSi = () => {
               setDetailModalVisible(false);
               setSelectedDoctor(null);
             }
-            fetchDoctors();
+            // Reset to page 1 and refresh doctors list
+            setCurrentPage(1);
+            const wasOnPendingTab = activeTab === "pending";
+            await fetchDoctors();
+            // If we were on pending tab, switch to rejected tab to see the rejected doctor
+            if (wasOnPendingTab) {
+              setActiveTab("rejected");
+            }
             resolve(true);
           } catch (err) {
             console.error("Error rejecting doctor:", err);
@@ -207,28 +300,6 @@ const XacMinhBacSi = () => {
     }
   };
 
-  const filterDoctors = (doctors, searchTerm) => {
-    if (!searchTerm.trim()) return doctors;
-
-    const term = searchTerm.toLowerCase().trim();
-    return doctors.filter((doctor) => {
-      const name = (doctor.name || doctor.fullName || "").toLowerCase();
-      const specialty = (
-        doctor.specialty ||
-        doctor.specializationName ||
-        ""
-      ).toLowerCase();
-      const email = (doctor.email || doctor.userId?.email || "").toLowerCase();
-      const phone = (doctor.phone || doctor.userId?.phone || "").toLowerCase();
-
-      return (
-        name.includes(term) ||
-        specialty.includes(term) ||
-        email.includes(term) ||
-        phone.includes(term)
-      );
-    });
-  };
 
   const renderDoctorRow = (doctor, status) => (
     <div key={doctor.id || doctor._id} className="doctor-row">
@@ -321,10 +392,15 @@ const XacMinhBacSi = () => {
     );
   }
 
-  // Filter doctors based on search term
-  const filteredPendingDoctors = filterDoctors(pendingDoctors, searchTerm);
-  const filteredVerifiedDoctors = filterDoctors(verifiedDoctors, searchTerm);
-  const filteredRejectedDoctors = filterDoctors(rejectedDoctors, searchTerm);
+
+  // Handle page change
+  const handlePageChange = (page, size) => {
+    setCurrentPage(page);
+    if (size !== pageSize) {
+      setPageSize(size);
+      setCurrentPage(1); // Reset to page 1 when page size changes
+    }
+  };
 
   const tabItems = [
     {
@@ -335,19 +411,49 @@ const XacMinhBacSi = () => {
         </span>
       ),
       children: (
-        <div className="doctors-list">
-          {filteredPendingDoctors.length === 0 ? (
-            <div className="empty-state">
-              {searchTerm
-                ? "Không tìm thấy bác sĩ nào"
-                : "Không có bác sĩ nào chờ xác minh"}
+        <>
+          <div className="doctors-list">
+            {filteredPendingDoctors.length === 0 ? (
+              <div className="empty-state">
+                {searchTerm
+                  ? "Không tìm thấy bác sĩ nào"
+                  : "Không có bác sĩ nào chờ xác minh"}
+              </div>
+            ) : activeTab === "pending" ? (
+              paginatedDoctors.map((doctor) =>
+                renderDoctorRow(doctor, "pending")
+              )
+            ) : (
+              filteredPendingDoctors.map((doctor) =>
+                renderDoctorRow(doctor, "pending")
+              )
+            )}
+          </div>
+          {activeTab === "pending" && filteredPendingDoctors.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                marginTop: "2rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <Pagination
+                current={currentPage}
+                pageSize={pageSize}
+                total={filteredPendingDoctors.length}
+                onChange={handlePageChange}
+                onShowSizeChange={handlePageChange}
+                showSizeChanger
+                showQuickJumper
+                showTotal={(total, range) =>
+                  `${range[0]}-${range[1]} của ${total} bác sĩ`
+                }
+                pageSizeOptions={["5", "10", "20", "50"]}
+              />
             </div>
-          ) : (
-            filteredPendingDoctors.map((doctor) =>
-              renderDoctorRow(doctor, "pending")
-            )
           )}
-        </div>
+        </>
       ),
     },
     {
@@ -358,19 +464,49 @@ const XacMinhBacSi = () => {
         </span>
       ),
       children: (
-        <div className="doctors-list">
-          {filteredVerifiedDoctors.length === 0 ? (
-            <div className="empty-state">
-              {searchTerm
-                ? "Không tìm thấy bác sĩ nào"
-                : "Không có bác sĩ nào đã xác minh"}
+        <>
+          <div className="doctors-list">
+            {filteredVerifiedDoctors.length === 0 ? (
+              <div className="empty-state">
+                {searchTerm
+                  ? "Không tìm thấy bác sĩ nào"
+                  : "Không có bác sĩ nào đã xác minh"}
+              </div>
+            ) : activeTab === "verified" ? (
+              paginatedDoctors.map((doctor) =>
+                renderDoctorRow(doctor, "verified")
+              )
+            ) : (
+              filteredVerifiedDoctors.map((doctor) =>
+                renderDoctorRow(doctor, "verified")
+              )
+            )}
+          </div>
+          {activeTab === "verified" && filteredVerifiedDoctors.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                marginTop: "2rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <Pagination
+                current={currentPage}
+                pageSize={pageSize}
+                total={filteredVerifiedDoctors.length}
+                onChange={handlePageChange}
+                onShowSizeChange={handlePageChange}
+                showSizeChanger
+                showQuickJumper
+                showTotal={(total, range) =>
+                  `${range[0]}-${range[1]} của ${total} bác sĩ`
+                }
+                pageSizeOptions={["5", "10", "20", "50"]}
+              />
             </div>
-          ) : (
-            filteredVerifiedDoctors.map((doctor) =>
-              renderDoctorRow(doctor, "verified")
-            )
           )}
-        </div>
+        </>
       ),
     },
     {
@@ -382,19 +518,49 @@ const XacMinhBacSi = () => {
         </span>
       ),
       children: (
-        <div className="doctors-list">
-          {filteredRejectedDoctors.length === 0 ? (
-            <div className="empty-state">
-              {searchTerm
-                ? "Không tìm thấy bác sĩ nào"
-                : "Không có bác sĩ nào bị từ chối"}
+        <>
+          <div className="doctors-list">
+            {filteredRejectedDoctors.length === 0 ? (
+              <div className="empty-state">
+                {searchTerm
+                  ? "Không tìm thấy bác sĩ nào"
+                  : "Không có bác sĩ nào bị từ chối"}
+              </div>
+            ) : activeTab === "rejected" ? (
+              paginatedDoctors.map((doctor) =>
+                renderDoctorRow(doctor, "rejected")
+              )
+            ) : (
+              filteredRejectedDoctors.map((doctor) =>
+                renderDoctorRow(doctor, "rejected")
+              )
+            )}
+          </div>
+          {activeTab === "rejected" && filteredRejectedDoctors.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                marginTop: "2rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <Pagination
+                current={currentPage}
+                pageSize={pageSize}
+                total={filteredRejectedDoctors.length}
+                onChange={handlePageChange}
+                onShowSizeChange={handlePageChange}
+                showSizeChanger
+                showQuickJumper
+                showTotal={(total, range) =>
+                  `${range[0]}-${range[1]} của ${total} bác sĩ`
+                }
+                pageSizeOptions={["5", "10", "20", "50"]}
+              />
             </div>
-          ) : (
-            filteredRejectedDoctors.map((doctor) =>
-              renderDoctorRow(doctor, "rejected")
-            )
           )}
-        </div>
+        </>
       ),
     },
   ];
@@ -450,7 +616,8 @@ const XacMinhBacSi = () => {
     }
 
     // Get submission date from database
-    const submissionDate = formatDate(doctor.submittedDate || doctor.createdAt);
+    // submittedDate is already formatted from backend, so use it directly if available
+    const submissionDate = doctor.submittedDate || (doctor.createdAt ? formatDate(doctor.createdAt) : "Chưa có ngày");
 
     // Get status from database - prioritize status from tab, then check isVerified and status field
     let doctorStatus = "pending";
@@ -616,6 +783,26 @@ const XacMinhBacSi = () => {
               </div>
             </div>
           </div>
+
+          {/* Rejection Reason Section - Only show for rejected doctors */}
+          {doctorStatus === "rejected" && doctor.rejectionReason && (
+            <div className="detail-info-section" style={{ marginTop: "24px", backgroundColor: "#fff1f0", border: "1px solid #ffccc7", borderRadius: "8px", padding: "16px" }}>
+              <h4 className="info-section-title" style={{ color: "#cf1322", marginBottom: "12px" }}>
+                <ExclamationCircleOutlined style={{ marginRight: "8px" }} />
+                Lý do từ chối
+              </h4>
+              <div style={{ padding: "12px", backgroundColor: "#fff", borderRadius: "4px", border: "1px solid #ffccc7" }}>
+                <p style={{ margin: 0, color: "#595959", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                  {doctor.rejectionReason}
+                </p>
+              </div>
+              {doctor.rejectedDate && (
+                <p style={{ marginTop: "8px", marginBottom: 0, fontSize: "12px", color: "#8c8c8c" }}>
+                  Ngày từ chối: {doctor.rejectedDate}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Documents Section */}
           <div className="detail-documents-section">

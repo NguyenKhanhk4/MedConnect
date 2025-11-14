@@ -50,6 +50,7 @@ import NguoiDung from "../pages/Admin/nguoi-dung/NguoiDung";
 import ChuyenKhoa from "../pages/Admin/chuyen-khoa/ChuyenKhoa";
 import LichHenAdmin from "../pages/Admin/lich-hen/LichHen";
 import ThongKe from "../pages/Admin/thong-ke/ThongKe";
+import { ThongBao as AdminNotifications } from "../pages/Admin/thong-bao/ThongBao";
 import AdminLayout from "../layouts/AdminLayout/AdminLayout";
 
 // Manager Components
@@ -211,6 +212,7 @@ export const privateRoutes = (
         <Route path="/admin/nguoi-dung" element={<NguoiDung />} />
         <Route path="/admin/chuyen-khoa" element={<ChuyenKhoa />} />
         <Route path="/admin/lich-hen" element={<LichHenAdmin />} />
+        <Route path="/admin/thong-bao" element={<AdminNotifications />} />
         {/* Legacy route redirects for backward compatibility */}
         <Route path="/admin/verify-doctors" element={<XacMinhBacSi />} />
         <Route path="/admin/users" element={<NguoiDung />} />

@@ -85,7 +85,7 @@ const AppointmentSchema = new Schema(
 
     reason: {
       type: String,
-      maxlength: 100,
+      maxlength: 250,
       trim: true,
     },
     cancelledAt: Date,

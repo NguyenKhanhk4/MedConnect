@@ -2912,6 +2912,47 @@ export async function processCashPayment(req, res) {
               console.log(
                 `📧 Cash payment confirmation email sent to ${patientEmail}`
               );
+
+              // Create in-app notification for patient about successful cash payment
+              try {
+                const Notification = (await import("../models/notification.model.js")).default;
+                const patientUserId = patient?.userId?._id || patient?.userId;
+                
+                if (patientUserId) {
+                  const appointmentTimeStr = `${formattedDate} ${formattedTime}`;
+                  const doctorName = doctor?.fullName || "Bác sĩ";
+
+                  await Notification.create({
+                    userId: patientUserId,
+                    type: "payment",
+                    title: "Thanh toán tiền mặt thành công",
+                    message: `Bạn đã thanh toán tiền mặt thành công ${formattedAmount} cho lịch hẹn khám với BS. ${doctorName} vào ${appointmentTimeStr}. Mã hóa đơn: ${payment.invoiceNumber}.`,
+                    priority: "high",
+                    relatedId: payment._id,
+                    relatedType: "payment",
+                    metadata: {
+                      paymentId: payment._id.toString(),
+                      invoiceNumber: payment.invoiceNumber,
+                      total: payment.total,
+                      appointmentId: appointment?._id?.toString(),
+                      doctorName,
+                      appointmentTime: appointmentTimeStr,
+                      status: "paid",
+                      paymentType: "cash",
+                    },
+                  });
+
+                  console.log(
+                    `✅ Created cash payment success notification for patient ${patientUserId}`
+                  );
+                }
+              } catch (notificationError) {
+                console.error(
+                  "❌ Error creating cash payment success notification:",
+                  notificationError
+                );
+                // Don't fail the whole process if notification fails
+              }
             } else {
               console.log(
                 "⚠️ No patient email found; skipping cash payment email"

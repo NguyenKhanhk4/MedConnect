@@ -2299,11 +2299,52 @@ export async function createPaymentForVisit(req, res) {
     }
 
     // Get patient profile
-    const patient = await Patient.findOne({ userId: appUserId }).populate(
-      "userId"
-    );
+    // IMPORTANT: Ưu tiên lấy self patient (đặt cho chính mình) nếu không có patientId trong appointments
+    let patient;
+    let isFamilyMemberBooking = false;
+    
+    // Kiểm tra xem có patientId trong appointments không
+    const hasPatientIdInAppointments = appointments.some(apt => apt.patientId);
+    
+    if (hasPatientIdInAppointments) {
+      // Có patientId trong appointments - có thể là đặt cho người thân
+      // Lấy patientId đầu tiên để kiểm tra
+      const firstPatientId = appointments.find(apt => apt.patientId)?.patientId;
+      if (firstPatientId) {
+        patient = await Patient.findOne({
+          _id: firstPatientId,
+          userId: appUserId,
+        }).populate("userId");
+        
+        if (patient) {
+          // Kiểm tra xem có phải là người thân không
+          if (patient.relationshipToOwner && patient.relationshipToOwner !== "self") {
+            isFamilyMemberBooking = true;
+          } else {
+            // patientId được gửi lên nhưng là self patient - coi như đặt cho chính mình
+            isFamilyMemberBooking = false;
+          }
+        }
+      }
+    }
+    
+    // Nếu không có patientId hoặc không tìm thấy patient, lấy self patient
     if (!patient) {
-      return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
+      patient = await Patient.findOne({ 
+        userId: appUserId,
+        relationshipToOwner: "self" // Ưu tiên lấy self patient
+      }).populate("userId");
+      
+      // Nếu không tìm thấy self patient, lấy bất kỳ patient nào của user
+      if (!patient) {
+        patient = await Patient.findOne({ userId: appUserId }).populate("userId");
+      }
+      
+      if (!patient) {
+        return fail(res, 404, ERROR_CODES.NOT_FOUND, "Patient profile not found");
+      }
+      
+      isFamilyMemberBooking = false;
     }
 
     // Validate all appointments and prepare appointmentData
@@ -2394,15 +2435,15 @@ export async function createPaymentForVisit(req, res) {
         scheduledEnd = new Date(scheduledEnd.getTime());
       }
 
-      // If patientId is provided (booking for family), verify ownership
+      // If patientId is provided (booking for family or self), verify ownership
       let validatedPatientId = undefined;
       if (patientId) {
-        const familyPatient = await Patient.findOne({
+        // Cho phép cả self patient và family member
+        const foundPatient = await Patient.findOne({
           _id: patientId,
           userId: appUserId,
-          relationshipToOwner: { $ne: "self" },
         }).lean();
-        if (!familyPatient) {
+        if (!foundPatient) {
           return fail(
             res,
             403,
@@ -2410,7 +2451,7 @@ export async function createPaymentForVisit(req, res) {
             "Provided patientId does not belong to current user"
           );
         }
-        validatedPatientId = familyPatient._id;
+        validatedPatientId = foundPatient._id;
       }
 
       appointmentData.push({
@@ -2513,8 +2554,16 @@ export async function createPaymentForVisit(req, res) {
     const invoiceNumber = `INV-VISIT-${orderCode}`;
 
     // Get first doctor for billFrom
+    // Với multiple appointments, có thể có nhiều bác sĩ khác nhau
+    // Nên không set doctorName cụ thể, để frontend ẩn phần "Thông tin bác sĩ"
     const firstAppointment = validAppointments[0];
     const firstDoctor = firstAppointment.doctor;
+    
+    // Kiểm tra xem có nhiều bác sĩ khác nhau không
+    const uniqueDoctorIds = new Set(
+      validAppointments.map(apt => apt.doctor?._id?.toString() || apt.doctorId?.toString())
+    );
+    const hasMultipleDoctors = uniqueDoctorIds.size > 1;
 
     // Log để debug
     console.log("🔍 Creating payment with appointmentData:", {
@@ -2529,6 +2578,8 @@ export async function createPaymentForVisit(req, res) {
       })),
       totalAmount,
       invoiceNumber,
+      hasMultipleDoctors,
+      uniqueDoctorIds: Array.from(uniqueDoctorIds),
     });
 
     // Determine billTo patient (use selected family member if provided, else owner's patient)
@@ -2536,6 +2587,54 @@ export async function createPaymentForVisit(req, res) {
     const firstAptWithPatient = appointmentData.find((a) => !!a.patientId);
     if (firstAptWithPatient?.patientId) {
       billToPatientId = firstAptWithPatient.patientId;
+    }
+
+    // Lấy thông tin owner (người đặt) để set billTo email/phone
+    // Nếu patient là người thân, lấy email/phone từ owner (self patient)
+    // Nếu patient là chính mình, lấy từ patient.userId
+    let billToEmail = patient.userId?.email;
+    let billToPhone = patient.userId?.phoneNumber || patient.phone;
+    let billToName = patient.fullName || patient.userId?.fullName || "Unknown";
+    
+    // Kiểm tra xem có phải đặt cho người thân không
+    if (isFamilyMemberBooking) {
+      // Đây là người thân, cần lấy email/phone từ owner (self patient)
+      const selfPatient = await Patient.findOne({
+        userId: patient.userId?._id || patient.userId,
+        relationshipToOwner: "self",
+      }).populate("userId");
+      
+      if (selfPatient && selfPatient.userId) {
+        billToEmail = selfPatient.userId.email;
+        billToPhone = selfPatient.userId.phoneNumber || selfPatient.phone;
+        // Name vẫn giữ là tên người thân (người khám)
+        billToName = patient.fullName || "Unknown";
+      }
+    } else {
+      // Đặt cho chính mình - đảm bảo lấy đúng thông tin từ self patient
+      // Nếu patient không phải là self, tìm self patient
+      if (patient.relationshipToOwner !== "self") {
+        const selfPatient = await Patient.findOne({
+          userId: appUserId,
+          relationshipToOwner: "self",
+        }).populate("userId");
+        
+        if (selfPatient) {
+          billToEmail = selfPatient.userId?.email || patient.userId?.email;
+          billToPhone = selfPatient.userId?.phoneNumber || selfPatient.phone || patient.phone;
+          billToName = selfPatient.fullName || patient.userId?.fullName || "Unknown";
+          // Cập nhật patient và billToPatientId để dùng cho appointmentData
+          patient = selfPatient;
+          billToPatientId = selfPatient._id;
+          
+          // Cập nhật patientId trong appointmentData nếu chưa có hoặc là người thân
+          appointmentData.forEach(apt => {
+            if (!apt.patientId || apt.patientId.toString() !== selfPatient._id.toString()) {
+              apt.patientId = selfPatient._id;
+            }
+          });
+        }
+      }
     }
 
     // Tạo payment object - Đảm bảo appointmentId KHÔNG được set (không phải undefined, mà là không có field)
@@ -2548,15 +2647,18 @@ export async function createPaymentForVisit(req, res) {
       currency: "VND",
       issueDate: new Date(),
       billTo: {
-        patientId: billToPatientId,
-        name: patient.fullName || patient.userId?.fullName || "Unknown",
-        email: patient.userId?.email,
-        phone: patient.userId?.phoneNumber || patient.phone,
+        patientId: billToPatientId, // Vẫn giữ patientId là người khám (có thể là người thân)
+        name: billToName, // Tên người khám
+        email: billToEmail, // Email người đặt (owner)
+        phone: billToPhone, // Phone người đặt (owner)
       },
       billFrom: {
         doctorId: firstDoctor._id,
         clinicId: firstAppointment.clinicId || null,
-        doctorName: firstDoctor.fullName || "MedConnect",
+        // Với multiple appointments có nhiều bác sĩ, set "Nhiều bác sĩ"
+        // Frontend sẽ ẩn phần "Thông tin bác sĩ" và chỉ hiển thị trong "Chi tiết dịch vụ"
+        // Nhưng vẫn phải set giá trị vì model yêu cầu required
+        doctorName: hasMultipleDoctors ? "Nhiều bác sĩ" : (firstDoctor.fullName || "MedConnect"),
         clinicName: firstAppointment.clinic?.name || "MedConnect Clinic",
       },
       items: appointmentItems,

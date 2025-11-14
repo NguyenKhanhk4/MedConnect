@@ -363,12 +363,15 @@ export default function ThanhToan() {
           </div>
         </div>
 
+        ${
+          invoice.doctorName && invoice.doctorName !== "Nhiều bác sĩ"
+            ? `
         <div class="section">
           <h2>Thông tin bác sĩ</h2>
           <div class="kv-2col">
             <div class="kv-item">
               <div class="kv-label">Họ và tên:</div>
-              <div class="kv-value">${invoice.doctorName || "N/A"}</div>
+              <div class="kv-value">${invoice.doctorName}</div>
             </div>
             ${
               invoice.clinicName
@@ -382,6 +385,9 @@ export default function ThanhToan() {
             }
           </div>
         </div>
+        `
+            : ""
+        }
 
         ${
           invoice.items && invoice.items.length > 0
@@ -644,7 +650,32 @@ function InvoiceTable({
                   {getInvoiceTypeText(invoice.invoiceType)}
                 </span>
               </td>
-              <td>{invoice.doctorName}</td>
+              <td>
+                {(() => {
+                  // Extract doctor names from items
+                  if (!invoice.items || invoice.items.length === 0) {
+                    return invoice.doctorName || "N/A";
+                  }
+                  const doctorNames = new Set();
+                  invoice.items.forEach((item) => {
+                    if (item.description) {
+                      const match = item.description.match(/^([^-]+?)\s*-\s*/);
+                      if (match && match[1]) {
+                        doctorNames.add(match[1].trim());
+                      }
+                    }
+                  });
+                  const namesArray = Array.from(doctorNames);
+                  if (namesArray.length === 0) {
+                    return invoice.doctorName || "N/A";
+                  }
+                  if (namesArray.length === 1) {
+                    return namesArray[0];
+                  }
+                  // Nhiều bác sĩ: hiển thị tên đầu tiên + "..."
+                  return `${namesArray[0]}...`;
+                })()}
+              </td>
               <td>{formatDate(invoice.createdAt)}</td>
               <td className="amount-cell">{formatCurrency(invoice.total)}</td>
               <td>
@@ -677,6 +708,26 @@ function InvoiceTable({
 
 function InvoiceDetailModal({ invoice, getStatusText }) {
   const [showModal, setShowModal] = useState(false);
+
+  // Extract doctor names from items description
+  // Format: "Tên bác sĩ - Chuyên khoa (Hình thức) (Thời gian)"
+  const extractDoctorNames = () => {
+    if (!invoice.items || invoice.items.length === 0) return [];
+    const doctorNames = new Set();
+    invoice.items.forEach((item) => {
+      if (item.description) {
+        // Extract name before " - "
+        const match = item.description.match(/^([^-]+?)\s*-\s*/);
+        if (match && match[1]) {
+          doctorNames.add(match[1].trim());
+        }
+      }
+    });
+    return Array.from(doctorNames);
+  };
+
+  const doctorNames = extractDoctorNames();
+  const hasMultipleDoctors = doctorNames.length > 1;
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -801,19 +852,36 @@ function InvoiceDetailModal({ invoice, getStatusText }) {
                 )}
               </div>
 
-              <div className="invoice-detail-section">
-                <h3>Thông tin bác sĩ</h3>
-                <div className="detail-row">
-                  <span>Tên:</span>
-                  <span>{invoice.doctorName}</span>
+              {/* Hiển thị "Thông tin bác sĩ" - nếu có nhiều bác sĩ thì hiển thị tất cả */}
+              {(hasMultipleDoctors || (invoice.doctorName && invoice.doctorName !== "Nhiều bác sĩ")) && (
+                <div className="invoice-detail-section">
+                  <h3>Thông tin bác sĩ</h3>
+                  {hasMultipleDoctors ? (
+                    <div className="detail-row">
+                      <span>Tên:</span>
+                      <span>
+                        {doctorNames.map((name, index) => (
+                          <span key={index}>
+                            {name}
+                            {index < doctorNames.length - 1 && ", "}
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="detail-row">
+                      <span>Tên:</span>
+                      <span>{invoice.doctorName}</span>
+                    </div>
+                  )}
+                  {invoice.clinicName && (
+                    <div className="detail-row">
+                      <span>Phòng khám:</span>
+                      <span>{invoice.clinicName}</span>
+                    </div>
+                  )}
                 </div>
-                {invoice.clinicName && (
-                  <div className="detail-row">
-                    <span>Phòng khám:</span>
-                    <span>{invoice.clinicName}</span>
-                  </div>
-                )}
-              </div>
+              )}
 
               {invoice.items && invoice.items.length > 0 && (
                 <div className="invoice-detail-section">

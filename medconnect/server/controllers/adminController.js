@@ -102,7 +102,21 @@ function getTimeAgo(date) {
  * @returns {string} - Chuỗi ngày đã được định dạng (ví dụ: "12/11/2025")
  */
 function formatDate(date) {
-  return new Date(date).toLocaleDateString("vi-VN");
+  if (!date) return "Chưa có ngày";
+  try {
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      return "Chưa có ngày";
+    }
+    return dateObj.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch (error) {
+    console.error("Error formatting date:", error, date);
+    return "Chưa có ngày";
+  }
 }
 
 /**
@@ -416,7 +430,11 @@ export const getAllDoctors = async (req, res) => {
 // Get pending doctors
 export const getPendingDoctors = async (req, res) => {
   try {
-    const pendingDoctors = await Doctor.find({ isVerified: false })
+    // Get doctors that are not verified AND not rejected (no rejectedAt)
+    const pendingDoctors = await Doctor.find({ 
+      isVerified: false,
+      rejectedAt: { $exists: false } // Exclude rejected doctors
+    })
       .populate("userId", "fullName email phone")
       .populate("specializationIds", "name")
       .populate("clinicDefaultId", "name address")
@@ -481,9 +499,7 @@ export const getPendingDoctors = async (req, res) => {
           license: doctor.licenseNo || "Chưa có giấy phép",
           licenseImageUrl: licenseImageUrl,
           bio: doctor.bio || "Chưa có mô tả",
-          submittedDate: doctor.createdAt
-            ? formatDate(doctor.createdAt)
-            : "Chưa có ngày",
+          submittedDate: formatDate(doctor.createdAt),
           avatar: avatarUrl,
         };
       } catch (formatError) {
@@ -530,7 +546,7 @@ export const getVerifiedDoctors = async (req, res) => {
       .populate("specializationIds", "name")
       .populate("clinicDefaultId", "name address")
       .select(
-        "userId fullName licenseNo yearsExperience bio avatarUrl specializationIds clinicDefaultId updatedAt isVerified isActive"
+        "userId fullName licenseNo yearsExperience bio avatarUrl specializationIds clinicDefaultId createdAt updatedAt isVerified isActive"
       )
       .sort({ updatedAt: -1 });
 
@@ -572,6 +588,9 @@ export const getVerifiedDoctors = async (req, res) => {
         license: doctor.licenseNo || "Chưa có giấy phép",
         licenseImageUrl: licenseImageUrl,
         bio: doctor.bio || "Chưa có mô tả",
+        submittedDate: doctor.createdAt
+          ? formatDate(doctor.createdAt)
+          : (doctor._id ? formatDate(doctor._id.getTimestamp()) : "Chưa có ngày"),
         verifiedDate: formatDate(doctor.updatedAt),
         verifiedBy: "Admin", // Would need to track who verified
         avatar: avatarUrl,
@@ -594,13 +613,106 @@ export const getVerifiedDoctors = async (req, res) => {
 // Get rejected doctors
 export const getRejectedDoctors = async (req, res) => {
   try {
-    // For now, return empty array since we don't have rejection tracking
-    // In a real system, you'd have a status field or separate collection for rejected doctors
-    const rejectedDoctors = [];
+    // Get doctors that have been rejected (have rejectedAt field)
+    const rejectedDoctors = await Doctor.find({ 
+      rejectedAt: { $exists: true, $ne: null } // Has rejection date
+    })
+      .populate("userId", "fullName email phone")
+      .populate("specializationIds", "name")
+      .populate("clinicDefaultId", "name address")
+      .select(
+        "userId fullName licenseNo yearsExperience bio avatarUrl specializationIds clinicDefaultId createdAt rejectedAt rejectionReason"
+      )
+      .sort({ rejectedAt: -1 }) // Sort by rejection date, newest first
+      .lean();
+
+    // Format doctors data - license image comes from licenseNo field
+    const doctorUploadDir = path.resolve('uploads/doctors');
+    
+    const formattedDoctors = rejectedDoctors.map((doctor) => {
+      try {
+        // Build license image URL - if licenseNo exists, it's a filename in uploads/doctors/
+        // Check if file actually exists before returning URL
+        let licenseImageUrl = null;
+        if (doctor.licenseNo) {
+          const filePath = path.join(doctorUploadDir, doctor.licenseNo);
+          if (fs.existsSync(filePath)) {
+            licenseImageUrl = `/server-uploads/doctors/${doctor.licenseNo}`;
+          } else {
+            console.warn(`⚠️ License file not found for doctor ${doctor._id}: ${doctor.licenseNo}`);
+            // Don't return licenseImageUrl if file doesn't exist
+          }
+        }
+
+        // Format specialty - handle null, undefined, or empty array
+        let specialty = "Chưa chọn chuyên khoa";
+        if (
+          doctor.specializationIds &&
+          Array.isArray(doctor.specializationIds) &&
+          doctor.specializationIds.length > 0
+        ) {
+          const specialtyNames = doctor.specializationIds
+            .filter((s) => s && s && s.name) // Filter out null/undefined
+            .map((s) => s.name)
+            .filter((name) => name); // Filter out empty names
+          if (specialtyNames.length > 0) {
+            specialty = specialtyNames.join(", ");
+          }
+        }
+
+        // Filter out picsum.photos URLs - replace with null to use default avatar
+        let avatarUrl = doctor.avatarUrl || null;
+        if (avatarUrl && avatarUrl.includes("picsum.photos")) {
+          avatarUrl = null;
+        }
+
+        // Safe access to userId
+        const userId = doctor.userId || {};
+        const clinicDefaultId = doctor.clinicDefaultId || {};
+
+        return {
+          id: doctor._id?.toString() || null,
+          name: doctor.fullName || userId.fullName || "Chưa có tên",
+          email: userId.email || "Chưa có email",
+          phone: userId.phone || "Chưa có số điện thoại",
+          specialty: specialty,
+          experience: `${doctor.yearsExperience || 0} năm kinh nghiệm`,
+          hospital: clinicDefaultId.name || "Chưa cập nhật",
+          license: doctor.licenseNo || "Chưa có giấy phép",
+          licenseImageUrl: licenseImageUrl,
+          bio: doctor.bio || "Chưa có mô tả",
+          submittedDate: formatDate(doctor.createdAt),
+          rejectedDate: doctor.rejectedAt
+            ? formatDate(doctor.rejectedAt)
+            : "Chưa có ngày",
+          rejectionReason: doctor.rejectionReason || "Không có lý do",
+          avatar: avatarUrl,
+        };
+      } catch (formatError) {
+        console.error("Error formatting doctor:", doctor._id, formatError);
+        // Return a minimal safe object
+        return {
+          id: doctor._id?.toString() || "unknown",
+          name: "Lỗi khi tải thông tin",
+          email: "N/A",
+          phone: "N/A",
+          specialty: "N/A",
+          experience: "N/A",
+          hospital: "N/A",
+          license: "N/A",
+          licenseImageUrl: null,
+          bio: "N/A",
+          submittedDate: "N/A",
+          rejectedDate: "N/A",
+          rejectionReason: "N/A",
+          avatar: null,
+        };
+      }
+    });
 
     res.json({
       success: true,
-      data: rejectedDoctors,
+      data: formattedDoctors,
     });
   } catch (error) {
     console.error("Error fetching rejected doctors:", error);
@@ -612,13 +724,11 @@ export const getRejectedDoctors = async (req, res) => {
 };
 
 // Helper function: Send approval email to doctor
-async function sendDoctorApprovalEmail(doctor, user) {
+async function sendDoctorApprovalEmail(doctor, user, canBeActive = true, activeCheck = null) {
   try {
     if (!user || !user.email) {
-      console.warn("⚠️ Doctor email not found, skipping approval email");
       return;
     }
-
     const doctorName = doctor.fullName || user.fullName || "Bác sĩ";
     const approvalDate = new Date().toLocaleDateString("vi-VN", {
       weekday: "long",
@@ -627,54 +737,127 @@ async function sendDoctorApprovalEmail(doctor, user) {
       day: "numeric",
     });
 
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #059669; border-bottom: 2px solid #059669; padding-bottom: 10px;">
-          Tài khoản bác sĩ của bạn đã được phê duyệt
-        </h2>
-        <p>Xin chào <strong>${doctorName}</strong>,</p>
-        <p>Chúng tôi vui mừng thông báo rằng <strong style="color: #059669;">tài khoản bác sĩ của bạn đã được phê duyệt</strong> thành công bởi ban quản trị.</p>
-        
-        <div style="background-color: #ecfdf5; border-left: 4px solid #059669; padding: 15px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #047857;">Thông tin tài khoản:</h3>
-          <p style="margin: 8px 0;"><strong>Họ và tên:</strong> ${doctorName}</p>
-          <p style="margin: 8px 0;"><strong>Email đăng nhập:</strong> ${
-            user.email
-          }</p>
-          <p style="margin: 8px 0;"><strong>Ngày phê duyệt:</strong> ${approvalDate}</p>
-        </div>
+    // Xác định thông tin còn thiếu
+    const missingInfo = [];
+    if (!doctor.yearsExperience || doctor.yearsExperience <= 0) {
+      missingInfo.push("Số năm kinh nghiệm (phải lớn hơn 0)");
+    }
+    if (!doctor.bio || doctor.bio.trim().length === 0) {
+      missingInfo.push("Lời giới thiệu về bản thân (bio)");
+    }
+    if (!doctor.educationLevel || !doctor.educationLevel.trim()) {
+      missingInfo.push("Trình độ học vấn");
+    }
 
-        <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #0284c7;">Hướng dẫn đăng nhập:</h3>
-          <p>Bạn có thể đăng nhập vào hệ thống MedConnect bằng:</p>
+    // Tạo nội dung email dựa trên canBeActive
+    let htmlContent = "";
+    let subject = "";
+    
+    if (canBeActive && missingInfo.length === 0) {
+      // Trường hợp đầy đủ thông tin - email phê duyệt thông thường
+      subject = "Tài khoản bác sĩ của bạn đã được phê duyệt - MedConnect";
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #059669; border-bottom: 2px solid #059669; padding-bottom: 10px;">
+            Tài khoản bác sĩ của bạn đã được phê duyệt
+          </h2>
+          <p>Xin chào <strong>${doctorName}</strong>,</p>
+          <p>Chúng tôi vui mừng thông báo rằng <strong style="color: #059669;">tài khoản bác sĩ của bạn đã được phê duyệt</strong> thành công bởi ban quản trị.</p>
+          
+          <div style="background-color: #ecfdf5; border-left: 4px solid #059669; padding: 15px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #047857;">Thông tin tài khoản:</h3>
+            <p style="margin: 8px 0;"><strong>Họ và tên:</strong> ${doctorName}</p>
+            <p style="margin: 8px 0;"><strong>Email đăng nhập:</strong> ${user.email}</p>
+            <p style="margin: 8px 0;"><strong>Ngày phê duyệt:</strong> ${approvalDate}</p>
+          </div>
+
+          <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #0284c7;">Hướng dẫn đăng nhập:</h3>
+            <p>Bạn có thể đăng nhập vào hệ thống MedConnect bằng:</p>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+              <li><strong>Email:</strong> ${user.email}</li>
+              <li><strong>Mật khẩu:</strong> Mật khẩu bạn đã đăng ký</li>
+            </ul>
+            <p style="margin-top: 15px;">
+              <a href="${process.env.CLIENT_URL || "http://localhost:5173"}/auth/login" 
+                 style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Đăng nhập ngay
+              </a>
+            </p>
+          </div>
+
+          <p style="margin-top: 30px;"><strong>Lưu ý:</strong></p>
           <ul style="margin: 10px 0; padding-left: 20px;">
-            <li><strong>Email:</strong> ${user.email}</li>
-            <li><strong>Mật khẩu:</strong> Mật khẩu bạn đã đăng ký</li>
+            <li>Đảm bảo bạn sử dụng đúng email và mật khẩu đã đăng ký</li>
+            <li>Nếu quên mật khẩu, bạn có thể sử dụng chức năng "Quên mật khẩu" trên trang đăng nhập</li>
+            <li>Vui lòng cập nhật đầy đủ thông tin hồ sơ sau khi đăng nhập</li>
           </ul>
-          <p style="margin-top: 15px;">
-            <a href="${
-              process.env.CLIENT_URL || "http://localhost:5173"
-            }/auth/login" 
-               style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-              Đăng nhập ngay
-            </a>
-          </p>
+          
+          <p style="margin-top: 30px;">Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với chúng tôi.</p>
+          
+          <p style="margin-top: 30px;">Trân trọng,<br><strong>MedConnect - Đội ngũ quản trị</strong></p>
         </div>
+      `;
+    } else {
+      // Trường hợp thiếu thông tin - email như trong ảnh
+      subject = "Tài khoản của bạn đã được xác minh - Cần bổ sung thông tin";
+      const missingInfoList = missingInfo.map(info => `<li>${info}</li>`).join("");
+      
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #f59e0b; border-bottom: 2px solid #f59e0b; padding-bottom: 10px; font-size: 24px;">
+            Tài khoản của bạn đã được xác minh - Cần bổ sung thông tin
+          </h2>
+          <p>Xin chào <strong>${doctorName}</strong>,</p>
+          <p>Tài khoản bác sĩ của bạn đã được <strong style="color: #059669;">xác minh thành công</strong> vào ngày ${approvalDate}.</p>
+          
+          <div style="background-color: #fff7ed; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #d97706;">
+              <span style="font-size: 20px;">⚠️</span> Thông tin quan trọng:
+            </h3>
+            <p style="margin: 8px 0;">Tài khoản của bạn hiện đang ở trạng thái <strong style="color: #f59e0b;">tạm khóa</strong> vì chưa điền đầy đủ thông tin cần thiết.</p>
+            <p style="margin: 8px 0;">Để bắt đầu hoạt động, bạn cần điền đầy đủ các thông tin sau:</p>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+              ${missingInfoList}
+            </ul>
+          </div>
 
-        <p style="margin-top: 30px;"><strong>Lưu ý:</strong></p>
-        <ul style="margin: 10px 0; padding-left: 20px;">
-          <li>Đảm bảo bạn sử dụng đúng email và mật khẩu đã đăng ký</li>
-          <li>Nếu quên mật khẩu, bạn có thể sử dụng chức năng "Quên mật khẩu" trên trang đăng nhập</li>
-          <li>Vui lòng cập nhật đầy đủ thông tin hồ sơ sau khi đăng nhập</li>
-        </ul>
-        
-        <p style="margin-top: 30px;">Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với chúng tôi.</p>
-        
-        <p style="margin-top: 30px;">Trân trọng,<br><strong>MedConnect - Đội ngũ quản trị</strong></p>
-      </div>
-    `;
+          <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #0284c7;">Hướng dẫn:</h3>
+            <ol style="margin: 10px 0; padding-left: 20px;">
+              <li>Đăng nhập vào hệ thống MedConnect bằng email: <a href="mailto:${user.email}" style="color: #0ea5e9; text-decoration: underline;">${user.email}</a></li>
+              <li>Vào phần "Cài đặt" hoặc "Hồ sơ" để cập nhật thông tin</li>
+              <li>Điền đầy đủ các thông tin còn thiếu</li>
+              <li>Sau khi điền đủ thông tin, tài khoản của bạn sẽ tự động được kích hoạt</li>
+            </ol>
+            <p style="margin-top: 15px;">
+              <a href="${process.env.CLIENT_URL || "http://localhost:5173"}/auth/login" 
+                 style="background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Đăng nhập ngay
+              </a>
+            </p>
+          </div>
 
-    const textContent = `
+          <div style="background-color: #ecfdf5; border-left: 4px solid #059669; padding: 15px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #047857;">Lưu ý:</h3>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+              <li>Bạn có thể đăng nhập vào hệ thống để cập nhật thông tin cá nhân</li>
+              <li>Tài khoản của bạn sẽ không hiển thị trong danh sách bác sĩ cho bệnh nhân chọn cho đến khi bạn điền đủ thông tin</li>
+              <li>Sau khi điền đủ thông tin, tài khoản sẽ tự động được kích hoạt và bạn có thể nhận lịch hẹn</li>
+            </ul>
+          </div>
+          
+          <p style="margin-top: 30px;">Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với chúng tôi.</p>
+          
+          <p style="margin-top: 30px;">Trân trọng,<br><strong>MedConnect - Đội ngũ quản trị</strong></p>
+        </div>
+      `;
+    }
+
+    // Tạo text content tương ứng
+    let textContent = "";
+    if (canBeActive && missingInfo.length === 0) {
+      textContent = `
 Tài khoản bác sĩ của bạn đã được phê duyệt
 
 Xin chào ${doctorName},
@@ -702,17 +885,52 @@ Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với chúng t�
 
 Trân trọng,
 MedConnect - Đội ngũ quản trị
-    `;
+      `;
+    } else {
+      const missingInfoText = missingInfo.map((info, index) => `${index + 1}. ${info}`).join("\n");
+      textContent = `
+Tài khoản của bạn đã được xác minh - Cần bổ sung thông tin
+
+Xin chào ${doctorName},
+
+Tài khoản bác sĩ của bạn đã được xác minh thành công vào ngày ${approvalDate}.
+
+⚠️ Thông tin quan trọng:
+Tài khoản của bạn hiện đang ở trạng thái tạm khóa vì chưa điền đầy đủ thông tin cần thiết.
+
+Để bắt đầu hoạt động, bạn cần điền đầy đủ các thông tin sau:
+${missingInfoText}
+
+Hướng dẫn:
+1. Đăng nhập vào hệ thống MedConnect bằng email: ${user.email}
+2. Vào phần "Cài đặt" hoặc "Hồ sơ" để cập nhật thông tin
+3. Điền đầy đủ các thông tin còn thiếu
+4. Sau khi điền đủ thông tin, tài khoản của bạn sẽ tự động được kích hoạt
+
+Link đăng nhập: ${process.env.CLIENT_URL || "http://localhost:5173"}/auth/login
+
+Lưu ý:
+- Bạn có thể đăng nhập vào hệ thống để cập nhật thông tin cá nhân
+- Tài khoản của bạn sẽ không hiển thị trong danh sách bác sĩ cho bệnh nhân chọn cho đến khi bạn điền đủ thông tin
+- Sau khi điền đủ thông tin, tài khoản sẽ tự động được kích hoạt và bạn có thể nhận lịch hẹn
+
+Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với chúng tôi.
+
+Trân trọng,
+MedConnect - Đội ngũ quản trị
+      `;
+    }
 
     const { sendMail } = await import("../utils/email.js");
-    const emailResult = await sendMail({
+    
+    await sendMail({
       to: user.email,
-      subject: "Tài khoản bác sĩ của bạn đã được phê duyệt - MedConnect",
+      subject: subject,
       text: textContent,
       html: htmlContent,
     });
   } catch (error) {
-    console.error("❌ Error sending doctor approval email:", error);
+    console.error("Error sending doctor approval email:", error);
     // Không throw error để không ảnh hưởng đến flow chính
   }
 }
@@ -721,7 +939,6 @@ MedConnect - Đội ngũ quản trị
 async function sendDoctorSuspensionEmail(doctor, user) {
   try {
     if (!user || !user.email) {
-      console.warn("⚠️ Doctor email not found, skipping suspension email");
       return;
     }
 
@@ -835,10 +1052,8 @@ MedConnect - Đội ngũ quản trị
 async function sendDoctorRejectionEmail(doctor, user, reason, rejectedBy) {
   try {
     if (!user || !user.email) {
-      console.warn("⚠️ Doctor email not found, skipping rejection email");
       return;
     }
-
     const doctorName = doctor.fullName || user.fullName || "Bác sĩ";
     const rejectionDate = new Date().toLocaleDateString("vi-VN", {
       weekday: "long",
@@ -931,14 +1146,15 @@ MedConnect - Đội ngũ quản trị
     `;
 
     const { sendMail } = await import("../utils/email.js");
-    const emailResult = await sendMail({
+    
+    await sendMail({
       to: user.email,
       subject: "Thông báo về đơn đăng ký tài khoản bác sĩ - MedConnect",
       text: textContent,
       html: htmlContent,
     });
   } catch (error) {
-    console.error("❌ Error sending doctor rejection email:", error);
+    console.error("Error sending doctor rejection email:", error);
     // Không throw error để không ảnh hưởng đến flow chính
   }
 }
@@ -1055,23 +1271,52 @@ export const approveDoctor = async (req, res) => {
         await User.findById(userId);
       }
 
-      // Send appropriate email based on status
+      // Gửi email xác minh tài khoản bác sĩ thành công (khi isVerified = true)
+      // Gửi email cho tất cả trường hợp phê duyệt, không phụ thuộc vào canBeActive
       try {
-        if (canBeActive) {
-          // Doctor has all required info → send approval email
-          await sendDoctorApprovalEmail(doctor, user || doctor.userId);
-        } else {
-          // Doctor missing required info → send suspension email
-          await sendDoctorSuspensionEmail(doctor, user || doctor.userId);
+        // Gửi email approval cho tất cả trường hợp phê duyệt (isVerified = true)
+        // Không phụ thuộc vào canBeActive
+        // Đảm bảo có user object với email
+        let userForEmail = user;
+        
+        if (!userForEmail || !userForEmail.email) {
+          // Nếu user chưa có hoặc không có email, lấy từ doctor.userId
+          if (doctor.userId) {
+            if (typeof doctor.userId === "object" && doctor.userId.email) {
+              // userId đã được populate
+              userForEmail = doctor.userId;
+            } else {
+              // userId là ObjectId, cần query
+              const User = (await import("../models/user.model.js")).default;
+              const userIdToQuery = doctor.userId._id || doctor.userId;
+              userForEmail = await User.findById(userIdToQuery).lean();
+            }
+          }
+        }
+        
+        if (userForEmail && userForEmail.email) {
+          await sendDoctorApprovalEmail(doctor, userForEmail, canBeActive, activeCheck);
         }
       } catch (emailError) {
-        console.error("❌ Failed to send email:", emailError);
-        console.error("❌ Error details:", {
-          message: emailError?.message,
-          cause: emailError?.cause?.message,
-          stack: emailError?.stack,
-        });
+        console.error("Failed to send email:", emailError);
         // Continue even if email fails
+      }
+
+      // Create in-app notification for doctor
+      try {
+        const { createDoctorRegistrationNotification } = await import(
+          "../services/notificationService.js"
+        );
+        await createDoctorRegistrationNotification(id, "approved", {
+          adminNotes: adminNotes || "",
+          adminName: reviewer?.fullName || "Quản trị viên",
+        });
+      } catch (notificationError) {
+        console.error(
+          "❌ Error creating approval notification:",
+          notificationError
+        );
+        // Don't fail the main request if notification fails
       }
     }
 
@@ -1164,26 +1409,63 @@ export const rejectDoctor = async (req, res) => {
     doctor.approvedAt = null;
     await doctor.save();
 
-    // Update User status to 'rejected' (allows re-registration)
-    if (doctor.userId) {
-      await User.findByIdAndUpdate(
-        doctor.userId,
-        { status: "rejected" },
-        { new: true }
-      );
-
-      // Send rejection email (don't block on error)
-      try {
-        await sendDoctorRejectionEmail(
-          doctor,
-          user || doctor.userId,
-          reason,
-          reviewer
+      // Update User status to 'rejected' (allows re-registration)
+      if (doctor.userId) {
+        const userId = doctor.userId._id || doctor.userId;
+        const updatedUser = await User.findByIdAndUpdate(
+          userId,
+          { status: "rejected" },
+          { new: true }
         );
-      } catch (emailError) {
-        console.error("⚠️ Failed to send rejection email:", emailError);
-        // Continue even if email fails
+
+        // Gửi email từ chối tài khoản bác sĩ
+        try {
+          // Đảm bảo có user object với email
+          let userForEmail = updatedUser;
+          
+          if (!userForEmail || !userForEmail.email) {
+            // Nếu user chưa có hoặc không có email, lấy từ doctor.userId
+            if (doctor.userId) {
+              if (typeof doctor.userId === "object" && doctor.userId.email) {
+                // userId đã được populate
+                userForEmail = doctor.userId;
+              } else {
+                // userId là ObjectId, cần query
+                const User = (await import("../models/user.model.js")).default;
+                const userId = doctor.userId._id || doctor.userId;
+                userForEmail = await User.findById(userId).lean();
+              }
+            }
+          }
+          
+          if (userForEmail && userForEmail.email) {
+            await sendDoctorRejectionEmail(
+              doctor,
+              userForEmail,
+              reason,
+              reviewer
+            );
+          }
+        } catch (emailError) {
+          console.error("Failed to send rejection email:", emailError);
+          // Continue even if email fails
+        }
       }
+
+    // Create in-app notification for doctor
+    try {
+      const { createDoctorRegistrationNotification } = await import(
+        "../services/notificationService.js"
+      );
+      await createDoctorRegistrationNotification(id, "rejected", {
+        adminName: reviewer?.fullName || "Quản trị viên",
+      });
+    } catch (notificationError) {
+      console.error(
+        "❌ Error creating rejection notification:",
+        notificationError
+      );
+      // Don't fail the main request if notification fails
     }
 
     res.json({
@@ -1403,6 +1685,21 @@ export const banUser = async (req, res) => {
       await Doctor.findOneAndUpdate({ userId: id }, { isActive: false });
     }
 
+    // Create in-app notification for user
+    try {
+      const { createUserStatusNotification } = await import(
+        "../services/notificationService.js"
+      );
+      const adminUser = await User.findOne({ email: req.user?.email });
+      await createUserStatusNotification(id, "banned", {
+        adminName: adminUser?.fullName || "Quản trị viên",
+        reason: req.body.reason || "",
+      });
+    } catch (notificationError) {
+      console.error("❌ Error creating ban notification:", notificationError);
+      // Don't fail the main request if notification fails
+    }
+
     res.json({
       success: true,
       message: "Đã cấm người dùng",
@@ -1439,6 +1736,21 @@ export const suspendUser = async (req, res) => {
       await Doctor.findOneAndUpdate({ userId: id }, { isActive: false });
     }
 
+    // Create in-app notification for user
+    try {
+      const { createUserStatusNotification } = await import(
+        "../services/notificationService.js"
+      );
+      const adminUser = await User.findOne({ email: req.user?.email });
+      await createUserStatusNotification(id, "suspended", {
+        adminName: adminUser?.fullName || "Quản trị viên",
+        reason: req.body.reason || "",
+      });
+    } catch (notificationError) {
+      console.error("❌ Error creating suspend notification:", notificationError);
+      // Don't fail the main request if notification fails
+    }
+
     res.json({
       success: true,
       message: "Đã tạm khóa người dùng",
@@ -1468,6 +1780,20 @@ export const activateUser = async (req, res) => {
         success: false,
         message: "Không tìm thấy người dùng",
       });
+    }
+
+    // Create in-app notification for user
+    try {
+      const { createUserStatusNotification } = await import(
+        "../services/notificationService.js"
+      );
+      const adminUser = await User.findOne({ email: req.user?.email });
+      await createUserStatusNotification(id, "activated", {
+        adminName: adminUser?.fullName || "Quản trị viên",
+      });
+    } catch (notificationError) {
+      console.error("❌ Error creating activate notification:", notificationError);
+      // Don't fail the main request if notification fails
     }
 
     res.json({
@@ -1817,6 +2143,20 @@ export const changeUserPassword = async (req, res) => {
     user.passwordHash = hashedPassword;
     await user.save();
 
+    // Create in-app notification for user
+    try {
+      const { createUserStatusNotification } = await import(
+        "../services/notificationService.js"
+      );
+      const adminUser = await User.findOne({ email: req.user?.email });
+      await createUserStatusNotification(id, "password_changed", {
+        adminName: adminUser?.fullName || "Quản trị viên",
+      });
+    } catch (notificationError) {
+      console.error("❌ Error creating password change notification:", notificationError);
+      // Don't fail the main request if notification fails
+    }
+
     res.json({
       success: true,
       message: "Đổi mật khẩu thành công",
@@ -2040,6 +2380,20 @@ export const createUser = async (req, res) => {
       });
     }
     // For manager and admin, no additional profile needed
+
+    // Create in-app notification for user
+    try {
+      const { createUserStatusNotification } = await import(
+        "../services/notificationService.js"
+      );
+      const adminUser = await User.findOne({ email: req.user?.email });
+      await createUserStatusNotification(userDoc._id, "created", {
+        adminName: adminUser?.fullName || "Quản trị viên",
+      });
+    } catch (notificationError) {
+      console.error("❌ Error creating user creation notification:", notificationError);
+      // Don't fail the main request if notification fails
+    }
 
     res.json({
       success: true,
@@ -3575,24 +3929,7 @@ export const getStatistics = async (req, res) => {
       }
     });
     
-    // Debug: Log appointments không có payments
-    const appointmentsWithoutPayments = appointmentsInPeriod.filter(apt => {
-      const aptIdStr = apt._id.toString();
-      return !paymentMap.has(aptIdStr) || paymentMap.get(aptIdStr) === 0;
-    });
-    if (appointmentsWithoutPayments.length > 0) {
-      console.log(`⚠️ Top Patients: ${appointmentsWithoutPayments.length} appointments without payments:`, 
-        appointmentsWithoutPayments.slice(0, 5).map(apt => ({
-          appointmentId: apt._id.toString(),
-          paymentId: apt.paymentId?.toString(),
-          hasPaymentId: !!apt.paymentId
-        }))
-      );
-    }
     
-    // Debug: Log paymentMap size và chi tiết
-    console.log(`📊 Payment Map size: ${paymentMap.size}, Sample entries:`, Array.from(paymentMap.entries()).slice(0, 5));
-    console.log(`📊 Appointment IDs in period (first 5):`, appointmentIds.slice(0, 5).map(id => id.toString()));
 
     // Bước 4: Nhóm appointments theo patientId
     // Sử dụng Map để nhóm và tính toán thống kê cho mỗi patient
@@ -3727,7 +4064,8 @@ export const getStatistics = async (req, res) => {
     
     if (originalPeriod === 'today') {
       // Xu hướng theo giờ cho hôm nay: duyệt qua 24 giờ
-      // Lưu ý: Query payments theo createdAt (thời gian thanh toán thực tế) để hiển thị đúng thời điểm thanh toán
+      // Sửa: Query appointments trong khoảng thời gian, rồi lấy payments qua paymentId
+      // Đảm bảo payments có liên kết với appointments và có thể lấy được mode
       for (let hour = 0; hour < 24; hour++) {
         const hourStart = new Date(startDate);
         hourStart.setHours(hour, 0, 0, 0);
@@ -3735,21 +4073,44 @@ export const getStatistics = async (req, res) => {
         hourEnd.setHours(hour, 59, 59, 999);
         
         // Query payments được tạo (thanh toán) trong giờ này
-        // Đây là thời điểm thanh toán thực tế, không phải thời điểm đặt lịch
+        // Đây là thời điểm thanh toán thực tế
         const hourPayments = await Payment.find({
-          status: { $in: ['captured', 'authorized'] }, // Chỉ lấy payments đã thanh toán thành công
-          createdAt: { $gte: hourStart, $lte: hourEnd } // Lọc theo thời gian thanh toán (createdAt)
-        }).populate('appointmentId', 'mode').lean(); // Populate để lấy mode (online/offline)
+          status: { $in: ['captured', 'authorized'] },
+          createdAt: { $gte: hourStart, $lte: hourEnd }
+        }).lean();
+        
+        // Lấy tất cả paymentIds từ payments (ObjectId)
+        const paymentIds = hourPayments.map(p => p._id);
+        
+        // Query appointments có paymentId trong danh sách payments này
+        // Để lấy mode (online/offline) của appointments
+        const hourAppointments = await Appointment.find({
+          paymentId: { $in: paymentIds }
+        }).select('_id mode paymentId').lean();
+        
+        // Tạo map: paymentId -> appointments để lấy mode
+        const paymentToAppointmentsMap = new Map();
+        hourAppointments.forEach(apt => {
+          if (apt.paymentId) {
+            const paymentIdStr = apt.paymentId.toString();
+            if (!paymentToAppointmentsMap.has(paymentIdStr)) {
+              paymentToAppointmentsMap.set(paymentIdStr, []);
+            }
+            paymentToAppointmentsMap.get(paymentIdStr).push(apt);
+          }
+        });
         
         // Debug: Log số lượng payments tìm được
         if (hour === 0 || hour === 12) {
-          console.log(`📊 Revenue Trend Hour ${hour}: Found ${hourPayments.length} payments`);
+          console.log(`📊 Revenue Trend Hour ${hour}: Found ${hourAppointments.length} appointments, ${hourPayments.length} payments`);
           if (hourPayments.length > 0) {
+            const samplePayment = hourPayments[0];
+            const sampleAppointments = paymentToAppointmentsMap.get(samplePayment._id.toString()) || [];
             console.log(`📊 Sample payment:`, {
-              total: hourPayments[0].total,
-              appointmentId: hourPayments[0].appointmentId?._id?.toString(),
-              appointmentMode: hourPayments[0].appointmentId?.mode,
-              hasAppointmentIds: !!hourPayments[0].appointmentIds
+              total: samplePayment.total,
+              paymentId: samplePayment._id.toString(),
+              appointmentsCount: sampleAppointments.length,
+              appointmentModes: sampleAppointments.map(apt => apt.mode)
             });
           }
         }
@@ -3759,36 +4120,37 @@ export const getStatistics = async (req, res) => {
         let offlineRevenue = 0;
         
         hourPayments.forEach(payment => {
-          const netAmount = payment.total - (payment.refundAmount || 0); // Doanh thu thực tế
+          const netAmount = payment.total - (payment.refundAmount || 0);
+          const paymentIdStr = payment._id.toString();
+          const appointments = paymentToAppointmentsMap.get(paymentIdStr) || [];
           
-          // Xử lý appointmentId (single)
-          if (payment.appointmentId) {
-            if (payment.appointmentId.mode === 'online') {
-              onlineRevenue += netAmount;
-            } else if (payment.appointmentId.mode === 'offline') {
-              offlineRevenue += netAmount;
-            }
-          } else if (payment.appointmentIds && Array.isArray(payment.appointmentIds) && payment.appointmentIds.length > 0) {
-            // Xử lý appointmentIds (array) - tạm thời tính vào online (cần cải thiện để query appointments)
-            // Lưu ý: Để tính đúng, cần query appointments để lấy mode, nhưng sẽ làm chậm query
-            // Tạm thời tính vào online để hiển thị dữ liệu
-            onlineRevenue += netAmount;
+          if (appointments.length > 0) {
+            // Tính doanh thu theo mode của appointments
+            appointments.forEach(apt => {
+              if (apt.mode === 'online') {
+                // Chia đều doanh thu nếu có nhiều appointments
+                onlineRevenue += netAmount / appointments.length;
+              } else if (apt.mode === 'offline') {
+                offlineRevenue += netAmount / appointments.length;
+              }
+            });
           } else {
-            // Nếu không có appointmentId/appointmentIds, bỏ qua (chỉ tính payments có appointments)
-            console.warn(`⚠️ Payment ${payment._id} has no appointmentId or appointmentIds`);
+            // Fallback: nếu không có appointments, thử query từ payment.appointmentId/appointmentIds
+            // (giữ lại logic cũ để tương thích)
+            console.warn(`⚠️ Revenue Trend: Payment ${payment._id} has no appointments in map`);
           }
         });
         
         revenueTrend.push({
           date: `${hour.toString().padStart(2, '0')}:00`,
-          online: onlineRevenue,
-          offline: offlineRevenue,
-          total: onlineRevenue + offlineRevenue
+          online: Math.round(onlineRevenue),
+          offline: Math.round(offlineRevenue),
+          total: Math.round(onlineRevenue + offlineRevenue)
         });
       }
     } else if (daysDiff <= 7) {
       // Daily trend for week
-      // Query payments theo createdAt (thời gian thanh toán thực tế)
+      // Sửa: Query payments theo createdAt, rồi lấy appointments từ paymentId
       const currentDate = new Date(startDate);
       while (currentDate <= endDate) {
         const dayStart = new Date(currentDate);
@@ -3799,43 +4161,59 @@ export const getStatistics = async (req, res) => {
         // Query payments được tạo (thanh toán) trong ngày này
         const dayPayments = await Payment.find({
           status: { $in: ['captured', 'authorized'] },
-          createdAt: { $gte: dayStart, $lte: dayEnd } // Lọc theo thời gian thanh toán
-        }).populate('appointmentId', 'mode').lean();
+          createdAt: { $gte: dayStart, $lte: dayEnd }
+        }).lean();
+        
+        // Lấy paymentIds và query appointments
+        const paymentIds = dayPayments.map(p => p._id);
+        const dayAppointments = await Appointment.find({
+          paymentId: { $in: paymentIds }
+        }).select('_id mode paymentId').lean();
+        
+        // Tạo map: paymentId -> appointments
+        const paymentToAppointmentsMap = new Map();
+        dayAppointments.forEach(apt => {
+          if (apt.paymentId) {
+            const paymentIdStr = apt.paymentId.toString();
+            if (!paymentToAppointmentsMap.has(paymentIdStr)) {
+              paymentToAppointmentsMap.set(paymentIdStr, []);
+            }
+            paymentToAppointmentsMap.get(paymentIdStr).push(apt);
+          }
+        });
         
         let onlineRevenue = 0;
         let offlineRevenue = 0;
         
         dayPayments.forEach(payment => {
           const netAmount = payment.total - (payment.refundAmount || 0);
-          // Xử lý appointmentId (single)
-          if (payment.appointmentId) {
-            if (payment.appointmentId.mode === 'online') {
-              onlineRevenue += netAmount;
-            } else if (payment.appointmentId.mode === 'offline') {
-              offlineRevenue += netAmount;
-            }
-          } else if (payment.appointmentIds && Array.isArray(payment.appointmentIds) && payment.appointmentIds.length > 0) {
-            // Xử lý appointmentIds (array) - tạm thời tính vào online (cần cải thiện)
-            onlineRevenue += netAmount;
-          } else {
-            // Bỏ qua payments không có appointments
-            console.warn(`⚠️ Payment ${payment._id} has no appointmentId or appointmentIds`);
+          const paymentIdStr = payment._id.toString();
+          const appointments = paymentToAppointmentsMap.get(paymentIdStr) || [];
+          
+          if (appointments.length > 0) {
+            appointments.forEach(apt => {
+              if (apt.mode === 'online') {
+                onlineRevenue += netAmount / appointments.length;
+              } else if (apt.mode === 'offline') {
+                offlineRevenue += netAmount / appointments.length;
+              }
+            });
           }
         });
         
         const dateStr = `${currentDate.getDate().toString().padStart(2, '0')}/${(currentDate.getMonth() + 1).toString().padStart(2, '0')}`;
         revenueTrend.push({
           date: dateStr,
-          online: onlineRevenue,
-          offline: offlineRevenue,
-          total: onlineRevenue + offlineRevenue
+          online: Math.round(onlineRevenue),
+          offline: Math.round(offlineRevenue),
+          total: Math.round(onlineRevenue + offlineRevenue)
         });
         
         currentDate.setDate(currentDate.getDate() + 1);
       }
     } else {
       // Monthly trend for month/year
-      // Query payments theo createdAt (thời gian thanh toán thực tế)
+      // Sửa: Query payments theo createdAt, rồi lấy appointments từ paymentId
       const currentDate = new Date(startDate);
       while (currentDate <= endDate) {
         const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -3844,35 +4222,51 @@ export const getStatistics = async (req, res) => {
         // Query payments được tạo (thanh toán) trong tháng này
         const monthPayments = await Payment.find({
           status: { $in: ['captured', 'authorized'] },
-          createdAt: { $gte: monthStart, $lte: monthEnd } // Lọc theo thời gian thanh toán
-        }).populate('appointmentId', 'mode').lean();
+          createdAt: { $gte: monthStart, $lte: monthEnd }
+        }).lean();
+        
+        // Lấy paymentIds và query appointments
+        const paymentIds = monthPayments.map(p => p._id);
+        const monthAppointments = await Appointment.find({
+          paymentId: { $in: paymentIds }
+        }).select('_id mode paymentId').lean();
+        
+        // Tạo map: paymentId -> appointments
+        const paymentToAppointmentsMap = new Map();
+        monthAppointments.forEach(apt => {
+          if (apt.paymentId) {
+            const paymentIdStr = apt.paymentId.toString();
+            if (!paymentToAppointmentsMap.has(paymentIdStr)) {
+              paymentToAppointmentsMap.set(paymentIdStr, []);
+            }
+            paymentToAppointmentsMap.get(paymentIdStr).push(apt);
+          }
+        });
         
         let onlineRevenue = 0;
         let offlineRevenue = 0;
         
         monthPayments.forEach(payment => {
           const netAmount = payment.total - (payment.refundAmount || 0);
-          // Xử lý appointmentId (single)
-          if (payment.appointmentId) {
-            if (payment.appointmentId.mode === 'online') {
-              onlineRevenue += netAmount;
-            } else if (payment.appointmentId.mode === 'offline') {
-              offlineRevenue += netAmount;
-            }
-          } else if (payment.appointmentIds && Array.isArray(payment.appointmentIds) && payment.appointmentIds.length > 0) {
-            // Xử lý appointmentIds (array) - tạm thời tính vào online (cần cải thiện)
-            onlineRevenue += netAmount;
-          } else {
-            // Bỏ qua payments không có appointments
-            console.warn(`⚠️ Payment ${payment._id} has no appointmentId or appointmentIds`);
+          const paymentIdStr = payment._id.toString();
+          const appointments = paymentToAppointmentsMap.get(paymentIdStr) || [];
+          
+          if (appointments.length > 0) {
+            appointments.forEach(apt => {
+              if (apt.mode === 'online') {
+                onlineRevenue += netAmount / appointments.length;
+              } else if (apt.mode === 'offline') {
+                offlineRevenue += netAmount / appointments.length;
+              }
+            });
           }
         });
         
         revenueTrend.push({
           date: `Th${currentDate.getMonth() + 1}/${currentDate.getFullYear()}`,
-          online: onlineRevenue,
-          offline: offlineRevenue,
-          total: onlineRevenue + offlineRevenue
+          online: Math.round(onlineRevenue),
+          offline: Math.round(offlineRevenue),
+          total: Math.round(onlineRevenue + offlineRevenue)
         });
         
         currentDate.setMonth(currentDate.getMonth() + 1);

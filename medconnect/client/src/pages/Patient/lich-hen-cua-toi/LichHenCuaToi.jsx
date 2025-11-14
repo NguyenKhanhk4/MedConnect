@@ -18,6 +18,7 @@ import {
   CheckCircle,
   Filter,
   ChevronDown,
+  User,
 } from "lucide-react";
 import ChiTietLichHen from "../chi-tiet-lich-hen/ChiTietLichHen";
 import ModalDanhGia from "../modal-danh-gia/ModalDanhGia";
@@ -153,6 +154,17 @@ export function LichHenCuaToi() {
     () => filterByStatuses(appointments, ["cancelled"]),
     [appointments]
   );
+  
+  // Filter appointments booked for family members (đặt hộ)
+  const familyBookedAppointments = useMemo(
+    () =>
+      appointments.filter(
+        (apt) =>
+          apt.patientId?.relationshipToOwner &&
+          apt.patientId.relationshipToOwner !== "self"
+      ),
+    [appointments]
+  );
 
   // Apply all filters to current tab appointments
   const filteredUpcomingAppointments = useMemo(
@@ -167,13 +179,21 @@ export function LichHenCuaToi() {
     () => applyAppointmentFilters(cancelledAppointments, filters),
     [cancelledAppointments, filters]
   );
+  const filteredFamilyBookedAppointments = useMemo(
+    () => applyAppointmentFilters(familyBookedAppointments, filters),
+    [familyBookedAppointments, filters]
+  );
 
   const currentAppointments =
     activeTab === "upcoming"
       ? filteredUpcomingAppointments
       : activeTab === "completed"
       ? filteredCompletedAppointments
-      : filteredCancelledAppointments;
+      : activeTab === "cancelled"
+      ? filteredCancelledAppointments
+      : activeTab === "family"
+      ? filteredFamilyBookedAppointments
+      : [];
   const handleShowDetail = (appointmentId) => {
     setSelectedAppointmentId(appointmentId);
     setShowDetailModal(true);
@@ -209,7 +229,7 @@ export function LichHenCuaToi() {
 
   return (
     <div className="my-appointments-container">
-      {/* Header with Gradient Background */}
+      
       <div className="my-appointments-header">
         <div className="header-content-wrapper">
           <div className="header-text-section">
@@ -457,7 +477,7 @@ export function LichHenCuaToi() {
             className={`tab-button ${activeTab === "upcoming" ? "active" : ""}`}
           >
             <Calendar size={16} style={{ marginRight: "0.5rem" }} />
-            Sắp tới ({filteredUpcomingAppointments.length})
+            Tất cả ({filteredUpcomingAppointments.length})
           </button>
           <button
             type="button"
@@ -478,6 +498,16 @@ export function LichHenCuaToi() {
           >
             <X size={16} style={{ marginRight: "0.5rem" }} />
             Đã hủy ({filteredCancelledAppointments.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("family")}
+            className={`tab-button ${
+              activeTab === "family" ? "active" : ""
+            }`}
+          >
+            <User size={16} style={{ marginRight: "0.5rem" }} />
+            Đặt hộ ({filteredFamilyBookedAppointments.length})
           </button>
         </div>
       </div>
@@ -773,7 +803,11 @@ export function LichHenCuaToi() {
                 ? "Bạn chưa có lịch hẹn nào. Hãy đặt lịch khám để bắt đầu!"
                 : activeTab === "completed"
                 ? "Chưa có lịch hẹn đã khám"
-                : "Chưa có lịch hẹn đã hủy"}
+                : activeTab === "cancelled"
+                ? "Chưa có lịch hẹn đã hủy"
+                : activeTab === "family"
+                ? "Chưa có lịch hẹn đặt hộ"
+                : "Không có lịch hẹn"}
             </p>
           </div>
         )}

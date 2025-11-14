@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Card,
   Input,
@@ -16,6 +16,7 @@ import {
   Descriptions,
   Divider,
   Image,
+  Pagination,
 } from "antd";
 import {
   SearchOutlined,
@@ -67,6 +68,8 @@ const NguoiDung = () => {
   const [error, setError] = useState(null);
   const [allUsers, setAllUsers] = useState([]); // Store all users loaded from API
   const [users, setUsers] = useState([]); // Filtered users
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -138,7 +141,29 @@ const NguoiDung = () => {
   useEffect(() => {
     const filtered = filterUsers(allUsers, searchText);
     setUsers(filtered);
+    setCurrentPage(1); // Reset to page 1 when filter changes
   }, [searchText, allUsers]);
+
+  // Reset to page 1 when roleFilter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [roleFilter]);
+
+  // Calculate paginated users
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return users.slice(startIndex, endIndex);
+  }, [users, currentPage, pageSize]);
+
+  // Handle page change
+  const handlePageChange = (page, size) => {
+    setCurrentPage(page);
+    if (size !== pageSize) {
+      setPageSize(size);
+      setCurrentPage(1); // Reset to page 1 when page size changes
+    }
+  };
 
   // Load specializations and clinics
   useEffect(() => {
@@ -470,7 +495,7 @@ const NguoiDung = () => {
       </div>
 
       <div className="users-list">
-        {users.map((user) => {
+        {paginatedUsers.map((user) => {
           const roleConfig = getRoleTag(user.role);
           const statusConfig = getStatusTag(user.status);
 
@@ -514,6 +539,32 @@ const NguoiDung = () => {
           );
         })}
       </div>
+
+      {/* Pagination */}
+      {users.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginTop: "2rem",
+            marginBottom: "1rem",
+          }}
+        >
+          <Pagination
+            current={currentPage}
+            pageSize={pageSize}
+            total={users.length}
+            onChange={handlePageChange}
+            onShowSizeChange={handlePageChange}
+            showSizeChanger
+            showQuickJumper
+            showTotal={(total, range) =>
+              `${range[0]}-${range[1]} của ${total} người dùng`
+            }
+            pageSizeOptions={["5", "10", "20", "50", "100"]}
+          />
+        </div>
+      )}
 
       {/* User Detail Modal */}
       <Modal
@@ -744,7 +795,7 @@ const NguoiDung = () => {
             name="role"
             rules={[{ required: true, message: "Vui lòng chọn vai trò" }]}
           >
-            <Select placeholder="Chọn vai trò">
+            <Select placeholder="Chọn vai trò" disabled>
               <Select.Option value="patient">Bệnh nhân</Select.Option>
               <Select.Option value="doctor">Bác sĩ</Select.Option>
               <Select.Option value="admin">Quản trị viên</Select.Option>

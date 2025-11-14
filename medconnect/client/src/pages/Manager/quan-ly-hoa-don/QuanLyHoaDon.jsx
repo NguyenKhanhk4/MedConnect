@@ -627,6 +627,7 @@ export default function QuanLyHoaDon() {
             formatDate={formatDate}
             getInvoiceTypeText={getInvoiceTypeText}
             handleDownloadInvoice={handleDownloadInvoice}
+            page={page}
           />
         </div>
       </div>
@@ -682,6 +683,7 @@ function InvoiceTable({
   formatDate,
   getInvoiceTypeText,
   handleDownloadInvoice,
+  page = 1,
 }) {
   if (loading) {
     return (
@@ -705,6 +707,7 @@ function InvoiceTable({
       <table className="invoice-table">
         <thead>
           <tr>
+            <th>STT</th>
             <th>Mã hóa đơn</th>
             <th>Loại</th>
             <th>Bệnh nhân</th>
@@ -715,8 +718,9 @@ function InvoiceTable({
           </tr>
         </thead>
         <tbody>
-          {invoices.map((invoice) => (
+          {invoices.map((invoice, index) => (
             <tr key={invoice._id}>
+              <td>{(page - 1) * 20 + index + 1}</td>
               <td>{invoice.invoiceNumber}</td>
               <td>
                 <span className={`invoice-type-badge ${invoice.invoiceType}`}>
