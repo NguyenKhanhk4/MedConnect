@@ -4,7 +4,8 @@ import {
   getNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
-  getUnreadCount
+  getUnreadCount,
+  createTestNotification,
 } from "../controllers/notificationController.js";
 
 const router = express.Router();
@@ -17,5 +18,6 @@ router.get("/", getNotifications);
 router.get("/unread-count", getUnreadCount);
 router.put("/:notificationId/read", markNotificationAsRead);
 router.put("/read-all", markAllNotificationsAsRead);
+router.post("/test", createTestNotification); // Test endpoint
 
 export default router;

@@ -4053,6 +4053,23 @@ export async function createAppointmentByDoctor(req, res) {
     // Update time slot status to booked
     await DoctorTimeSlot.findByIdAndUpdate(slotId, { status: "booked" });
 
+    // Create notification for patient about new appointment
+    try {
+      const { createBookingNotification } = await import(
+        "../services/notificationService.js"
+      );
+      await createBookingNotification(appointment._id);
+      console.log(
+        `✅ Booking notification created for appointment ${appointment._id}`
+      );
+    } catch (notificationError) {
+      console.error(
+        "❌ Error creating booking notification:",
+        notificationError
+      );
+      // Don't fail the main request if notification fails
+    }
+
     // Populate appointment data for response
     const populatedAppointment = await Appointment.findById(appointment._id)
       .populate("patientId", "fullName phone")

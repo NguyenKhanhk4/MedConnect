@@ -9,6 +9,7 @@ import Patient from "../models/patient.model.js";
 import Doctor from "../models/doctor.model.js";
 import User from "../models/user.model.js";
 import VideoCall from "../models/videoCall.model.js";
+import Notification from "../models/notification.model.js";
 import { sendMail } from "../utils/email.js";
 
 let cronJob = null;
@@ -76,7 +77,14 @@ export async function sendVideoCallReminders() {
         $lt: windowEnd,
       },
     })
-      .populate("patientId", "userId fullName email")
+      .populate({
+        path: "patientId",
+        select: "userId fullName email",
+        populate: {
+          path: "userId",
+          select: "_id email",
+        },
+      })
       .populate("doctorId", "userId fullName")
       .lean();
 
@@ -226,6 +234,51 @@ MedConnect
         });
 
         console.log(`✅ Sent video call reminder email to ${patientEmail} for appointment ${appointment._id}`);
+        
+        // Create in-app notification for patient
+        try {
+          // Get patient userId - could be ObjectId or populated object
+          let patientUserId = appointment.patientId?.userId;
+          if (patientUserId && typeof patientUserId === "object" && patientUserId._id) {
+            patientUserId = patientUserId._id;
+          }
+          
+          if (patientUserId) {
+            const appointmentTimeStr = scheduledStart.toLocaleString("vi-VN", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+
+            await Notification.create({
+              userId: patientUserId,
+              type: "appointment",
+              title: "⏰ Nhắc nhở: Cuộc gọi video sắp bắt đầu",
+              message: `Cuộc gọi video khám trực tuyến với BS. ${doctorName} sẽ bắt đầu trong 10 phút nữa (${appointmentTimeStr}). Vui lòng chuẩn bị sẵn sàng và đăng nhập vào hệ thống.`,
+              priority: "high",
+              relatedId: appointment._id,
+              relatedType: "appointment",
+              metadata: {
+                appointmentId: appointment._id.toString(),
+                doctorName,
+                appointmentTime: appointmentTimeStr,
+                scheduledStart: appointment.scheduledStart,
+                scheduledEnd: appointment.scheduledEnd,
+                mode: "online",
+                videoCallId: videoCall?._id?.toString(),
+                reminderType: "10_minutes_before",
+              },
+            });
+
+            console.log(`✅ Created in-app notification for patient ${patientUserId} for appointment ${appointment._id}`);
+          }
+        } catch (notificationError) {
+          console.error(`❌ Error creating in-app notification for appointment ${appointment._id}:`, notificationError);
+          // Don't fail the whole process if notification creation fails
+        }
         
         // Mark as sent
         sentReminders.add(reminderKey);

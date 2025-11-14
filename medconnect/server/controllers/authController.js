@@ -463,6 +463,20 @@ export async function registerDoctor(req, res) {
         fullName: doctorDoc.fullName,
         isVerified: doctorDoc.isVerified,
       });
+
+      // Create notification for admins about new doctor registration
+      try {
+        const { createNewDoctorRegistrationNotification } = await import(
+          "../services/notificationService.js"
+        );
+        await createNewDoctorRegistrationNotification(doctorDoc._id);
+      } catch (notificationError) {
+        console.error(
+          "Error creating new doctor registration notification:",
+          notificationError
+        );
+        // Don't fail the registration if notification fails
+      }
     } catch (doctorError) {
       console.error("❌ Error creating Doctor record:", doctorError);
 

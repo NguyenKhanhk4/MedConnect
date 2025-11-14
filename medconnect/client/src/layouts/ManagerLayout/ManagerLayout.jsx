@@ -183,16 +183,15 @@ const ManagerLayout = () => {
           <div className="header-left"></div>
 
           <div className="header-right">
-            <Button
-              type="text"
-              icon={<BellOutlined />}
+            <button
               className="notification-btn"
               onClick={() => navigate("/manager/thong-bao")}
             >
+              <BellOutlined className="bell-icon" />
               {unreadNotificationCount > 0 && (
-                <Badge count={unreadNotificationCount} size="small" />
+                <span className="unread-badge">{unreadNotificationCount}</span>
               )}
-            </Button>
+            </button>
 
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <Button type="text" className="user-btn">

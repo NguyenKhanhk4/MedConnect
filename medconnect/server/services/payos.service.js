@@ -563,6 +563,57 @@ export const handlePayosWebhook = async (
           console.log(
             `✅ Service payment confirmation email sent successfully for appointment ${appointment._id}`
           );
+
+          // Create in-app notification for patient about successful service payment
+          try {
+            const Notification = (await import("../models/notification.model.js")).default;
+            const patientUserId = patient?.userId?._id || patient?.userId;
+            
+            if (patientUserId) {
+              // Format payment amount
+              const formattedAmount = new Intl.NumberFormat("vi-VN", {
+                style: "currency",
+                currency: "VND",
+              }).format(payment.total);
+
+              // Format services list
+              const servicesList = payment.items
+                .map((item) => item.description)
+                .join(", ");
+
+              const doctorName = doctor?.fullName || "Bác sĩ";
+
+              await Notification.create({
+                userId: patientUserId,
+                type: "payment",
+                title: "Thanh toán dịch vụ thành công",
+                message: `Bạn đã thanh toán thành công ${formattedAmount} cho dịch vụ: ${servicesList}. Mã hóa đơn: ${payment.invoiceNumber}.`,
+                priority: "high",
+                relatedId: payment._id,
+                relatedType: "payment",
+                metadata: {
+                  paymentId: payment._id.toString(),
+                  invoiceNumber: payment.invoiceNumber,
+                  total: payment.total,
+                  services: payment.items,
+                  appointmentId: appointment?._id?.toString(),
+                  doctorName,
+                  status: "paid",
+                  paymentType: "service",
+                },
+              });
+
+              console.log(
+                `✅ Created service payment success notification for patient ${patientUserId}`
+              );
+            }
+          } catch (notificationError) {
+            console.error(
+              "❌ Error creating service payment success notification:",
+              notificationError
+            );
+            // Don't fail the whole process if notification fails
+          }
         } catch (emailError) {
           console.error(
             "❌ Error sending service payment confirmation email:",
@@ -1342,6 +1393,63 @@ export const handlePayosWebhook = async (
               console.log(
                 `📧 Payment confirmation email sent for ${appointmentsForEmail.length} appointment(s)`
               );
+
+              // Create in-app notification for patient about successful payment
+              try {
+                const Notification = (await import("../models/notification.model.js")).default;
+                const patientUserId = patient?.userId?._id || patient?.userId;
+                
+                if (patientUserId) {
+                  // Format payment amount
+                  const formattedAmount = new Intl.NumberFormat("vi-VN", {
+                    style: "currency",
+                    currency: "VND",
+                  }).format(payment.total);
+
+                  // Get appointment info for notification
+                  const firstAppointment = appointmentsForEmail[0];
+                  const doctorName = firstAppointment?.doctorId?.fullName || "Bác sĩ";
+                  const appointmentTime = firstAppointment?.scheduledStart 
+                    ? new Date(firstAppointment.scheduledStart).toLocaleString("vi-VN", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "";
+
+                  await Notification.create({
+                    userId: patientUserId,
+                    type: "payment",
+                    title: "Thanh toán thành công",
+                    message: `Bạn đã thanh toán thành công ${formattedAmount} cho lịch hẹn khám với BS. ${doctorName}${appointmentTime ? ` vào ${appointmentTime}` : ""}. Mã hóa đơn: ${payment.invoiceNumber}. Lịch hẹn đã được xác nhận.`,
+                    priority: "high",
+                    relatedId: payment._id,
+                    relatedType: "payment",
+                    metadata: {
+                      paymentId: payment._id.toString(),
+                      invoiceNumber: payment.invoiceNumber,
+                      total: payment.total,
+                      appointmentIds: appointmentsForEmail.map(apt => apt._id.toString()),
+                      doctorName,
+                      appointmentTime,
+                      status: "paid",
+                    },
+                  });
+
+                  console.log(
+                    `✅ Created payment success notification for patient ${patientUserId}`
+                  );
+                }
+              } catch (notificationError) {
+                console.error(
+                  "❌ Error creating payment success notification:",
+                  notificationError
+                );
+                // Don't fail the whole process if notification fails
+              }
             } else {
               console.log(`⚠️ No appointments found for email - payment:`, {
                 paymentId: payment._id,
