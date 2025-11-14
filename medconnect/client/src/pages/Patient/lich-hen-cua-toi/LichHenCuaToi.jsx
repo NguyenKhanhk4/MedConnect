@@ -229,7 +229,7 @@ export function LichHenCuaToi() {
 
   return (
     <div className="my-appointments-container">
-      {/* Header with Gradient Background */}
+      
       <div className="my-appointments-header">
         <div className="header-content-wrapper">
           <div className="header-text-section">
