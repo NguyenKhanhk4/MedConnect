@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getDoctorAppointmentsWithFallback } from "../../../lib/api";
 import { Button } from "../../../components/ui/Button";
@@ -11,12 +11,15 @@ export default function KhamTrucTiep() {
   const navigate = useNavigate();
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("vitals");
+  const [activeTab, setActiveTab] = useState("basic");
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState({});
+  const [openModal, setOpenModal] = useState(null); // null hoặc index của dịch vụ đang mở modal
+  const [clinicalServices, setClinicalServices] = useState([]);
+  const [loadingServices, setLoadingServices] = useState(true);
   const [formData, setFormData] = useState({
     reasonForVisit: "",
     visitDate: new Date().toISOString().split("T")[0],
-    treatmentResult: "improved",
     consultationCategory: "examination",
     diagnoses: [{ name: "" }],
     vitals: {
@@ -147,6 +150,49 @@ export default function KhamTrucTiep() {
       "Bạn đã xác nhận đã xem xét gợi ý từ AI. Có thể tiếp tục lưu hồ sơ."
     );
   };
+
+  // Fetch danh sách dịch vụ cận lâm sàng từ database
+  useEffect(() => {
+    const fetchClinicalServices = async () => {
+      try {
+        setLoadingServices(true);
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/service-prices/active`,
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.success && data.data?.servicePrices) {
+            // Lấy danh sách tên dịch vụ từ servicePrices
+            const serviceNames = data.data.servicePrices.map(
+              (service) => service.serviceName
+            );
+            setClinicalServices(serviceNames);
+          } else {
+            console.warn("⚠️ No servicePrices in response:", data);
+            setClinicalServices([]);
+          }
+        } else {
+          const errorText = await response.text();
+          console.error("❌ Failed to fetch clinical services:", response.status, errorText);
+          setClinicalServices([]);
+        }
+      } catch (error) {
+        console.error("❌ Error fetching clinical services:", error);
+        setClinicalServices([]);
+      } finally {
+        setLoadingServices(false);
+      }
+    };
+
+    fetchClinicalServices();
+  }, []);
+
 
   useEffect(() => {
     const fetchAppointment = async () => {
@@ -360,7 +406,6 @@ export default function KhamTrucTiep() {
         visitDate: formData.visitDate
           ? new Date(formData.visitDate)
           : undefined,
-        treatmentResult: formData.treatmentResult,
         consultationCategory: formData.consultationCategory,
         diagnoses: validDiagnoses,
         vitals: formData.vitals,
@@ -381,12 +426,6 @@ export default function KhamTrucTiep() {
           : undefined,
         followUpInstructions: formData.followUpInstructions,
       };
-
-      // Debug logging
-      console.log(
-        "🔍 Submitting imagingResults:",
-        JSON.stringify(submitData.imagingResults, null, 2)
-      );
 
       try {
         const response = await fetch(
@@ -420,12 +459,7 @@ export default function KhamTrucTiep() {
         // End video call if it exists
         try {
           const VideoCallAPI = await import("../../../services/videoCallAPI");
-          console.log(
-            "🔍 KhamTrucTiep - Attempting to end video call for appointmentId:",
-            appointmentId
-          );
           await VideoCallAPI.default.endCallByAppointmentId(appointmentId);
-          console.log("✅ KhamTrucTiep - Video call ended successfully");
         } catch (videoCallError) {
           console.warn(
             "⚠️ KhamTrucTiep - Could not end video call:",
@@ -465,24 +499,30 @@ export default function KhamTrucTiep() {
     <div className="offline-consultation-page-container">
       <div className="offline-consultation-page-content">
         <div className="consultation-page-header">
-          <div className="header-content">
+          <div className="header-content" style={{ flex: 1 }}>
             <h1>Hoàn thành khám bệnh trực tiếp</h1>
-            <p className="patient-info">
-              Bệnh nhân:{" "}
-              <strong>
+            <div style={{ marginTop: "12px", marginLeft: "-20px" }}>
+              <p style={{ 
+                margin: 0, 
+                fontSize: "14px", 
+                color: "#fff",
+                marginBottom: "4px"
+              }}>
+                Bệnh nhân:
+              </p>
+              <p style={{ 
+                margin: 0, 
+                fontSize: "24px", 
+                fontWeight: "600",
+                color: "#fff"
+              }}>
                 {appointment?.patientId?.fullName ||
                   appointment?.patient?.fullName ||
                   appointment?.patientName ||
                   "Không có"}
-              </strong>
-            </p>
+              </p>
+            </div>
           </div>
-          <button
-            className="back-btn"
-            onClick={() => navigate("/bac-si/lich-hen")}
-          >
-            ← Quay lại
-          </button>
         </div>
 
         <div className="consultation-form-wrapper">
@@ -496,13 +536,6 @@ export default function KhamTrucTiep() {
             </button>
             <button
               type="button"
-              className={`tab-btn ${activeTab === "vitals" ? "active" : ""}`}
-              onClick={() => setActiveTab("vitals")}
-            >
-              📊 Chỉ số
-            </button>
-            <button
-              type="button"
               className={`tab-btn ${activeTab === "diagnosis" ? "active" : ""}`}
               onClick={() => setActiveTab("diagnosis")}
             >
@@ -513,7 +546,7 @@ export default function KhamTrucTiep() {
               className={`tab-btn ${activeTab === "tests" ? "active" : ""}`}
               onClick={() => setActiveTab("tests")}
             >
-              🧪 Xét nghiệm
+              🧪 Dịch vụ cận lâm sàng
             </button>
             <button
               type="button"
@@ -559,27 +592,9 @@ export default function KhamTrucTiep() {
                     />
                   </div>
                 </div>
-                <div className="form-group">
-                  <label>Kết quả điều trị</label>
-                  <select
-                    value={formData.treatmentResult}
-                    onChange={(e) =>
-                      handleFieldChange("treatmentResult", e.target.value)
-                    }
-                    className="form-select"
-                  >
-                    <option value="recovered">Khỏi hoàn toàn</option>
-                    <option value="improved">Cải thiện</option>
-                    <option value="unchanged">Không thay đổi</option>
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {/* Vitals Tab */}
-            {activeTab === "vitals" && (
-              <div className="form-section">
-                <h3 className="section-title">📊 Chỉ số Sinh Học</h3>
+                
+                {/* Vitals Section - Gộp vào tab Thông tin cơ bản */}
+                <h3 className="section-title" style={{ marginTop: "2rem" }}>📊 Chỉ số Sinh Học</h3>
                 <div className="vitals-grid">
                   <div className="form-group">
                     <label>Chiều cao (cm)</label>
@@ -703,13 +718,6 @@ export default function KhamTrucTiep() {
                     </div>
                   </div>
                 ))}
-                <Button
-                  type="button"
-                  onClick={() => addArrayItem("diagnoses", { name: "" })}
-                  className="btn-add"
-                >
-                  + Thêm chẩn đoán
-                </Button>
 
                 {/* Hiển thị gợi ý từ AI */}
                 {aiSuggestion && (
@@ -1083,15 +1091,25 @@ export default function KhamTrucTiep() {
             {/* Tests Tab */}
             {activeTab === "tests" && (
               <div className="form-section">
-                <h3 className="section-title">🧪 Xét Nghiệm</h3>
+                <h3 className="section-title">🧪 Dịch vụ cận lâm sàng</h3>
                 {formData.labResults.length === 0 && (
-                  <p className="no-data">Chưa có xét nghiệm nào</p>
+                  <p className="no-data">Chưa có dịch vụ cận lâm sàng nào</p>
                 )}
-                {formData.labResults.map((lab, index) => (
+                {formData.labResults.map((lab, index) => {
+                  // Tính toán filteredServices trước khi render
+                  const searchTerm = (serviceSearch[index] || "").toLowerCase();
+                  const filteredServices = clinicalServices.filter((service) => {
+                    return (
+                      searchTerm === "" ||
+                      service.toLowerCase().includes(searchTerm)
+                    );
+                  });
+                  
+                  return (
                   <div key={index} className="array-item">
                     <div className="item-header">
                       <span className="item-number">
-                        Xét nghiệm #{index + 1}
+                        Dịch vụ cận lâm sàng #{index + 1}
                       </span>
                       {formData.labResults.length > 1 && (
                         <button
@@ -1103,22 +1121,31 @@ export default function KhamTrucTiep() {
                         </button>
                       )}
                     </div>
-                    <div className="item-content">
+                    <div className="item-content" style={{ position: "relative", zIndex: 1, overflow: "visible" }}>
                       <div className="form-group">
-                        <label>Tên xét nghiệm</label>
-                        <Input
-                          type="text"
-                          placeholder="VD: Tổng phân tích tế bào máu"
-                          value={lab.testName}
-                          onChange={(e) =>
-                            handleArrayChange(
-                              "labResults",
-                              index,
-                              "testName",
-                              e.target.value
-                            )
-                          }
-                        />
+                        <label>Chọn dịch vụ cận lâm sàng</label>
+                        <div
+                          onClick={() => {
+                            setOpenModal(index);
+                            setServiceSearch({
+                              ...serviceSearch,
+                              [index]: "",
+                            });
+                          }}
+                          style={{
+                            padding: "8px 12px",
+                            border: "1px solid #d9d9d9",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            backgroundColor: "#fff",
+                            minHeight: "32px",
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          {lab.testName || "-- Chọn dịch vụ --"}
+                          <span style={{ marginLeft: "auto" }}>▼</span>
+                        </div>
                       </div>
                       <div className="form-group">
                         <label>Kết quả</label>
@@ -1137,7 +1164,8 @@ export default function KhamTrucTiep() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
                 <Button
                   type="button"
                   onClick={() =>
@@ -1145,7 +1173,7 @@ export default function KhamTrucTiep() {
                   }
                   className="btn-add"
                 >
-                  + Thêm xét nghiệm
+                  + Thêm dịch vụ cận lâm sàng
                 </Button>
               </div>
             )}
@@ -1218,6 +1246,227 @@ export default function KhamTrucTiep() {
           </form>
         </div>
       </div>
+
+      {/* Modal chọn dịch vụ cận lâm sàng */}
+      {openModal !== null && (() => {
+        const currentIndex = openModal;
+        const searchTerm = (serviceSearch[currentIndex] || "").toLowerCase();
+        const filteredServices = clinicalServices.filter((service) => {
+          return (
+            searchTerm === "" ||
+            service.toLowerCase().includes(searchTerm)
+          );
+        });
+        const currentLab = formData.labResults[currentIndex];
+
+        return (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              zIndex: 10000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "20px",
+            }}
+            onClick={() => {
+              setOpenModal(null);
+              setServiceSearch({
+                ...serviceSearch,
+                [currentIndex]: "",
+              });
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: "#fff",
+                borderRadius: "8px",
+                width: "100%",
+                maxWidth: "600px",
+                maxHeight: "80vh",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div
+                style={{
+                  padding: "16px 20px",
+                  borderBottom: "1px solid #e8e8e8",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: "600" }}>
+                  Chọn dịch vụ cận lâm sàng
+                </h3>
+                <button
+                  onClick={() => {
+                    setOpenModal(null);
+                    setServiceSearch({
+                      ...serviceSearch,
+                      [currentIndex]: "",
+                    });
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    fontSize: "24px",
+                    cursor: "pointer",
+                    color: "#999",
+                    padding: 0,
+                    width: "30px",
+                    height: "30px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Search Input */}
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #e8e8e8" }}>
+                <Input
+                  type="text"
+                  placeholder="🔍 Tìm dịch vụ..."
+                  value={serviceSearch[currentIndex] || ""}
+                  onChange={(e) => {
+                    setServiceSearch({
+                      ...serviceSearch,
+                      [currentIndex]: e.target.value,
+                    });
+                  }}
+                  style={{ width: "100%" }}
+                  autoFocus
+                />
+              </div>
+
+              {/* Services List */}
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  padding: "8px 0",
+                  maxHeight: "400px",
+                }}
+              >
+                {loadingServices ? (
+                  <div style={{ padding: "20px", textAlign: "center", color: "#999" }}>
+                    Đang tải danh sách dịch vụ...
+                  </div>
+                ) : clinicalServices.length === 0 ? (
+                  <div style={{ padding: "20px", textAlign: "center", color: "#999" }}>
+                    Chưa có dịch vụ nào. Vui lòng thêm dịch vụ trong quản lý.
+                  </div>
+                ) : filteredServices.length === 0 ? (
+                  <div style={{ padding: "20px", textAlign: "center", color: "#999" }}>
+                    Không tìm thấy dịch vụ phù hợp
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      onClick={() => {
+                        handleArrayChange("labResults", currentIndex, "testName", "");
+                        setOpenModal(null);
+                        setServiceSearch({
+                          ...serviceSearch,
+                          [currentIndex]: "",
+                        });
+                      }}
+                      style={{
+                        padding: "12px 20px",
+                        cursor: "pointer",
+                        backgroundColor: !currentLab?.testName ? "#e6f7ff" : "#fff",
+                        borderBottom: "1px solid #f0f0f0",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!currentLab?.testName) return;
+                        e.target.style.backgroundColor = "#f5f5f5";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!currentLab?.testName) return;
+                        e.target.style.backgroundColor = "#fff";
+                      }}
+                    >
+                      -- Chọn dịch vụ --
+                    </div>
+                    {filteredServices.map((service, idx) => (
+                      <div
+                        key={`modal-service-${currentIndex}-${idx}`}
+                        onClick={() => {
+                          handleArrayChange(
+                            "labResults",
+                            currentIndex,
+                            "testName",
+                            service
+                          );
+                          setOpenModal(null);
+                          setServiceSearch({
+                            ...serviceSearch,
+                            [currentIndex]: "",
+                          });
+                        }}
+                        style={{
+                          padding: "12px 20px",
+                          cursor: "pointer",
+                          backgroundColor:
+                            currentLab?.testName === service ? "#e6f7ff" : "#fff",
+                          borderBottom: "1px solid #f0f0f0",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (currentLab?.testName === service) return;
+                          e.target.style.backgroundColor = "#f5f5f5";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (currentLab?.testName === service) return;
+                          e.target.style.backgroundColor = "#fff";
+                        }}
+                      >
+                        {service}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div
+                style={{
+                  padding: "16px 20px",
+                  borderTop: "1px solid #e8e8e8",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "10px",
+                }}
+              >
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setOpenModal(null);
+                    setServiceSearch({
+                      ...serviceSearch,
+                      [currentIndex]: "",
+                    });
+                  }}
+                  variant="outline"
+                >
+                  Hủy
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Custom Alert */}
       <CustomAlert

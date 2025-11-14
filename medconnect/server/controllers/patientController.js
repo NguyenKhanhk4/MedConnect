@@ -2193,6 +2193,8 @@ export async function getFamilyMemberConsultationAdvice(req, res) {
           medications: advice.medications || [],
           notes: advice.notes || "",
           attachmentUrl: advice.attachmentUrl || null,
+          // Include appointment object with reason (same as getPatientConsultationAdvice)
+          appointment: advice.appointmentId || null,
         },
       };
     });

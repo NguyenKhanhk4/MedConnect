@@ -13,6 +13,7 @@ import User from "../models/user.model.js";
 import Review from "../models/review.model.js";
 import Payment from "../models/payment.model.js";
 import EducationLevelPrice from "../models/educationLevelPrice.model.js";
+import Clinic from "../models/clinic.model.js";
 import { ok, fail } from "../utils/response.js";
 import { ERROR_CODES } from "../constants/index.js";
 import { createAppointmentNotification } from "../services/notificationService.js";

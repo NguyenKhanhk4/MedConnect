@@ -1049,191 +1049,8 @@ MedConnect
   }
 }
 
-/**
- * Helper function: Send appointment completion email to patient
- */
-async function sendAppointmentCompletedEmail(appointment, patient, doctor) {
-  try {
-    console.log(`📧 sendAppointmentCompletedEmail called with:`, {
-      patientEmail: patient?.email,
-      patientUserId: patient?.userId,
-      hasUserIdObject: patient?.userId && typeof patient.userId === "object",
-      userIdEmail: patient?.userId?.email,
-    });
-
-    // Lấy email từ Patient hoặc User
-    let patientEmail = patient.email;
-
-    // Nếu Patient không có email, lấy từ User (userId có thể là object đã populate hoặc ObjectId)
-    if (!patientEmail) {
-      if (
-        patient.userId &&
-        typeof patient.userId === "object" &&
-        patient.userId.email
-      ) {
-        // userId đã được populate
-        patientEmail = patient.userId.email;
-        console.log(`📧 Found email from populated userId: ${patientEmail}`);
-      } else if (patient.userId) {
-        // userId là ObjectId, cần query
-        console.log(`📧 Querying User for email, userId: ${patient.userId}`);
-        const patientUser = await User.findById(patient.userId)
-          .select("email")
-          .lean();
-        if (patientUser) {
-          patientEmail = patientUser.email;
-          console.log(`📧 Found email from User query: ${patientEmail}`);
-        } else {
-          console.log(`⚠️ User not found for userId: ${patient.userId}`);
-        }
-      }
-    } else {
-      console.log(`📧 Using email from patient object: ${patientEmail}`);
-    }
-
-    // Nếu vẫn không có email, không gửi
-    if (!patientEmail) {
-      console.log(
-        "⚠️ Patient email not found, skipping completion email notification. Patient data:",
-        {
-          patientId: patient?._id,
-          patientEmail: patient?.email,
-          userId: patient?.userId,
-        }
-      );
-      return;
-    }
-
-    console.log(`📧 Sending completion email to: ${patientEmail}`);
-
-    // Format thời gian
-    const scheduledStart = new Date(appointment.scheduledStart);
-    const scheduledEnd = new Date(appointment.scheduledEnd);
-
-    const dateStr = scheduledStart.toLocaleDateString("vi-VN", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    const timeStr = `${scheduledStart.toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })} - ${scheduledEnd.toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
-
-    const modeText =
-      appointment.mode === "online" ? "Online" : "Trực tiếp tại phòng khám";
-
-    // Lấy tên bác sĩ
-    const doctorName = doctor?.fullName || doctor?.userId?.fullName || "Bác sĩ";
-
-    // Tạo nội dung email
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #059669; border-bottom: 2px solid #059669; padding-bottom: 10px;">
-          Hoàn thành khám bệnh
-        </h2>
-        <p>Xin chào <strong>${patient.fullName || "Bệnh nhân"}</strong>,</p>
-        <p>Cảm ơn bạn đã sử dụng dịch vụ khám bệnh của MedConnect. Chúng tôi xin thông báo rằng <strong style="color: #059669;">buổi khám của bạn đã hoàn thành</strong>.</p>
-        
-        <div style="background-color: #ecfdf5; border-left: 4px solid #059669; padding: 15px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #047857;">Thông tin buổi khám:</h3>
-          <p style="margin: 8px 0;"><strong>Bác sĩ:</strong> ${doctorName}</p>
-          <p style="margin: 8px 0;"><strong>Ngày khám:</strong> ${dateStr}</p>
-          <p style="margin: 8px 0;"><strong>Giờ:</strong> ${timeStr}</p>
-          <p style="margin: 8px 0;"><strong>Hình thức:</strong> ${modeText}</p>
-          ${
-            appointment.reason
-              ? `<p style="margin: 8px 0;"><strong>Lý do khám:</strong> ${appointment.reason}</p>`
-              : ""
-          }
-        </div>
-
-        <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #0284c7;">Hồ sơ bệnh án:</h3>
-          <p style="margin: 0;">Hồ sơ bệnh án của bạn đã được cập nhật và lưu trữ trong hệ thống. Bạn có thể xem chi tiết trong phần "Hồ sơ bệnh án" trên ứng dụng MedConnect.</p>
-        </div>
-
-        <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #d97706;">Lời nhắc:</h3>
-          <ul style="margin: 10px 0; padding-left: 20px;">
-            <li>Vui lòng tuân thủ theo đơn thuốc và chỉ dẫn của bác sĩ</li>
-            <li>Đặt lịch hẹn tái khám nếu cần thiết</li>
-            <li>Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ với bác sĩ hoặc phòng khám</li>
-          </ul>
-        </div>
-
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${
-            process.env.CLIENT_URL || "http://localhost:5173"
-          }/benh-an" 
-             style="background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-            Xem hồ sơ bệnh án
-          </a>
-        </div>
-        
-        <p style="margin-top: 30px;">Chúng tôi hy vọng bạn đã có trải nghiệm tốt với dịch vụ của MedConnect. Chúc bạn luôn khỏe mạnh!</p>
-        
-        <p style="margin-top: 30px;">Trân trọng,<br><strong>MedConnect</strong></p>
-      </div>
-    `;
-
-    const textContent = `
-Hoàn thành khám bệnh
-
-Xin chào ${patient.fullName || "Bệnh nhân"},
-
-Cảm ơn bạn đã sử dụng dịch vụ khám bệnh của MedConnect. Chúng tôi xin thông báo rằng buổi khám của bạn đã hoàn thành.
-
-Thông tin buổi khám:
-- Bác sĩ: ${doctorName}
-- Ngày khám: ${dateStr}
-- Giờ: ${timeStr}
-- Hình thức: ${modeText}
-${appointment.reason ? `- Lý do khám: ${appointment.reason}` : ""}
-
-Hồ sơ bệnh án:
-Hồ sơ bệnh án của bạn đã được cập nhật và lưu trữ trong hệ thống. Bạn có thể xem chi tiết trong phần "Hồ sơ bệnh án" trên ứng dụng MedConnect.
-
-Lời nhắc:
-- Vui lòng tuân thủ theo đơn thuốc và chỉ dẫn của bác sĩ
-- Đặt lịch hẹn tái khám nếu cần thiết
-- Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ với bác sĩ hoặc phòng khám
-
-Chúng tôi hy vọng bạn đã có trải nghiệm tốt với dịch vụ của MedConnect. Chúc bạn luôn khỏe mạnh!
-
-Trân trọng,
-MedConnect
-    `;
-
-    console.log(`📧 Attempting to send completion email via sendMail...`);
-    const emailResult = await sendMail({
-      to: patientEmail,
-      subject: "Hoàn thành khám bệnh - MedConnect",
-      text: textContent,
-      html: htmlContent,
-    });
-
-    console.log(
-      `✅ Appointment completion email sent successfully to ${patientEmail}`
-    );
-    console.log(`📧 Email result:`, {
-      messageId: emailResult?.messageId,
-      response: emailResult?.response,
-    });
-  } catch (error) {
-    console.error("❌ Error sending appointment completion email:", error);
-    console.error("❌ Error details:", {
-      message: error?.message,
-      stack: error?.stack,
-      status: error?.status,
-    });
-    // Không throw error để không ảnh hưởng đến flow chính
-  }
-}
+// NOTE: sendAppointmentCompletedEmail đã được di chuyển sang payos.service.js
+// để hỗ trợ cả single và multiple appointments, và đặt cho người thân
 
 /**
  * Update appointment status
@@ -1421,13 +1238,22 @@ export async function updateAppointmentStatus(req, res) {
             console.log(`✅ sendAppointmentRejectionEmail completed`);
           } else if (status === "done") {
             // Gửi email thông báo hoàn thành khám cho bệnh nhân
+            // Sử dụng hàm mới từ payos.service.js hỗ trợ single và multiple appointments
             console.log(`📧 Calling sendAppointmentCompletedEmail...`);
-            await sendAppointmentCompletedEmail(
-              populatedAppointment,
-              populatedAppointment.patientId,
-              populatedAppointment.doctorId
-            );
-            console.log(`✅ sendAppointmentCompletedEmail completed`);
+            try {
+              const { sendAppointmentCompletedEmail } = await import(
+                "../services/payos.service.js"
+              );
+              await sendAppointmentCompletedEmail(
+                populatedAppointment,
+                populatedAppointment.patientId,
+                populatedAppointment.doctorId
+              );
+              console.log(`✅ sendAppointmentCompletedEmail completed`);
+            } catch (emailError) {
+              console.error("❌ Error importing or calling sendAppointmentCompletedEmail:", emailError);
+              // Không throw error để không ảnh hưởng đến flow chính
+            }
           }
         } else {
           console.log(`⚠️ No patientId found in populated appointment`);

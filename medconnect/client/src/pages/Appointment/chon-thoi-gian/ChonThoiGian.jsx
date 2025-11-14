@@ -37,6 +37,7 @@ import {
   HomeOutlined,
   EyeOutlined,
   ExclamationCircleOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
 import NavigationBreadcrumb from "../../../components/Breadcrumb/NavigationBreadcrumb";
 import ClinicMap from "../../../components/ClinicMap/ClinicMap";
@@ -89,6 +90,8 @@ const ChonThoiGian = () => {
   const [familyMembers, setFamilyMembers] = useState([]);
   const [selectedFamilyMember, setSelectedFamilyMember] = useState(null);
   const [loadingFamilyMembers, setLoadingFamilyMembers] = useState(false);
+  const [familyForm] = Form.useForm(); // Form for family member info (giống đặt nhiều lịch)
+  const [savedFamilyFormValues, setSavedFamilyFormValues] = useState(null); // Store form values when form is filled (giống đặt nhiều lịch)
   const [currentTime, setCurrentTime] = useState(dayjs()); // Track current time for real-time filtering
   const [pendingAppointmentId, setPendingAppointmentId] = useState(null); // Track appointment chưa thanh toán
   const [pendingOrderCode, setPendingOrderCode] = useState(null); // Track orderCode để cleanup
@@ -99,6 +102,7 @@ const ChonThoiGian = () => {
   const [showPaymentSummary, setShowPaymentSummary] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [patientIdForBooking, setPatientIdForBooking] = useState(null); // Store patientId for family member booking
+  const [visitDate, setVisitDate] = useState(null); // Visit date for medical visit structure (giống đặt nhiều lịch)
 
   // Modal state for viewing reviews
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -649,74 +653,275 @@ const ChonThoiGian = () => {
         currentPatientIdForBooking = null;
       }
 
-      // If booking for family, check if using existing member or create new
+      // Validate and create family member if booking for family (giống đặt nhiều lịch)
       if (bookingFor === "family") {
-        // If patientIdForBooking is already set (selected from dropdown), use it
-        if (currentPatientIdForBooking && selectedFamilyMember) {
-          // Using existing family member, no need to create new
-          console.log("Using existing family member:", currentPatientIdForBooking);
-        } else {
-          // Create new family member
-          try {
+        try {
+          // Create or get family member
+          // If patientIdForBooking is already set (selected from dropdown), use it
+          if (currentPatientIdForBooking && selectedFamilyMember) {
+            // Using existing family member, no need to create new
+            console.log("Using existing family member:", currentPatientIdForBooking);
+          } else {
+            // Validate family form for new member (giống đặt nhiều lịch)
+            let familyValues;
+            try {
+              // Try validateFields first from main form (vì family member fields nằm trong form chính)
+              if (form && typeof form.validateFields === "function") {
+                try {
+                  // Validate only family member fields
+                  familyValues = await form.validateFields([
+                    "fullName",
+                    "citizenId",
+                    "dob",
+                    "gender",
+                    "relationshipToOwner",
+                    "phone",
+                    "address",
+                  ]);
+                } catch (validationError) {
+                  // Continue to try getFieldsValue
+                }
+              }
+
+              // If validateFields returns empty or form is unmounted, try getFieldsValue
+              if (!familyValues || Object.keys(familyValues).length === 0) {
+                try {
+                  if (form && typeof form.getFieldsValue === "function") {
+                    const allValues = form.getFieldsValue(true); // true = include disabled fields
+                    // Extract only family member fields
+                    familyValues = {
+                      fullName: allValues.fullName,
+                      citizenId: allValues.citizenId,
+                      dob: allValues.dob,
+                      gender: allValues.gender,
+                      ethnicity: allValues.ethnicity,
+                      occupation: allValues.occupation,
+                      bloodType: allValues.bloodType,
+                      relationshipToOwner: allValues.relationshipToOwner,
+                      phone: allValues.phone,
+                      address: allValues.address,
+                      allergyNotes: allValues.allergyNotes,
+                      medicalHistory: allValues.medicalHistory,
+                    };
+                  }
+                } catch (e) {
+                  // Ignore
+                }
+              }
+
+              // If still empty, use saved form values from state
+              if (!familyValues || Object.keys(familyValues).length === 0) {
+                if (
+                  savedFamilyFormValues &&
+                  Object.keys(savedFamilyFormValues).length > 0
+                ) {
+                  familyValues = savedFamilyFormValues;
+                } else {
+                  message.error("Vui lòng điền đầy đủ thông tin người thân");
+                  setLoading(false);
+                  return;
+                }
+              }
+            } catch (validationError) {
+              // Form validation failed
+              // Try to get values anyway
+              try {
+                if (form && typeof form.getFieldsValue === "function") {
+                  const allValues = form.getFieldsValue(true);
+                  // Extract only family member fields
+                  familyValues = {
+                    fullName: allValues.fullName,
+                    citizenId: allValues.citizenId,
+                    dob: allValues.dob,
+                    gender: allValues.gender,
+                    ethnicity: allValues.ethnicity,
+                    occupation: allValues.occupation,
+                    bloodType: allValues.bloodType,
+                    relationshipToOwner: allValues.relationshipToOwner,
+                    phone: allValues.phone,
+                    address: allValues.address,
+                    allergyNotes: allValues.allergyNotes,
+                    medicalHistory: allValues.medicalHistory,
+                  };
+                }
+              } catch (e) {
+                // Ignore
+              }
+
+              // If still empty, use saved form values
+              if (
+                (!familyValues || Object.keys(familyValues).length === 0) &&
+                savedFamilyFormValues
+              ) {
+                familyValues = savedFamilyFormValues;
+              }
+
+              if (validationError.errorFields) {
+                const missingFields = validationError.errorFields
+                  .map((f) => f.name)
+                  .join(", ");
+                message.error(`Vui lòng điền đầy đủ thông tin: ${missingFields}`);
+              } else {
+                message.error("Vui lòng kiểm tra lại thông tin đã nhập");
+              }
+
+              // If we have values, continue; otherwise return
+              if (!familyValues || Object.keys(familyValues).length === 0) {
+                setLoading(false);
+                return;
+              }
+            }
+
+            // Format dob properly first to check if it's valid
+            let dobFormatted = null;
+            if (familyValues.dob) {
+              try {
+                if (typeof familyValues.dob.format === "function") {
+                  // dayjs object - try to format it
+                  try {
+                    dobFormatted = familyValues.dob.format("YYYY-MM-DD");
+                  } catch (formatError) {
+                    // Try to convert to dayjs and format
+                    const dayjsObj = dayjs(familyValues.dob);
+                    if (dayjsObj.isValid()) {
+                      dobFormatted = dayjsObj.format("YYYY-MM-DD");
+                    }
+                  }
+                } else if (
+                  typeof familyValues.dob === "string" &&
+                  familyValues.dob.trim()
+                ) {
+                  // Already a string
+                  dobFormatted = familyValues.dob.trim();
+                } else if (familyValues.dob instanceof Date) {
+                  // Date object
+                  dobFormatted = dayjs(familyValues.dob).format("YYYY-MM-DD");
+                }
+              } catch (e) {
+                // Ignore
+              }
+            }
+
+            // Validate required fields with proper checks
+            const fullNameValid =
+              familyValues.fullName &&
+              typeof familyValues.fullName === "string" &&
+              familyValues.fullName.trim().length > 0;
+            const dobValid =
+              dobFormatted &&
+              typeof dobFormatted === "string" &&
+              dobFormatted.length > 0;
+            const genderValid =
+              familyValues.gender &&
+              typeof familyValues.gender === "string" &&
+              ["male", "female", "other"].includes(familyValues.gender);
+            const relationshipValid =
+              familyValues.relationshipToOwner &&
+              typeof familyValues.relationshipToOwner === "string" &&
+              [
+                "father",
+                "mother",
+                "spouse",
+                "child",
+                "grandparent",
+                "other",
+              ].includes(familyValues.relationshipToOwner);
+
+            if (
+              !fullNameValid ||
+              !dobValid ||
+              !genderValid ||
+              !relationshipValid
+            ) {
+              const missingFields = [];
+              if (!fullNameValid) missingFields.push("Họ tên");
+              if (!dobValid) missingFields.push("Ngày sinh");
+              if (!genderValid) missingFields.push("Giới tính");
+              if (!relationshipValid) missingFields.push("Mối quan hệ");
+
+              message.error(
+                `Vui lòng điền đầy đủ các thông tin bắt buộc: ${missingFields.join(
+                  ", "
+                )}`
+              );
+              setLoading(false);
+              return;
+            }
+
+            // Create new family member
             const familyResponse = await api.post(
               "/api/patients/me/family-members",
               {
-                fullName: values.fullName,
-                dob: values.dob ? values.dob.format("YYYY-MM-DD") : undefined,
-                gender: values.gender,
-                ethnicity: values.ethnicity,
-                occupation: values.occupation,
-                bloodType: values.bloodType || "Unknown",
-                relationshipToOwner: values.relationshipToOwner,
-                phone: values.phone,
-                citizenId: values.citizenId,
-                address: values.address,
-                allergyNotes: values.allergyNotes || "",
-                medicalHistory: values.medicalHistory || [],
+                fullName: familyValues.fullName?.trim() || "",
+                dob: dobFormatted,
+                gender: familyValues.gender,
+                ethnicity: familyValues.ethnicity || "",
+                occupation: familyValues.occupation || "",
+                bloodType: familyValues.bloodType || "Unknown",
+                relationshipToOwner: familyValues.relationshipToOwner,
+                phone: familyValues.phone?.trim() || "",
+                citizenId: familyValues.citizenId?.trim() || "",
+                address: familyValues.address?.trim() || "",
+                allergyNotes: familyValues.allergyNotes || "",
+                medicalHistory: Array.isArray(familyValues.medicalHistory)
+                  ? familyValues.medicalHistory
+                  : [],
               }
             );
 
             if (familyResponse.success) {
               message.success("Thêm người thân thành công!");
               const newPatientId = familyResponse.data.patient._id;
+              setPatientIdForBooking(newPatientId);
               currentPatientIdForBooking = newPatientId;
-              setPatientIdForBooking(newPatientId); // Store in state
               await fetchFamilyMembers();
             } else {
-              message.error(
-                familyResponse.message || "Thêm người thân thất bại"
-              );
+              const errorMsg =
+                familyResponse.message ||
+                familyResponse.data?.message ||
+                "Thêm người thân thất bại";
+              message.error(errorMsg);
               setLoading(false);
               return;
             }
-          } catch (error) {
-            message.error("Có lỗi xảy ra khi thêm người thân");
-            setLoading(false);
-            return;
           }
+        } catch (error) {
+          if (error.errorFields) {
+            // Form validation error
+            message.error("Vui lòng điền đầy đủ thông tin người thân");
+          } else if (error.response?.data?.message) {
+            // API error with message
+            message.error(error.response.data.message);
+          } else if (error.message) {
+            // General error
+            message.error(error.message);
+          } else {
+            message.error("Có lỗi xảy ra khi thêm người thân. Vui lòng thử lại.");
+          }
+          setLoading(false);
+          return;
         }
       }
 
-      // Prepare appointment data
+      // Prepare visitDate from selectedDate (giống đặt nhiều lịch)
+      const visitDateStr = selectedDate.format("YYYY-MM-DD");
+      setVisitDate(visitDateStr);
+
+      // Prepare appointment data (giống đặt nhiều lịch - dùng cấu trúc appointments array)
       const appointmentData = {
         doctorId: doctor._id,
         slotId: selectedTimeSlot._id,
         mode: selectedMode,
         reason: values.reason || "",
-        scheduledStart: selectedDate
-          .clone()
-          .hour(parseInt(selectedTimeSlot.startTime.split(":")[0]))
-          .minute(parseInt(selectedTimeSlot.startTime.split(":")[1]))
-          .toISOString(),
-        scheduledEnd: selectedDate
-          .clone()
-          .hour(parseInt(selectedTimeSlot.endTime.split(":")[0]))
-          .minute(parseInt(selectedTimeSlot.endTime.split(":")[1]))
-          .toISOString(),
       };
 
-      // Add clinicId for offline appointments
-      if (selectedMode === "offline" && defaultClinic) {
+      // Add clinicId for offline appointments (bắt buộc)
+      if (selectedMode === "offline") {
+        if (!defaultClinic || !defaultClinic._id) {
+          message.error("Vui lòng chọn phòng khám hoặc bác sĩ chưa có phòng khám mặc định");
+          setLoading(false);
+          return;
+        }
         appointmentData.clinicId = defaultClinic._id;
       }
 
@@ -724,15 +929,13 @@ const ChonThoiGian = () => {
       // IMPORTANT: Check bookingFor instead of just patientIdForBooking to be absolutely sure
       if (bookingFor === "family" && currentPatientIdForBooking) {
         appointmentData.patientId = currentPatientIdForBooking;
-      } else {
-        // IMPORTANT: Explicitly delete patientId if booking for "me" to prevent backend from adding it
-        delete appointmentData.patientId;
       }
 
       // Debug log để kiểm tra
       console.log("🔍 handleBookingSubmit - Debug Info:");
       console.log("bookingFor:", bookingFor);
       console.log("currentPatientIdForBooking:", currentPatientIdForBooking);
+      console.log("visitDate:", visitDateStr);
       console.log(
         "appointmentData BEFORE sending to API:",
         JSON.parse(JSON.stringify(appointmentData))
@@ -740,46 +943,46 @@ const ChonThoiGian = () => {
       console.log("appointmentData.patientId:", appointmentData.patientId);
       console.log("Has patientId key:", "patientId" in appointmentData);
 
-      // NEW FLOW: Calculate payment summary (don't create appointment yet)
+      // NEW FLOW: Calculate payment summary using medical-visits API (giống đặt nhiều lịch)
       try {
         const summaryResponse = await api.post(
-          "/api/patients/appointments/calculate-payment-summary",
-          appointmentData
+          "/api/medical-visits/complete-planning",
+          {
+            visitDate: visitDateStr,
+            appointments: [appointmentData], // Array with single appointment (giống đặt nhiều lịch)
+          }
         );
 
         if (summaryResponse.success || summaryResponse?.data?.success) {
-          const summary = summaryResponse?.data || summaryResponse;
+          const data = summaryResponse?.data || summaryResponse;
 
           // Debug log để xem response từ backend
-          console.log("📥 Summary Response from backend:", summary);
+          console.log("📥 Summary Response from backend:", data);
+
+          // Transform response to match payment summary structure (giống đặt nhiều lịch)
+          const summary = {
+            totalAmount: data.totalAmount || 0,
+            appointmentSummaries: data.appointmentSummaries || [],
+            acceptedAppointments: data.appointmentSummaries || [], // All appointments are "accepted" for payment
+            acceptedCount:
+              data.appointmentsCount || data.appointmentSummaries?.length || 0,
+            pendingCount: 0,
+            rejectedCount: 0,
+            totalCount:
+              data.appointmentsCount || data.appointmentSummaries?.length || 0,
+          };
 
           // IMPORTANT: Lưu bookingFor vào paymentSummary để dùng trong handleConfirmPayment
           summary.bookingFor = bookingFor;
           summary.familyMemberPatientId =
-            bookingFor === "family" ? patientIdForBooking : null;
-
-          // IMPORTANT: Nếu booking for "me", xóa patientId khỏi appointmentSummary (nếu backend trả về)
-          if (
-            bookingFor === "me" &&
-            summary.appointmentSummary &&
-            summary.appointmentSummary.patientId
-          ) {
-            console.warn(
-              '⚠️ Backend returned patientId for "me" booking, removing it...'
-            );
-            delete summary.appointmentSummary.patientId;
-          }
+            bookingFor === "family" ? currentPatientIdForBooking : null;
 
           // Debug log
-          console.log("💾 Payment Summary AFTER cleanup:");
+          console.log("💾 Payment Summary AFTER transformation:");
           console.log("summary.bookingFor:", summary.bookingFor);
           console.log(
             "summary.familyMemberPatientId:",
             summary.familyMemberPatientId
-          );
-          console.log(
-            "summary.appointmentSummary.patientId:",
-            summary.appointmentSummary?.patientId
           );
 
           setPaymentSummary(summary);
@@ -806,8 +1009,13 @@ const ChonThoiGian = () => {
     }
   };
 
-  // Handle confirm payment (NEW FLOW) - Tham khảo logic từ đặt nhiều lịch
+  // Handle confirm payment (NEW FLOW) - Giống logic từ đặt nhiều lịch
   const handleConfirmPayment = async () => {
+    if (!visitDate) {
+      message.error("Không tìm thấy thông tin ngày khám");
+      return;
+    }
+
     if (!paymentSummary || paymentSummary.totalAmount === 0) {
       message.warning("Không có phí nào cần thanh toán");
       return;
@@ -825,81 +1033,22 @@ const ChonThoiGian = () => {
       "paymentSummary.familyMemberPatientId:",
       paymentSummary.familyMemberPatientId
     );
+    console.log("visitDate:", visitDate);
 
     try {
       setProcessingPayment(true);
 
-      // Prepare appointment data - Tham khảo logic từ đặt nhiều lịch
-      // Ưu tiên lấy từ paymentSummary.appointmentSummary nếu có (đã được tính toán sẵn)
-      let appointmentData = null;
+      // Prepare appointment data (giống đặt nhiều lịch)
+      const appointmentData = {
+        doctorId: doctor._id,
+        slotId: selectedTimeSlot._id,
+        mode: selectedMode,
+        reason: form.getFieldValue("reason") || "",
+      };
 
-      if (paymentSummary.appointmentSummary) {
-        // Sử dụng data từ paymentSummary (đã được validate và tính toán)
-        appointmentData = {
-          doctorId: paymentSummary.appointmentSummary.doctorId || doctor._id,
-          slotId:
-            paymentSummary.appointmentSummary.slotId || selectedTimeSlot._id,
-          mode: paymentSummary.appointmentSummary.mode || selectedMode,
-          reason:
-            paymentSummary.appointmentSummary.reason ||
-            form.getFieldValue("reason") ||
-            "",
-          scheduledStart: paymentSummary.appointmentSummary.scheduledStart
-            ? new Date(
-                paymentSummary.appointmentSummary.scheduledStart
-              ).toISOString()
-            : selectedDate
-                .clone()
-                .hour(parseInt(selectedTimeSlot.startTime.split(":")[0]))
-                .minute(parseInt(selectedTimeSlot.startTime.split(":")[1]))
-                .second(0)
-                .millisecond(0)
-                .toISOString(),
-          scheduledEnd: paymentSummary.appointmentSummary.scheduledEnd
-            ? new Date(
-                paymentSummary.appointmentSummary.scheduledEnd
-              ).toISOString()
-            : selectedDate
-                .clone()
-                .hour(parseInt(selectedTimeSlot.endTime.split(":")[0]))
-                .minute(parseInt(selectedTimeSlot.endTime.split(":")[1]))
-                .second(0)
-                .millisecond(0)
-                .toISOString(),
-        };
-
-        // Add clinicId for offline appointments
-        if (appointmentData.mode === "offline") {
-          appointmentData.clinicId =
-            paymentSummary.appointmentSummary.clinicId || defaultClinic?._id;
-        }
-      } else {
-        // Fallback - extract từ form và selected data (tương tự logic nhiều lịch)
-        appointmentData = {
-          doctorId: doctor._id,
-          slotId: selectedTimeSlot._id,
-          mode: selectedMode,
-          reason: form.getFieldValue("reason") || "",
-          scheduledStart: selectedDate
-            .clone()
-            .hour(parseInt(selectedTimeSlot.startTime.split(":")[0]))
-            .minute(parseInt(selectedTimeSlot.startTime.split(":")[1]))
-            .second(0)
-            .millisecond(0)
-            .toISOString(),
-          scheduledEnd: selectedDate
-            .clone()
-            .hour(parseInt(selectedTimeSlot.endTime.split(":")[0]))
-            .minute(parseInt(selectedTimeSlot.endTime.split(":")[1]))
-            .second(0)
-            .millisecond(0)
-            .toISOString(),
-        };
-
-        // Add clinicId for offline appointments
-        if (selectedMode === "offline" && defaultClinic) {
-          appointmentData.clinicId = defaultClinic._id;
-        }
+      // Add clinicId for offline appointments
+      if (selectedMode === "offline" && defaultClinic) {
+        appointmentData.clinicId = defaultClinic._id;
       }
 
       // Validate appointment data (tương tự logic nhiều lịch)
@@ -927,23 +1076,15 @@ const ChonThoiGian = () => {
       if (isBookingForFamily && familyPatientId) {
         appointmentData.patientId = familyPatientId;
         console.log("✅ Added patientId to appointmentData:", familyPatientId);
-      } else {
-        // IMPORTANT: Explicitly delete patientId if booking for "me"
-        delete appointmentData.patientId;
-        console.log(
-          "✅ No patientId added (booking for me) - deleted patientId key"
-        );
       }
 
-      // Create payment and get PayOS link (tương tự logic nhiều lịch)
-      const response = await api.post(
-        "/api/patients/appointments/create-payment",
-        {
-          ...appointmentData,
-          gateway: "payos",
-          method: "qr", // QR code payment
-        }
-      );
+      // Create payment với appointments data (NEW FLOW - giống đặt nhiều lịch)
+      const response = await api.post("/api/medical-visits/create-payment", {
+        visitDate,
+        appointments: [appointmentData], // Array with single appointment (giống đặt nhiều lịch)
+        gateway: "payos",
+        method: "qr", // QR code payment
+      });
 
       if (response?.success || response?.data?.success) {
         // Response structure: ok(res, { paymentId, payUrl, orderCode, ... })
@@ -952,10 +1093,10 @@ const ChonThoiGian = () => {
 
         if (payUrl) {
           // Redirect to PayOS payment page
-          // Sau khi thanh toán thành công, webhook sẽ tạo appointment với status "pending_doctor"
+          // Sau khi thanh toán thành công, webhook sẽ tạo visit và appointments với status "pending_doctor"
           window.location.href = payUrl;
         } else {
-          message.error("Không thể tạo liên kết thanh toán ");
+          message.error("Không thể tạo liên kết thanh toán");
         }
       } else {
         message.error(response?.message || "Không thể tạo thanh toán");
@@ -1280,15 +1421,21 @@ const ChonThoiGian = () => {
                   <Divider />
 
                   {/* Appointment Details Table */}
-                  {paymentSummary.appointmentSummary && (
-                    <Table
-                      dataSource={[paymentSummary.appointmentSummary]}
-                      rowKey={(record) =>
-                        record.slotId?.toString() ||
-                        record.doctorId?.toString() ||
-                        "appointment"
-                      }
-                      pagination={false}
+                  {(() => {
+                    // Support both old structure (appointmentSummary) and new structure (appointmentSummaries array)
+                    const appointmentData = paymentSummary.appointmentSummaries && paymentSummary.appointmentSummaries.length > 0
+                      ? paymentSummary.appointmentSummaries[0] // Use first appointment from array (giống đặt nhiều lịch)
+                      : paymentSummary.appointmentSummary; // Fallback to old structure for backward compatibility
+                    
+                    return appointmentData ? (
+                      <Table
+                        dataSource={[appointmentData]}
+                        rowKey={(record) =>
+                          record.slotId?.toString() ||
+                          record.doctorId?.toString() ||
+                          "appointment"
+                        }
+                        pagination={false}
                       columns={[
                         {
                           title: "Bác sĩ",
@@ -1359,9 +1506,10 @@ const ChonThoiGian = () => {
                           ),
                         },
                       ]}
-                      style={{ marginBottom: 16 }}
-                    />
-                  )}
+                        style={{ marginBottom: 16 }}
+                      />
+                    ) : null;
+                  })()}
 
                   <Divider />
 
@@ -1449,6 +1597,12 @@ const ChonThoiGian = () => {
                     layout="vertical"
                     onFinish={handleBookingSubmit}
                     className="booking-form"
+                    onValuesChange={(changedValues, allValues) => {
+                      // Save family member form values to state whenever form changes (giống đặt nhiều lịch)
+                      if (bookingFor === "family") {
+                        setSavedFamilyFormValues(allValues);
+                      }
+                    }}
                   >
                     {/* Booking For Selection */}
                     <Form.Item label="Đặt khám cho">
@@ -1489,106 +1643,102 @@ const ChonThoiGian = () => {
                           Thông tin người thân
                         </Title>
 
-                        {/* Dropdown to select existing family member */}
-                        <Form.Item
-                          label="Chọn người thân đã có"
-                          name="selectedFamilyMemberId"
-                          style={{ marginBottom: 16 }}
-                        >
-                          <Select
-                            placeholder="Chọn người thân hoặc thêm mới"
-                            allowClear
-                            showSearch
-                            optionFilterProp="children"
-                            onChange={(value) => {
-                              if (value === "new") {
-                                // Reset form when selecting "Add new"
-                                setSelectedFamilyMember(null);
-                                setPatientIdForBooking(null);
-                                form.resetFields([
-                                  "fullName",
-                                  "citizenId",
-                                  "dob",
-                                  "gender",
-                                  "ethnicity",
-                                  "occupation",
-                                  "bloodType",
-                                  "relationshipToOwner",
-                                  "phone",
-                                  "address",
-                                  "allergyNotes",
-                                  "medicalHistory",
-                                ]);
-                              } else if (value) {
-                                // Find selected family member
-                                const member = familyMembers.find(
-                                  (m) => m._id === value
-                                );
-                                if (member) {
+                        {/* Dropdown to select existing family member (giống đặt nhiều lịch) */}
+                        {familyMembers.length > 0 && (
+                          <Form.Item
+                            label="Chọn người thân đã có"
+                            style={{ marginBottom: 16 }}
+                          >
+                            <Select
+                              placeholder="Chọn người thân hoặc để trống để thêm mới"
+                              allowClear
+                              size="large"
+                              onChange={(value) => {
+                                if (value) {
+                                  const member = familyMembers.find(
+                                    (m) => m._id === value
+                                  );
                                   setSelectedFamilyMember(member);
-                                  setPatientIdForBooking(member._id);
-
-                                  // Auto-fill form with member data
+                                  // Persist patientId immediately to avoid losing selection across steps (giống đặt nhiều lịch)
+                                  setPatientIdForBooking(member?._id || null);
+                                  // Fill form with existing member data
                                   form.setFieldsValue({
                                     fullName: member.fullName,
-                                    citizenId:
-                                      member.citizenId || member.nationalId,
-                                    dob: member.dob ? dayjs(member.dob) : null,
+                                    dob: member.dob
+                                      ? dayjs(member.dob)
+                                      : undefined,
                                     gender: member.gender,
-                                    ethnicity: member.ethnicity || undefined,
-                                    occupation: member.occupation || undefined,
-                                    bloodType: member.bloodType || undefined,
+                                    ethnicity: member.ethnicity,
+                                    occupation: member.occupation,
+                                    bloodType: member.bloodType || "Unknown",
                                     relationshipToOwner:
                                       member.relationshipToOwner,
                                     phone: member.phone,
-                                    address: member.address || undefined,
-                                    allergyNotes:
-                                      member.allergyNotes || undefined,
+                                    citizenId: member.citizenId,
+                                    address: member.address,
+                                    allergyNotes: member.allergyNotes || "",
                                     medicalHistory: member.medicalHistory || [],
                                   });
+                                  // Save to savedFamilyFormValues
+                                  setSavedFamilyFormValues({
+                                    fullName: member.fullName,
+                                    dob: member.dob
+                                      ? dayjs(member.dob)
+                                      : undefined,
+                                    gender: member.gender,
+                                    ethnicity: member.ethnicity,
+                                    occupation: member.occupation,
+                                    bloodType: member.bloodType || "Unknown",
+                                    relationshipToOwner:
+                                      member.relationshipToOwner,
+                                    phone: member.phone,
+                                    citizenId: member.citizenId,
+                                    address: member.address,
+                                    allergyNotes: member.allergyNotes || "",
+                                    medicalHistory: member.medicalHistory || [],
+                                  });
+                                } else {
+                                  setSelectedFamilyMember(null);
+                                  setPatientIdForBooking(null);
+                                  form.resetFields();
+                                  setSavedFamilyFormValues(null);
                                 }
-                              } else {
-                                // Clear selection
+                              }}
+                              loading={loadingFamilyMembers}
+                            >
+                              {familyMembers.map((member) => (
+                                <Option key={member._id} value={member._id}>
+                                  {member.fullName} (
+                                  {member.relationshipToOwner === "father"
+                                    ? "Cha"
+                                    : member.relationshipToOwner === "mother"
+                                    ? "Mẹ"
+                                    : member.relationshipToOwner === "spouse"
+                                    ? "Vợ/Chồng"
+                                    : member.relationshipToOwner === "child"
+                                    ? "Con"
+                                    : member.relationshipToOwner === "grandparent"
+                                    ? "Ông/Bà"
+                                    : "Khác"}
+                                  )
+                                </Option>
+                              ))}
+                            </Select>
+                            <Button
+                              type="link"
+                              icon={<PlusOutlined />}
+                              onClick={() => {
                                 setSelectedFamilyMember(null);
                                 setPatientIdForBooking(null);
-                                form.resetFields([
-                                  "fullName",
-                                  "citizenId",
-                                  "dob",
-                                  "gender",
-                                  "ethnicity",
-                                  "occupation",
-                                  "bloodType",
-                                  "relationshipToOwner",
-                                  "phone",
-                                  "address",
-                                  "allergyNotes",
-                                  "medicalHistory",
-                                ]);
-                              }
-                            }}
-                            loading={loadingFamilyMembers}
-                          >
-                            <Option value="new">➕ Thêm người thân mới</Option>
-                            {familyMembers.map((member) => (
-                              <Option key={member._id} value={member._id}>
-                                {member.fullName} (
-                                {member.relationshipToOwner === "father"
-                                  ? "Cha"
-                                  : member.relationshipToOwner === "mother"
-                                  ? "Mẹ"
-                                  : member.relationshipToOwner === "spouse"
-                                  ? "Vợ/Chồng"
-                                  : member.relationshipToOwner === "child"
-                                  ? "Con"
-                                  : member.relationshipToOwner === "grandparent"
-                                  ? "Ông/Bà"
-                                  : "Khác"}
-                                )
-                              </Option>
-                            ))}
-                          </Select>
-                        </Form.Item>
+                                form.resetFields();
+                                setSavedFamilyFormValues(null);
+                              }}
+                              style={{ padding: 0, marginTop: 8 }}
+                            >
+                              + Thêm người mới
+                            </Button>
+                          </Form.Item>
+                        )}
 
                         <Form.Item
                           label="Họ và tên"

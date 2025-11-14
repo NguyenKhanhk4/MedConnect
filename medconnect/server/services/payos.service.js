@@ -2537,3 +2537,368 @@ async function sendServicePaymentConfirmationEmail(
     throw error;
   }
 }
+
+/**
+ * Gửi email thông báo hoàn thành cuộc hẹn cho bệnh nhân
+ * Hỗ trợ cả single và multiple appointments, và đặt cho người thân
+ * @param {array|object} appointments - Appointment object hoặc array of appointments
+ * @param {object} patient - Patient object (có thể là người thân)
+ * @param {object} doctor - Doctor object (cho backward compatibility)
+ */
+export async function sendAppointmentCompletedEmail(
+  appointments,
+  patient,
+  doctor
+) {
+  // Normalize: nếu là single appointment, convert thành array
+  const appointmentsArray = Array.isArray(appointments) ? appointments : [appointments];
+  const firstAppointment = appointmentsArray[0];
+  
+  if (!firstAppointment) {
+    console.log("⚠️ No appointments provided for completion email");
+    return;
+  }
+  
+  try {
+    // Lấy email từ người đặt (owner), không phải từ người thân
+    let patientEmail = null;
+    let ownerName = null;
+    let isFamilyMemberBooking = false;
+    let familyMemberName = null;
+
+    // Kiểm tra xem patient có phải là người thân không
+    // Lấy patient từ appointment đầu tiên để đảm bảo đúng patient của appointment
+    let actualPatient = patient;
+    if (firstAppointment && firstAppointment.patientId) {
+      const Patient = (await import("../models/patient.model.js")).default;
+      const appointmentPatientId = firstAppointment.patientId._id || firstAppointment.patientId;
+      const appointmentPatient = await Patient.findById(appointmentPatientId).populate("userId");
+      if (appointmentPatient) {
+        actualPatient = appointmentPatient;
+      }
+    }
+
+    // Kiểm tra relationshipToOwner - chỉ khi có giá trị VÀ không phải "self" thì mới là người thân
+    // Nếu relationshipToOwner là undefined, null, hoặc "self" → đặt cho chính mình
+    const relationship = actualPatient.relationshipToOwner;
+    const isFamilyMember = relationship && relationship !== "self";
+
+    // Debug log
+    console.log("📧 Completion email debug - Patient info:", {
+      patientId: actualPatient._id?.toString(),
+      fullName: actualPatient.fullName,
+      relationshipToOwner: relationship,
+      isFamilyMember: isFamilyMember,
+      hasUserId: !!actualPatient.userId,
+      userIdEmail: actualPatient.userId?.email,
+    });
+
+    if (isFamilyMember) {
+      // Đây là người thân, cần lấy email từ owner
+      isFamilyMemberBooking = true;
+      familyMemberName = actualPatient.fullName;
+      
+      // Lấy owner (self patient) từ userId
+      if (actualPatient.userId && actualPatient.userId._id) {
+        const Patient = (await import("../models/patient.model.js")).default;
+        const selfPatient = await Patient.findOne({
+          userId: actualPatient.userId._id,
+          relationshipToOwner: "self",
+        }).populate("userId");
+        
+        if (selfPatient && selfPatient.userId && selfPatient.userId.email) {
+          patientEmail = selfPatient.userId.email;
+          ownerName = selfPatient.fullName || selfPatient.userId.fullName || "Khách hàng";
+        } else {
+          // Fallback: thử lấy từ actualPatient.userId trực tiếp
+          patientEmail = actualPatient.userId.email;
+          ownerName = actualPatient.userId.fullName || "Khách hàng";
+        }
+      }
+    } else {
+      // Đây là đặt cho chính mình
+      patientEmail = actualPatient.userId?.email;
+      ownerName = actualPatient.fullName || actualPatient.userId?.fullName || "Khách hàng";
+    }
+
+    if (!patientEmail) {
+      console.log("⚠️ No email address found for patient, skipping completion email");
+      return;
+    }
+
+    // Lấy thông tin specialization cho doctor đầu tiên (backward compatibility)
+    const Specialization = (await import("../models/specialization.model.js"))
+      .default;
+    let specializationName = "Chuyên khoa";
+    if (doctor && doctor.specializationIds && doctor.specializationIds.length > 0) {
+      const spec = await Specialization.findById(doctor.specializationIds[0]);
+      if (spec) {
+        specializationName = spec.name;
+      }
+    }
+
+    // Kiểm tra xem có nhiều appointments không
+    const hasMultipleAppointments = appointmentsArray.length > 1;
+    
+    // Format appointments để hiển thị trong email
+    let appointmentsHtml = "";
+    
+    // Populate specialization cho tất cả appointments
+    for (const apt of appointmentsArray) {
+      if (apt.doctorId && apt.doctorId.specializationIds && apt.doctorId.specializationIds.length > 0) {
+        const spec = await Specialization.findById(apt.doctorId.specializationIds[0]);
+        if (spec) {
+          apt.specializationName = spec.name;
+        }
+      }
+    }
+    
+    if (hasMultipleAppointments) {
+      // Hiển thị tất cả appointments
+      appointmentsHtml = appointmentsArray.map((apt, index) => {
+        const aptDate = new Date(apt.scheduledStart);
+        const aptEndDate = apt.scheduledEnd ? new Date(apt.scheduledEnd) : aptDate;
+        const formattedAptDate = aptDate.toLocaleDateString("vi-VN", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+        const formattedAptTime = `${aptDate.toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })} - ${aptEndDate.toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}`;
+        
+        // Lấy thông tin doctor
+        const aptDoctor = apt.doctorId?._id ? apt.doctorId : apt.doctorId;
+        const aptDoctorName = aptDoctor?.fullName || "Unknown Doctor";
+        const aptSpecializationName = apt.specializationName || "Chuyên khoa";
+        const aptModeText = apt.mode === "online" ? "Khám trực tuyến" : "Khám tại phòng khám";
+        
+        return `
+          <div style="background-color: #ecfdf5; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #059669;">
+            <h4 style="margin-top: 0; color: #047857;">Lịch hẹn ${index + 1}</h4>
+            <p style="margin: 8px 0;"><strong>Bác sĩ:</strong> ${aptDoctorName}</p>
+            <p style="margin: 8px 0;"><strong>Chuyên khoa:</strong> ${aptSpecializationName}</p>
+            <p style="margin: 8px 0;"><strong>Ngày khám:</strong> ${formattedAptDate}</p>
+            <p style="margin: 8px 0;"><strong>Giờ:</strong> ${formattedAptTime}</p>
+            <p style="margin: 8px 0;"><strong>Hình thức:</strong> ${aptModeText}</p>
+            ${apt.clinicId?.name ? `<p style="margin: 8px 0;"><strong>Phòng khám:</strong> ${apt.clinicId.name}</p>` : ""}
+            ${apt.reason ? `<p style="margin: 8px 0;"><strong>Lý do khám:</strong> ${apt.reason}</p>` : ""}
+          </div>
+        `;
+      }).join("");
+    } else {
+      // Single appointment - format như cũ
+      const appointmentDate = new Date(firstAppointment.scheduledStart);
+      const appointmentEndDate = firstAppointment.scheduledEnd 
+        ? new Date(firstAppointment.scheduledEnd) 
+        : appointmentDate;
+      const formattedDate = appointmentDate.toLocaleDateString("vi-VN", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      const formattedTime = `${appointmentDate.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })} - ${appointmentEndDate.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}`;
+      const modeText = firstAppointment.mode === "online" ? "Khám trực tuyến" : "Khám tại phòng khám";
+      
+      appointmentsHtml = `
+        <p style="margin: 8px 0;"><strong>Bác sĩ:</strong> ${doctor?.fullName || "Unknown Doctor"}</p>
+        <p style="margin: 8px 0;"><strong>Chuyên khoa:</strong> ${specializationName}</p>
+        <p style="margin: 8px 0;"><strong>Ngày khám:</strong> ${formattedDate}</p>
+        <p style="margin: 8px 0;"><strong>Giờ:</strong> ${formattedTime}</p>
+        <p style="margin: 8px 0;"><strong>Hình thức:</strong> ${modeText}</p>
+        ${firstAppointment.clinicId?.name ? `<p style="margin: 8px 0;"><strong>Phòng khám:</strong> ${firstAppointment.clinicId.name}</p>` : ""}
+        ${firstAppointment.reason ? `<p style="margin: 8px 0;"><strong>Lý do khám:</strong> ${firstAppointment.reason}</p>` : ""}
+      `;
+    }
+
+    // Template email HTML
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Hoàn thành khám bệnh - MedConnect</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+          }
+          .container {
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+          }
+          .header {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 28px;
+          }
+          .content {
+            padding: 30px 20px;
+          }
+          .success-badge {
+            display: inline-block;
+            background-color: #059669;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+          }
+          .info-section {
+            background-color: #ecfdf5;
+            border-left: 4px solid #059669;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+          }
+          .info-section h3 {
+            margin-top: 0;
+            color: #047857;
+          }
+          .reminder-section {
+            background-color: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+          }
+          .reminder-section h3 {
+            margin-top: 0;
+            color: #d97706;
+          }
+          .reminder-section ul {
+            margin: 10px 0;
+            padding-left: 20px;
+          }
+          .button {
+            display: inline-block;
+            background-color: #0ea5e9;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 10px 10px 0;
+            text-align: center;
+          }
+          .button:hover {
+            background-color: #0284c7;
+          }
+          .footer {
+            background-color: #f9f9f9;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+          }
+          .footer a {
+            color: #667eea;
+            text-decoration: none;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>MedConnect</h1>
+            <p style="margin: 10px 0 0 0;">Hệ thống đặt lịch khám bệnh trực tuyến</p>
+          </div>
+          
+          <div class="content">
+            <div class="success-badge">✓ Hoàn thành khám bệnh</div>
+            
+            <p>Xin chào <strong>${ownerName}</strong>,</p>
+            
+            ${
+              isFamilyMemberBooking
+                ? `<p>Cảm ơn bạn đã sử dụng dịch vụ khám bệnh của MedConnect. Chúng tôi xin thông báo rằng <strong style="color: #059669;">buổi khám của <strong>${familyMemberName}</strong> đã hoàn thành</strong>.</p>`
+                : `<p>Cảm ơn bạn đã sử dụng dịch vụ khám bệnh của MedConnect. Chúng tôi xin thông báo rằng <strong style="color: #059669;">buổi khám của bạn đã hoàn thành</strong>.</p>`
+            }
+            
+            <div class="info-section">
+              <h3>📅 Thông tin buổi khám${hasMultipleAppointments ? ` (${appointmentsArray.length} lịch hẹn)` : ""}</h3>
+              ${
+                isFamilyMemberBooking
+                  ? `<p style="margin: 8px 0;"><strong>Người khám:</strong> ${familyMemberName}</p>`
+                  : ""
+              }
+              ${appointmentsHtml}
+            </div>
+
+            <div class="info-section" style="background-color: #f0f9ff; border-left-color: #0ea5e9;">
+              <h3 style="color: #0284c7;">📋 Hồ sơ bệnh án</h3>
+              <p style="margin: 0;">Hồ sơ bệnh án ${
+                isFamilyMemberBooking ? `của ${familyMemberName} ` : ""
+              }đã được cập nhật và lưu trữ trong hệ thống. Bạn có thể xem chi tiết trong phần "Hồ sơ bệnh án" trên ứng dụng MedConnect.</p>
+            </div>
+
+            <div class="reminder-section">
+              <h3>💡 Lời nhắc</h3>
+              <ul>
+                <li>Vui lòng tuân thủ theo đơn thuốc và chỉ dẫn của bác sĩ</li>
+                <li>Đặt lịch hẹn tái khám nếu cần thiết</li>
+                <li>Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ với bác sĩ hoặc phòng khám</li>
+              </ul>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${
+                process.env.CLIENT_URL || "http://localhost:5173"
+              }/benh-an" 
+                 class="button">
+                Xem hồ sơ bệnh án
+              </a>
+            </div>
+            
+            <p style="margin-top: 30px;">Chúng tôi hy vọng bạn đã có trải nghiệm tốt với dịch vụ của MedConnect. Chúc bạn luôn khỏe mạnh!</p>
+            
+            <p style="margin-top: 30px;"><strong>Trân trọng,<br>Đội ngũ MedConnect</strong></p>
+          </div>
+          
+          <div class="footer">
+            <p>Email này được gửi tự động từ hệ thống MedConnect.</p>
+            <p>© ${new Date().getFullYear()} MedConnect. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    await sendMail({
+      to: patientEmail,
+      subject: `Hoàn thành khám bệnh - MedConnect${hasMultipleAppointments ? ` (${appointmentsArray.length} lịch hẹn)` : ""}`,
+      html: emailHtml,
+    });
+
+    console.log(
+      `📧 Appointment completion email sent successfully to ${patientEmail} for ${appointmentsArray.length} appointment(s)`
+    );
+  } catch (error) {
+    console.error("❌ Error in sendAppointmentCompletedEmail:", error);
+    throw error;
+  }
+}

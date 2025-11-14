@@ -378,7 +378,6 @@ export default function HoSoKham() {
         }
       
         ${
-          record.treatmentResult ||
           record.summaryText ||
           record.treatmentMethod ||
           record.followUpInstructions ||
@@ -386,19 +385,6 @@ export default function HoSoKham() {
             ? `
         <div class="section">
           <h2>Kết quả & Hướng dẫn</h2>
-          ${
-            record.treatmentResult
-              ? `<p><strong>Kết quả điều trị:</strong> ${
-                  record.treatmentResult === "recovered"
-                    ? "Khỏi"
-                    : record.treatmentResult === "improved"
-                    ? "Cải thiện"
-                    : record.treatmentResult === "unchanged"
-                    ? "Không thay đổi"
-                    : record.treatmentResult
-                }</p>`
-              : ""
-          }
           ${
             record.summaryText
               ? `<p><strong>Tóm tắt:</strong> ${record.summaryText}</p>`
@@ -901,20 +887,6 @@ export default function HoSoKham() {
                         <div className="detail-item">
                           <strong>Lý do khám:</strong>
                           <span>{selectedSummary.reasonForVisit}</span>
-                        </div>
-                      )}
-                      {selectedSummary.treatmentResult && (
-                        <div className="detail-item">
-                          <strong>Kết quả điều trị:</strong>
-                          <span>
-                            {selectedSummary.treatmentResult === "recovered"
-                              ? "Khỏi"
-                              : selectedSummary.treatmentResult === "improved"
-                              ? "Cải thiện"
-                              : selectedSummary.treatmentResult === "unchanged"
-                              ? "Không thay đổi"
-                              : selectedSummary.treatmentResult}
-                          </span>
                         </div>
                       )}
                     </div>

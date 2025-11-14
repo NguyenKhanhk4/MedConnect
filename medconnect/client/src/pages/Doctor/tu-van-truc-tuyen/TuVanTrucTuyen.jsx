@@ -513,15 +513,6 @@ export default function TuVanTrucTuyen() {
                   </div>
                 </div>
               ))}
-              <Button
-                type="button"
-                onClick={() =>
-                  addArrayItem("diagnoses", { name: "" })
-                }
-                className="btn-add"
-              >
-                + Thêm chẩn đoán
-              </Button>
 
               {/* Hiển thị gợi ý từ AI */}
               {aiSuggestion && (

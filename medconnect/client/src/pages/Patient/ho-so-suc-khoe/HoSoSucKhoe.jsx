@@ -560,13 +560,6 @@ export function HoSoSucKhoe() {
                             "Không có thông tin"}
                         </span>
                       </div>
-                      <div className="detail-item">
-                        <strong>Kết quả điều trị:</strong>
-                        <span>
-                          {selectedSummary.fullDetails.treatmentResult ||
-                            "Không có thông tin"}
-                        </span>
-                      </div>
                       {selectedSummary.fullDetails.appointment
                         ?.scheduledEnd && (
                         <div className="detail-item">

@@ -776,13 +776,6 @@ export function HoSoSucKhoeGiaDinh() {
                                 "Không có thông tin"}
                             </span>
                           </div>
-                          <div className="detail-item">
-                            <strong>Kết quả điều trị:</strong>
-                            <span>
-                              {selectedSummary.fullDetails.treatmentResult ||
-                                "Không có thông tin"}
-                            </span>
-                          </div>
                         </div>
                       </div>
 
@@ -1024,18 +1017,10 @@ export function HoSoSucKhoeGiaDinh() {
                             </span>
                           </div>
                           <div className="detail-item">
-                            <strong>Loại tư vấn:</strong>
+                            <strong>Lý do đi:</strong>
                             <span>
-                              {selectedAdvice.fullDetails.adviceType ===
-                              "general"
-                                ? "Tư vấn chung"
-                                : selectedAdvice.fullDetails.adviceType ===
-                                  "follow_up"
-                                ? "Tái khám"
-                                : selectedAdvice.fullDetails.adviceType ===
-                                  "second_opinion"
-                                ? "Ý kiến thứ hai"
-                                : "Không xác định"}
+                              {selectedAdvice.fullDetails.appointment?.reason ||
+                                "Không có thông tin"}
                             </span>
                           </div>
                           <div className="detail-item">
@@ -1056,14 +1041,6 @@ export function HoSoSucKhoeGiaDinh() {
                               </span>
                             </div>
                           )}
-                        </div>
-                      </div>
-
-                      {/* Summary */}
-                      <div className="detail-section">
-                        <h4>Tóm tắt buổi tư vấn</h4>
-                        <div className="summary-text">
-                          <p>{selectedAdvice.fullDetails.summary}</p>
                         </div>
                       </div>
 
@@ -1121,7 +1098,7 @@ export function HoSoSucKhoeGiaDinh() {
                       {/* Notes */}
                       {selectedAdvice.fullDetails.notes && (
                         <div className="detail-section">
-                          <h4>Ghi chú bổ sung</h4>
+                          <h4>Ghi chú tư vấn</h4>
                           <div className="summary-text">
                             <p>{selectedAdvice.fullDetails.notes}</p>
                           </div>
