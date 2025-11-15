@@ -695,14 +695,6 @@ export function LichDatHo() {
                       </Button>
                     ) : null}
 
-                    {/* Regular Video Button for other online appointments */}
-                    {a.mode === "online" && a.status !== "accepted" ? (
-                      <Button variant="outline" size="sm" disabled>
-                        <Video size={16} style={{ marginRight: 6 }} />
-                        Chờ duyệt
-                      </Button>
-                    ) : null}
-
                     <Button
                       variant="outline"
                       size="sm"

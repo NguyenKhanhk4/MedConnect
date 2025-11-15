@@ -1300,7 +1300,6 @@ const DatLichNhieuChuyenKhoa = () => {
       key: "status",
       render: (status) => {
         const statusConfig = {
-          pending_doctor: { color: "orange", text: "Chờ duyệt" },
           accepted: { color: "green", text: "Đã chấp nhận" },
           rejected: { color: "red", text: "Bị từ chối" },
           cancelled: { color: "default", text: "Đã hủy" },
@@ -2247,7 +2246,6 @@ const DatLichNhieuChuyenKhoa = () => {
                                   )}`
                                 : "N/A"}
                             </Text>
-                            <Tag color="orange">Chờ duyệt</Tag>
                           </Space>
                           {apt.mode && (
                             <Text type="secondary">

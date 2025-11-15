@@ -24,7 +24,10 @@ initializeFirebase();
 
 /* ================ App & CORS ================ */
 const app = express();
-const allowedOrigins = ["http://localhost:5173"];
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.CLIENT_URL, // Allow ngrok URL from .env
+].filter(Boolean); // Remove undefined values
 const corsOptions = {
   origin(origin, callback) {
     // Allow requests with no origin (mobile apps, Postman, curl, server-to-server)
@@ -32,6 +35,11 @@ const corsOptions = {
 
     // Allow requests from allowed origins
     if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    // Allow ngrok URLs (for development)
+    if (origin && (origin.includes(".ngrok.io") || origin.includes(".ngrok-free.dev"))) {
+      return callback(null, true);
+    }
 
     // Log rejected origin for debugging
     console.warn(`⚠️ CORS rejected origin: ${origin}`);

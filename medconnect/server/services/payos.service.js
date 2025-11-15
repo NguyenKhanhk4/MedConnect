@@ -964,7 +964,7 @@ export const handlePayosWebhook = async (
               const visit = new MedicalVisit({
                 patientId: visitPatientId,
                 visitDate: visitDate,
-                status: "pending_doctor",
+                status: "scheduled", // All appointments are auto-accepted, so visit is scheduled
                 appointmentIds: [],
                 totalFee: payment.total,
                 paymentStatus: "paid",
