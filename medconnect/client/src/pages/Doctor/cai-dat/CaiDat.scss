@@ -456,9 +456,30 @@ body {
   transition: color 0.2s ease;
   pointer-events: auto;
   padding: 8px;
+  background: transparent;
+  border: none;
+  outline: none;
+  z-index: 10;
+  width: auto;
+  height: auto;
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   &:hover {
     color: #2d3748;
+  }
+
+  &:active {
+    color: #1f2937;
+    transform: translateY(-50%);
+  }
+
+  &:focus {
+    outline: none;
+    transform: translateY(-50%);
   }
 }
 

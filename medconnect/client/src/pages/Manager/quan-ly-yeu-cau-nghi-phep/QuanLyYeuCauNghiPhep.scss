@@ -312,3 +312,81 @@
     }
   }
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .leave-request-management {
+    padding: 16px;
+
+    .page-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 1rem 16px !important;
+      margin-left: -16px !important;
+      margin-right: -16px !important;
+      width: calc(100% + 32px) !important;
+
+      h1 {
+        font-size: 1.5rem !important;
+      }
+
+      p {
+        font-size: 0.875rem !important;
+      }
+    }
+
+    .filter-section {
+      flex-direction: column;
+      gap: 12px;
+
+      .ant-select,
+      .ant-btn {
+        width: 100%;
+      }
+    }
+
+    .request-card {
+      padding: 16px;
+
+      .request-header {
+        flex-direction: column;
+        gap: 12px;
+
+        .doctor-info {
+          width: 100%;
+        }
+
+        .request-actions {
+          width: 100%;
+          flex-direction: column;
+          gap: 8px;
+
+          .ant-btn {
+            width: 100%;
+          }
+        }
+      }
+
+      .request-details {
+        .detail-row {
+          flex-direction: column;
+          gap: 4px;
+        }
+      }
+    }
+
+    .dialog-content {
+      padding: 16px;
+
+      .dialog-actions {
+        flex-direction: column;
+        gap: 8px;
+
+        .ant-btn {
+          width: 100%;
+        }
+      }
+    }
+  }
+}

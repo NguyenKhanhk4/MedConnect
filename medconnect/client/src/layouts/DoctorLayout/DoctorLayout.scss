@@ -3,6 +3,10 @@
   height: 100vh;
   width: 100%;
   overflow: hidden;
+
+  @media (max-width: 1024px) {
+    flex-direction: column;
+  }
 }
 
 .doctor-layout-main {
@@ -10,6 +14,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+
+  @media (max-width: 1024px) {
+    width: 100%;
+  }
 }
 
 .doctor-layout-content {
@@ -92,5 +100,26 @@
     &::-webkit-scrollbar {
       display: none !important;
     }
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .doctor-layout-container {
+    height: 100vh;
+  }
+
+  .doctor-layout-main {
+    width: 100%;
+  }
+
+  .doctor-layout-content {
+    padding: 0;
+  }
+}
+
+@media (max-width: 576px) {
+  .doctor-layout-container {
+    height: 100vh;
   }
 }

@@ -7,14 +7,15 @@ export const CustomAlert = ({
   onClose, 
   onConfirm,
   title = "Hệ thống MedConnect",
-  type = "alert" // "alert" or "confirm"
+  type = "alert", // "alert" or "confirm"
+  hideButton = false // New prop to hide button
 }) => {
   if (!message) return null;
 
   const isConfirm = type === "confirm" && onConfirm;
 
   return (
-    <div className="custom-alert-overlay" onClick={isConfirm ? undefined : onClose}>
+    <div className="custom-alert-overlay" onClick={isConfirm || hideButton ? undefined : onClose}>
       <div className="custom-alert-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="custom-alert-header">
           <div className="custom-alert-title-wrapper">
@@ -27,22 +28,24 @@ export const CustomAlert = ({
         <div className="custom-alert-body">
           <p className="custom-alert-message">{message}</p>
         </div>
-        <div className="custom-alert-footer">
-          {isConfirm ? (
-            <>
-              <button className="custom-alert-button cancel" onClick={onClose}>
-                Hủy
+        {!hideButton && (
+          <div className="custom-alert-footer">
+            {isConfirm ? (
+              <>
+                <button className="custom-alert-button cancel" onClick={onClose}>
+                  Hủy
+                </button>
+                <button className="custom-alert-button confirm" onClick={onConfirm}>
+                  Xác nhận
+                </button>
+              </>
+            ) : (
+              <button className="custom-alert-button" onClick={onClose}>
+                OK
               </button>
-              <button className="custom-alert-button confirm" onClick={onConfirm}>
-                Xác nhận
-              </button>
-            </>
-          ) : (
-            <button className="custom-alert-button" onClick={onClose}>
-              OK
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -54,5 +57,6 @@ CustomAlert.propTypes = {
   onConfirm: PropTypes.func,
   title: PropTypes.string,
   type: PropTypes.oneOf(["alert", "confirm"]),
+  hideButton: PropTypes.bool,
 };
 

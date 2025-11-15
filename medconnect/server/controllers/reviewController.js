@@ -2,6 +2,7 @@ import Review from "../models/review.model.js";
 import Appointment from "../models/appointment.model.js";
 import User from "../models/user.model.js";
 import { ok, fail } from "../utils/response.js";
+import { createReviewNotification } from "../services/notificationService.js";
 
 /**
  * Tạo đánh giá mới
@@ -108,6 +109,18 @@ export const createReview = async (req, res) => {
       { path: "doctorId", select: "fullName specializationIds" },
       { path: "appointmentId", select: "scheduledStart mode" },
     ]);
+
+    // Create notification for doctor about new review
+    try {
+      await createReviewNotification(review._id);
+      console.log(`✅ Review notification created for review ${review._id}`);
+    } catch (notificationError) {
+      console.error(
+        "❌ Error creating review notification:",
+        notificationError
+      );
+      // Don't fail the main request if notification fails
+    }
 
     return ok(res, review, {}, 201, "Đánh giá đã được tạo thành công");
   } catch (error) {

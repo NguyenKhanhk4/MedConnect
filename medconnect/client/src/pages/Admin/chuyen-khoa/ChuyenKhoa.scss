@@ -376,3 +376,61 @@
     }
   }
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .specializations {
+    .page-header {
+      margin-bottom: 24px;
+
+      .header-content {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+
+        h1 {
+          font-size: 24px;
+        }
+
+        p {
+          font-size: 14px;
+        }
+
+        .add-button {
+          width: 100%;
+        }
+      }
+    }
+
+    .specializations-grid {
+      grid-template-columns: 1fr;
+      gap: 16px;
+
+      .specialization-card {
+        .ant-card-body {
+          padding: 16px;
+        }
+
+        .card-content {
+          gap: 12px;
+
+          .specialization-icon {
+            width: 50px;
+            height: 50px;
+            font-size: 20px;
+          }
+
+          .specialization-info {
+            h3 {
+              font-size: 16px;
+            }
+
+            .specialization-description {
+              font-size: 12px;
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { auth, signInWithGoogle } from "../../../lib/firebase";
 import { signInWithCustomToken, signOut } from "firebase/auth";
+import { CustomAlert } from "../../../components/ui/CustomAlert";
 import "./DangKy.scss";
 
 export default function DangKy() {
@@ -21,6 +22,7 @@ export default function DangKy() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   const toE164 = (raw, country = "+84") => {
     const num = String(raw || "").replace(/\D/g, "");
@@ -178,47 +180,13 @@ export default function DangKy() {
         return;
       }
 
-      // For patients: automatically log in after registration
-      // If server returned a customToken, sign in automatically
-      if (data?.customToken && data?.role?.toLowerCase() === "patient") {
-        try {
-          const fbConfigured = Boolean(import.meta.env.VITE_FB_PROJECT_ID);
-          if (fbConfigured) {
-            // Sign in with Firebase custom token
-            const cred = await signInWithCustomToken(auth, data.customToken);
-            const idToken = await cred.user.getIdToken();
-
-            // Create session cookie on backend
-            const sessionResponse = await fetch(apiUrl + "/api/auth/session", {
-              method: "POST",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ idToken }),
-            });
-
-            if (!sessionResponse.ok) {
-              throw new Error("Không tạo được phiên đăng nhập");
-            }
-          } else {
-            console.warn("Firebase not configured, skipping auto-login");
-          }
-        } catch (err) {
-          console.error("Auto-login failed after registration:", err);
-          // Still navigate - user can manually log in if needed
-          // But for better UX, we should show an error message
-          setErrors({
-            general:
-              "Đăng ký thành công nhưng không thể tự động đăng nhập. Vui lòng đăng nhập thủ công.",
-          });
-          setTimeout(() => {
-            navigate("/dang-nhap");
-          }, 2000);
-          return;
-        }
-      }
-
-      // Navigate to appropriate page based on role
-      goByRole(data.role);
+      // Show success alert and navigate to login page
+      setSuccessMessage("Đăng ký tài khoản thành công! Đang chuyển đến trang đăng nhập...");
+      
+      // Auto navigate to login page after 750ms (just enough to show the alert)
+      setTimeout(() => {
+        navigate("/dang-nhap");
+      }, 750);
     } catch (err) {
       console.error("Registration error:", err);
       setErrors({
@@ -289,7 +257,13 @@ export default function DangKy() {
         }
       }
 
-      goByRole(data.role);
+      // Show success alert and navigate to login page
+      setSuccessMessage("Đăng ký tài khoản thành công! Đang chuyển đến trang đăng nhập...");
+      
+      // Auto navigate to login page after 750ms (just enough to show the alert)
+      setTimeout(() => {
+        navigate("/dang-nhap");
+      }, 750);
     } catch (err) {
       console.error("Google registration error:", err);
       setErrors({
@@ -530,6 +504,16 @@ export default function DangKy() {
           </Link>
         </div>
       </div>
+
+      {/* Success Alert */}
+      <CustomAlert
+        message={successMessage}
+        onClose={() => {
+          setSuccessMessage(null);
+          navigate("/dang-nhap");
+        }}
+        title="Đăng ký thành công"
+      />
     </div>
   );
 }

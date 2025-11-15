@@ -5,10 +5,22 @@
   background-color: #f5f5f5;
 }
 
+@media (max-width: 768px) {
+  .appointment-booking-home {
+    padding: 16px 0;
+  }
+}
+
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+  }
 }
 
 .page-header {
@@ -16,11 +28,24 @@
   margin-bottom: 48px;
 }
 
+@media (max-width: 768px) {
+  .page-header {
+    margin-bottom: 32px;
+  }
+}
+
 .header-description {
   font-size: 18px;
   color: #8c8c8c;
   max-width: 600px;
   margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .header-description {
+    font-size: 16px;
+    padding: 0 16px;
+  }
 }
 
 .main-cta-section {
@@ -76,6 +101,12 @@
   font-weight: 700 !important;
   margin-bottom: 12px !important;
   font-size: 24px !important;
+}
+
+@media (max-width: 768px) {
+  .cta-title {
+    font-size: 20px !important;
+  }
 }
 
 .cta-description {

@@ -349,3 +349,54 @@ $white: #ffffff;
   overflow: auto;
   max-height: calc(100vh - 350px);
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .my-appointments-container {
+    padding: 0 16px 16px 16px;
+  }
+
+  .my-appointments-header {
+    padding: 1rem 16px !important;
+    margin-left: -16px !important;
+    margin-right: -16px !important;
+    width: calc(100% + 32px) !important;
+    margin-bottom: 1.5rem !important;
+  }
+
+  .page-title {
+    font-size: 1.75rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.875rem;
+  }
+
+  .header-content-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .appointments-content {
+    max-height: calc(100vh - 300px);
+    gap: 12px;
+  }
+}
+
+@media (max-width: 576px) {
+  .my-appointments-container {
+    padding: 0 12px 12px 12px;
+  }
+
+  .my-appointments-header {
+    padding: 0.875rem 12px !important;
+    margin-left: -12px !important;
+    margin-right: -12px !important;
+    width: calc(100% + 24px) !important;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+  }
+}

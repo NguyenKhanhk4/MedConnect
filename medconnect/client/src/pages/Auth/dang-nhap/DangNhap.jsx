@@ -204,6 +204,8 @@ export default function DangNhap() {
     }
 
     setAuthAllowed(true);
+    
+    // Navigate immediately without alert
     goByRole(finalRole);
   }
 
@@ -344,6 +346,8 @@ export default function DangNhap() {
       }
 
       setAuthAllowed(true);
+      
+      // Navigate immediately without alert
       goByRole(finalRole);
     } catch (err) {
       setAuthAllowed(false);

@@ -85,11 +85,9 @@ const TrangChu = () => {
     infinite: true,
     slidesToShow: 3,
     slidesToScroll: 3,
-    arrows: true,
+    arrows: false,
     autoplay: true,
     autoplaySpeed: 4500,
-    nextArrow: <SampleNextArrow />,
-    prevArrow: <SamplePrevArrow />,
     responsive: [
       { breakpoint: 992, settings: { slidesToShow: 2, slidesToScroll: 2 } },
       { breakpoint: 576, settings: { slidesToShow: 1, slidesToScroll: 1 } },
@@ -413,86 +411,6 @@ const TrangChu = () => {
         </div>
       </section>
 
-      {/* Comprehensive Services */}
-      {/* <section style={{ padding: "40px 0 40px 0", background: "#f9fafb" }}> */}
-      <section style={{ padding: "80px 0", background: "#f9fafb" }}>
-        <div className="container">
-          <Title level={2} style={{ marginBottom: "50px" }}>
-            Dịch vụ toàn diện
-          </Title>
-
-          <Row gutter={[24, 24]}>
-            {[
-              {
-                title: "Khám Chuyên khoa",
-                icon: "https://cdn.bookingcare.vn/fo/w1920/2023/12/28/145510-chuyenkhoa.png",
-              },
-              {
-                title: "Khám từ xa",
-                icon: "https://cdn.bookingcare.vn/fo/w1920/2023/12/28/145511-khamtuxa.png",
-              },
-              {
-                title: "Khám tổng quát",
-                icon: "https://cdn.bookingcare.vn/fo/w1920/2023/12/28/145512-khamtongquat.png",
-              },
-              {
-                title: "Xét nghiệm y học",
-                icon: "https://cdn.bookingcare.vn/fo/w1920/2023/12/28/145513-xetnghiemyhoc.png",
-              },
-              {
-                title: "Sức khỏe tinh thần",
-                icon: "https://cdn.bookingcare.vn/fo/w1920/2023/12/28/145514-tinhthan.png",
-              },
-              {
-                title: "Khám nha khoa",
-                icon: "https://cdn.bookingcare.vn/fo/w1920/2023/12/28/145515-nhakhoa.png",
-              },
-            ].map((service, index) => (
-              <Col xs={24} sm={12} md={12} lg={8} key={index}>
-                <Card
-                  hoverable
-                  variant="outlined" // keep visual border
-                  style={{
-                    borderRadius: "20px",
-                    boxShadow: "0 3px 10px rgba(0,0,0,0.05)",
-                  }}
-                  styles={{
-                    body: {
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "16px",
-                      padding: "20px 24px",
-                    },
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "56px",
-                      height: "56px",
-                      flexShrink: 0,
-                      background: "#fff9e6",
-                      borderRadius: "12px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <img
-                      src={service.icon}
-                      alt={service.title}
-                      style={{ width: "36px", height: "36px" }}
-                    />
-                  </div>
-                  <Title level={4} style={{ margin: 0 }}>
-                    {service.title}
-                  </Title>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </div>
-      </section>
-
       {/* Specialties Section */}
       {/* <section style={{ padding: "40px 0 60px 0", background: "#f9fafb" }}> */}
       <section style={{ padding: "80px 0", background: "#fff" }}>
@@ -762,96 +680,6 @@ const TrangChu = () => {
         </div>
       </section>
 
-      {/* Promotion Section */}
-      <section style={{ padding: "15px 0", background: "#f9fafb" }}>
-        <div className="container">
-          <Title
-            level={2}
-            style={{
-              textAlign: "left",
-              marginBottom: "10px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              fontSize: "1.5rem",
-            }}
-          >
-            Ưu đãi HOT trong tháng
-            <img
-              src="https://cdn-icons-png.flaticon.com/512/616/616554.png"
-              alt="Hot"
-              style={{ width: "18px", height: "18px" }}
-            />
-          </Title>
-
-          <Slider
-            {...{
-              dots: true,
-              infinite: true,
-              autoplay: true,
-              autoplaySpeed: 3000,
-              slidesToShow: 1,
-              slidesToScroll: 1,
-              arrows: false,
-              pauseOnHover: true,
-            }}
-          >
-            {[
-              {
-                id: 1,
-                image:
-                  "https://cdn.bookingcare.vn/fo/w1920/2024/08/01/144053-uu-dai-medlatec.png",
-                link: "/promotions/medlatec",
-              },
-              {
-                id: 2,
-                image:
-                  "https://cdn.bookingcare.vn/fo/w1920/2024/07/01/145311-uu-dai-da-lieu.png",
-                link: "/promotions/dermatology",
-              },
-              {
-                id: 3,
-                image:
-                  "https://cdn.bookingcare.vn/fo/w1920/2024/06/01/145312-uu-dai-vinmec.png",
-                link: "/promotions/vinmec",
-              },
-              {
-                id: 4,
-                image:
-                  "https://cdn.bookingcare.vn/fo/w1920/2024/05/01/145313-uu-dai-nha-khoa.png",
-                link: "/promotions/dental",
-              },
-              {
-                id: 5,
-                image:
-                  "https://cdn.bookingcare.vn/fo/w1920/2024/04/01/145314-uu-dai-tam-soat.png",
-                link: "/promotions/checkup",
-              },
-            ].map((promo) => (
-              <div key={promo.id} style={{ textAlign: "center" }}>
-                <Link to={promo.link}>
-                  <img
-                    src={promo.image}
-                    alt={`Ưu đãi ${promo.id}`}
-                    style={{
-                      width: "100%",
-                      maxWidth: "1200px",
-                      height: "auto",
-                      maxHeight: "400px",
-                      objectFit: "cover",
-                      borderRadius: "16px",
-                      margin: "0 auto",
-                      boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-                      cursor: "pointer",
-                    }}
-                  />
-                </Link>
-              </div>
-            ))}
-          </Slider>
-        </div>
-      </section>
-
       {/* Features Section */}
       <section style={{ padding: "80px 0", background: "#f8f9fa" }}>
         <div className="container">
@@ -973,13 +801,11 @@ const TrangChu = () => {
                 infinite: true,
                 slidesToShow: 4,
                 slidesToScroll: 1,
-                arrows: true,
+                arrows: false,
                 autoplay: true,
                 autoplaySpeed: 5000,
                 centerMode: false,
                 variableWidth: false,
-                nextArrow: <SampleNextArrow />,
-                prevArrow: <SamplePrevArrow />,
                 responsive: [
                   {
                     breakpoint: 992,

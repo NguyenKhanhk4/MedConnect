@@ -132,7 +132,7 @@ export default function KhamTrucTiep() {
         setActiveTab("summary");
 
         showAlert(
-          "AI đã đưa ra gợi ý điều trị. Vui lòng xem xét và verify trước khi lưu!"
+          "AI đã đưa ra gợi ý điều trị. Vui lòng xem xét và xác nhận trước khi lưu!"
         );
       }
     } catch (error) {
@@ -760,7 +760,7 @@ export default function KhamTrucTiep() {
                       )}
                       {isAIVerified && (
                         <span style={{ color: "#52c41a", fontWeight: "bold" }}>
-                          ✓ Đã verify
+                          ✓ Đã xãc nhận
                         </span>
                       )}
                     </div>

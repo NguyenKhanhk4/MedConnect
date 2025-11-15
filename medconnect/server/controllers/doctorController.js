@@ -1236,7 +1236,7 @@ export async function updateAppointmentStatus(req, res) {
               cancelReason || populatedAppointment.rejectReason
             );
             console.log(`✅ sendAppointmentRejectionEmail completed`);
-          } else if (status === "done") {
+            } else if (status === "done") {
             // Gửi email thông báo hoàn thành khám cho bệnh nhân
             // Sử dụng hàm mới từ payos.service.js hỗ trợ single và multiple appointments
             console.log(`📧 Calling sendAppointmentCompletedEmail...`);
@@ -1252,6 +1252,23 @@ export async function updateAppointmentStatus(req, res) {
               console.log(`✅ sendAppointmentCompletedEmail completed`);
             } catch (emailError) {
               console.error("❌ Error importing or calling sendAppointmentCompletedEmail:", emailError);
+              // Không throw error để không ảnh hưởng đến flow chính
+            }
+          } else if (status === "no_show") {
+            // Gửi email thông báo không đến khám cho bệnh nhân
+            console.log(`📧 Calling sendAppointmentNoShowEmail...`);
+            try {
+              const { sendAppointmentNoShowEmail } = await import(
+                "../services/payos.service.js"
+              );
+              await sendAppointmentNoShowEmail(
+                populatedAppointment,
+                populatedAppointment.patientId,
+                populatedAppointment.doctorId
+              );
+              console.log(`✅ sendAppointmentNoShowEmail completed`);
+            } catch (emailError) {
+              console.error("❌ Error importing or calling sendAppointmentNoShowEmail:", emailError);
               // Không throw error để không ảnh hưởng đến flow chính
             }
           }
@@ -3326,7 +3343,7 @@ export async function getDoctorTimeSlots(req, res) {
             cancelled: "cancelled",
             done: "completed",
             rejected: "cancelled",
-            no_show: "cancelled",
+            no_show: "no_show", // Keep no_show status to display "Không đến" on frontend
           };
           displayStatus =
             statusMap[appointment.appointmentStatus] || slot.status;

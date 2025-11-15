@@ -220,3 +220,29 @@
   font-style: italic;
   font-size: 0.875rem;
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .family-member-selector-section {
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .selector-dropdown {
+    max-width: 100%;
+  }
+
+  .selector-button {
+    font-size: 0.75rem;
+    padding: 0.5rem;
+  }
+
+  .selector-options {
+    max-height: 180px;
+  }
+
+  .selector-option-wrapper {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+}

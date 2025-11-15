@@ -6,6 +6,10 @@
   position: relative;
   padding: 24px;
   background: linear-gradient(135deg, #f5f3f0 0%, #faf9f7 50%, #f0ede8 100%);
+
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
 }
 
 .login-bg {
@@ -37,6 +41,11 @@
   position: relative;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 
+  @media (max-width: 768px) {
+    padding: 32px 24px;
+    border-radius: 16px;
+  }
+
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 24px 70px rgba(45, 55, 72, 0.15),
@@ -64,6 +73,11 @@
   text-align: center;
   letter-spacing: -0.02em;
   line-height: 1.3;
+
+  @media (max-width: 768px) {
+    font-size: 24px;
+    margin: 0 0 24px;
+  }
 }
 
 .login-input,
@@ -143,6 +157,13 @@
   background: transparent;
   border: none;
   outline: none;
+  width: auto;
+  height: auto;
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   &:hover {
     color: #2d3748;
@@ -150,6 +171,12 @@
 
   &:active {
     color: #1f2937;
+    transform: translateY(-50%);
+  }
+
+  &:focus {
+    outline: none;
+    transform: translateY(-50%);
   }
 }
 
@@ -364,11 +391,31 @@
   .password-toggle {
     right: 45px; // Move left when validation icon is present
     z-index: 10; // Ensure it's above other elements
+    top: 50%;
+    transform: translateY(-50%);
+    
+    &:active {
+      transform: translateY(-50%);
+    }
+
+    &:focus {
+      transform: translateY(-50%);
+    }
   }
 
   // When no validation icon, keep original position
   &.no-validation-icon .password-toggle {
     right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    
+    &:active {
+      transform: translateY(-50%);
+    }
+
+    &:focus {
+      transform: translateY(-50%);
+    }
   }
 }
 

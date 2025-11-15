@@ -63,3 +63,44 @@
     }
   }
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .education-level-price-management {
+    padding: 16px;
+
+    .page-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 1rem 16px !important;
+      margin-left: -16px !important;
+      margin-right: -16px !important;
+      width: calc(100% + 32px) !important;
+
+      h1 {
+        font-size: 1.5rem !important;
+      }
+
+      p {
+        font-size: 0.875rem !important;
+      }
+    }
+
+    .ant-table {
+      font-size: 12px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+
+      .ant-table-thead > tr > th {
+        padding: 8px;
+        font-size: 12px;
+      }
+
+      .ant-table-tbody > tr > td {
+        padding: 12px 8px;
+        font-size: 12px;
+      }
+    }
+  }
+}

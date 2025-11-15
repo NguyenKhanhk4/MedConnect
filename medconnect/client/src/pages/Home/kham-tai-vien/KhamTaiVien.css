@@ -11,6 +11,22 @@
   --container-max: 1180px;
 }
 
+/* Booking Step Cards */
+.booking-step-card {
+  transition: all 0.3s ease;
+}
+
+.booking-step-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 40px rgba(69, 195, 210, 0.2);
+  border-color: #45c3d2;
+}
+
+.booking-step-card:hover .ant-card-body > div:first-child {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(69, 195, 210, 0.4);
+}
+
 /* Page wrapper & container centering */
 .hospital-visit {
   min-height: 100vh;
@@ -293,6 +309,88 @@
   height: 48px;
   font-size: 16px;
   border-radius: 8px;
+}
+
+/* ==== Slick Carousel Custom Arrows ==== */
+/* Hide ALL default slick arrows */
+.slick-prev,
+.slick-next {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Only show custom arrows */
+.custom-slick-arrow {
+  opacity: 1 !important;
+  display: flex !important;
+  visibility: visible !important;
+}
+
+/* Hide one of the custom arrows if needed */
+.custom-slick-arrow.slick-prev {
+  display: none !important;
+}
+
+.custom-slick-arrow.slick-disabled {
+  opacity: 0.3 !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+/* Ensure arrows are visible and properly positioned */
+.slick-slider {
+  position: relative;
+}
+
+.slick-slider .custom-slick-arrow {
+  position: absolute !important;
+  z-index: 10 !important;
+}
+
+/* Hero Section */
+.hero-image-container {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .hero-image-container {
+    display: block;
+  }
+}
+
+/* Hero Section Responsive */
+@media (max-width: 768px) {
+  .hospital-visit section:first-child .ant-typography h1 {
+    font-size: 2rem !important;
+  }
+
+  .hospital-visit section:first-child .ant-typography p {
+    font-size: 1rem !important;
+  }
+
+  .hospital-visit section:first-child .ant-btn {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+
+  .hospital-visit section:first-child .ant-space {
+    width: 100%;
+    flex-direction: column;
+  }
+}
+
+/* Step connector line - show on desktop only */
+@media (min-width: 992px) {
+  .step-connector {
+    display: block !important;
+  }
+}
+
+/* Specialty see more button - hide on mobile */
+@media (max-width: 576px) {
+  .specialty-see-more-btn {
+    display: none !important;
+  }
 }
 
 /* ==== Responsive ==== */

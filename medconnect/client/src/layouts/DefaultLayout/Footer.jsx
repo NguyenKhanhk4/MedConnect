@@ -85,9 +85,7 @@ const AppFooter = () => {
               Hỗ trợ
             </Title>
             <ul className="footer-links">
-              <li>
-                <Link to="/help">Trung tâm trợ giúp</Link>
-              </li>
+              
               <li>
                 <Link to="/dieu-khoan-su-dung">Điều khoản sử dụng</Link>
               </li>

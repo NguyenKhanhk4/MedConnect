@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Row, Col, Card, Typography, Button, Space, Statistic } from "antd";
+import { Row, Col, Card, Typography, Button, Space } from "antd";
 import {
   HomeOutlined,
   HeartOutlined,
@@ -96,12 +96,6 @@ const About = () => {
     },
   ];
 
-  const stats = [
-    { title: "Bác sĩ", value: "1000+", prefix: "" },
-    { title: "Bệnh nhân", value: "50K+", prefix: "" },
-    { title: "Cuộc tư vấn", value: "200K+", prefix: "" },
-    { title: "Đánh giá", value: "4.8", suffix: "/5.0", prefix: "" },
-  ];
 
   const values = [
     {
@@ -242,27 +236,6 @@ const About = () => {
                   <Paragraph className="feature-description">
                     {feature.description}
                   </Paragraph>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </div>
-      </section>
-
-      {/* Statistics Section */}
-      <section className="about-statistics">
-        <div className="container">
-          <Row gutter={[32, 32]}>
-            {stats.map((stat, index) => (
-              <Col xs={12} sm={12} lg={6} key={index}>
-                <Card className="stat-card" bordered={false}>
-                  <Statistic
-                    title={stat.title}
-                    value={stat.value}
-                    prefix={stat.prefix}
-                    suffix={stat.suffix}
-                    valueStyle={{ color: "#45c3d2", fontSize: "36px" }}
-                  />
                 </Card>
               </Col>
             ))}

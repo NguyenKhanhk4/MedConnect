@@ -77,25 +77,16 @@
 }
 
 /* Service Cards */
-.service-card {
+.service-card-hover {
   transition: all 0.3s ease;
   border: 1px solid #f0f0f0;
 }
 
-.service-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-}
-
-.service-card-selected {
-  transition: all 0.3s ease;
-  border: 2px solid #45c3d2;
-  background: rgba(69, 195, 210, 0.05);
-}
-
-.service-card-selected:hover {
+.service-card-hover:hover {
   transform: translateY(-5px);
   box-shadow: 0 8px 30px rgba(69, 195, 210, 0.2);
+  border-color: #45c3d2;
+  background: rgba(69, 195, 210, 0.03);
 }
 
 /* Doctor Cards */

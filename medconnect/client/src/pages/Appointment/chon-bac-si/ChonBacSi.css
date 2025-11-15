@@ -266,3 +266,70 @@
   color: #000;
   font-weight: bold;
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .doctor-selection-page {
+    padding: 16px 0;
+  }
+
+  .doctor-selection-page .container {
+    padding: 0 16px;
+  }
+
+  .doctor-selection-page .page-header {
+    margin-bottom: 24px;
+  }
+
+  .doctor-selection-page .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .doctor-selection-page .doctor-card-modern {
+    margin-bottom: 16px;
+  }
+
+  .doctor-selection-page .doctor-image-container {
+    height: 150px;
+    padding: 16px;
+  }
+
+  .doctor-selection-page .doctor-image {
+    width: 120px;
+    height: 120px;
+  }
+
+  .doctor-selection-page .doctor-card-content {
+    padding: 12px;
+  }
+
+  .doctor-selection-page .doctor-name-modern {
+    font-size: 18px !important;
+  }
+
+  .doctor-selection-page .doctors-grid {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 576px) {
+  .doctor-selection-page .doctor-image-container {
+    height: 120px;
+  }
+
+  .doctor-selection-page .doctor-image {
+    width: 100px;
+    height: 100px;
+  }
+
+  .doctor-selection-page .doctor-name-modern {
+    font-size: 16px !important;
+  }
+
+  .doctor-selection-page .doctor-book-button {
+    height: 36px !important;
+    font-size: 13px !important;
+  }
+}

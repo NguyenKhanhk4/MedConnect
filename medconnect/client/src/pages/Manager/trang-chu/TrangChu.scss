@@ -229,3 +229,98 @@
     }
   }
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .manager-dashboard {
+    padding: 0 16px 16px 16px;
+
+    .dashboard-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 1rem 16px !important;
+      margin-left: -16px !important;
+      margin-right: -16px !important;
+      width: calc(100% + 32px) !important;
+
+      h1 {
+        font-size: 1.5rem !important;
+      }
+
+      p {
+        font-size: 0.875rem !important;
+      }
+    }
+
+    .dashboard-card {
+      .card-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+
+        .card-icon {
+          font-size: 36px;
+        }
+
+        .card-info {
+          h3 {
+            font-size: 16px;
+          }
+
+          p {
+            font-size: 13px;
+          }
+        }
+      }
+    }
+
+    .pending-payments-card,
+    .invoices-card {
+      .payment-item,
+      .invoice-item {
+        padding: 10px 0;
+
+        .payment-item-title,
+        .invoice-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+
+          .payment-amount,
+          .invoice-amount {
+            font-size: 14px;
+          }
+        }
+
+        .payment-item-description,
+        .invoice-details {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 576px) {
+  .manager-dashboard {
+    padding: 0 12px 12px 12px;
+
+    .dashboard-header {
+      padding: 0.875rem 12px !important;
+      margin-left: -12px !important;
+      margin-right: -12px !important;
+      width: calc(100% + 24px) !important;
+
+      h1 {
+        font-size: 1.25rem !important;
+      }
+    }
+
+    .dashboard-card .card-content .card-icon {
+      font-size: 32px;
+    }
+  }
+}

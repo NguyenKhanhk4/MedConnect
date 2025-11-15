@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Button,
   Input,
@@ -21,6 +21,9 @@ import {
   Rate,
   Avatar,
   Badge,
+  Spin,
+  Empty,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -42,6 +45,8 @@ import {
   CarOutlined,
   HistoryOutlined,
 } from "@ant-design/icons";
+import { api } from "../../../lib/api";
+import { useAuth } from "../../../hooks/useAuth";
 import "./KhamTaiNha.css";
 
 const { Title, Paragraph, Text } = Typography;
@@ -50,123 +55,133 @@ const { TextArea } = Input;
 const { RangePicker } = DatePicker;
 
 const KhamTaiNha = () => {
-  const [selectedService, setSelectedService] = useState("general");
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [bookingForm] = Form.useForm();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const services = [
     {
-      id: "general",
-      title: "Khám tổng quát",
-      price: "500.000đ",
-      duration: "45 phút",
-      description: "Khám sức khỏe tổng quát, tư vấn bệnh lý thường gặp",
+      id: "online",
+      title: "Khám trực tuyến",
+      description: "Tư vấn và khám bệnh qua video call với bác sĩ chuyên khoa",
       icon: (
-        <MedicineBoxOutlined style={{ fontSize: "24px", color: "#45c3d2" }} />
+        <VideoCameraOutlined style={{ fontSize: "24px", color: "#45c3d2" }} />
       ),
     },
     {
-      id: "elderly",
-      title: "Chăm sóc người cao tuổi",
-      price: "700.000đ",
-      duration: "60 phút",
-      description: "Chăm sóc sức khỏe chuyên biệt cho người cao tuổi",
-      icon: <TeamOutlined style={{ fontSize: "24px", color: "#45c3d2" }} />,
+      id: "clinic",
+      title: "Khám tại phòng khám",
+      description: "Đặt lịch khám trực tiếp tại phòng khám với bác sĩ",
+      icon: <MedicineBoxOutlined style={{ fontSize: "24px", color: "#45c3d2" }} />,
     },
     {
-      id: "emergency",
-      title: "Cấp cứu tại nhà",
-      price: "1.200.000đ",
-      duration: "30 phút",
-      description: "Xử lý các tình huống cấp cứu không nguy hiểm đến tính mạng",
-      icon: <CarOutlined style={{ fontSize: "24px", color: "#e74c3c" }} />,
+      id: "consultation",
+      title: "Tư vấn sức khỏe",
+      description: "Tư vấn về sức khỏe, dinh dưỡng và lối sống lành mạnh",
+      icon: <FileTextOutlined style={{ fontSize: "24px", color: "#45c3d2" }} />,
     },
     {
-      id: "checkup",
-      title: "Kiểm tra định kỳ",
-      price: "600.000đ",
-      duration: "45 phút",
+      id: "followup",
+      title: "Tái khám",
       description:
-        "Theo dõi tình trạng sức khỏe định kỳ cho bệnh nhân mãn tính",
+        "Theo dõi và tái khám cho bệnh nhân đang điều trị",
       icon: <HistoryOutlined style={{ fontSize: "24px", color: "#45c3d2" }} />,
     },
   ];
 
-  const doctors = [
-    {
-      id: 1,
-      name: "BS. Nguyễn Văn An",
-      specialty: "Nội khoa",
-      experience: "15 năm",
-      rating: 4.8,
-      reviews: 156,
-      avatar:
-        "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=100&h=100&fit=crop&crop=face",
-      price: "500.000đ",
-      available: true,
-      distance: "2.5km",
-    },
-    {
-      id: 2,
-      name: "BS. Trần Thị Bình",
-      specialty: "Tim mạch",
-      experience: "12 năm",
-      rating: 4.9,
-      reviews: 203,
-      avatar:
-        "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=100&h=100&fit=crop&crop=face",
-      price: "600.000đ",
-      available: true,
-      distance: "3.1km",
-    },
-    {
-      id: 3,
-      name: "BS. Lê Minh Cường",
-      specialty: "Lão khoa",
-      experience: "18 năm",
-      rating: 4.7,
-      reviews: 89,
-      avatar:
-        "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=100&h=100&fit=crop&crop=face",
-      price: "700.000đ",
-      available: false,
-      distance: "1.8km",
-    },
-  ];
+  // Helper function to get specialization names
+  const getSpecializationNames = (specializationIds) => {
+    if (!specializationIds || specializationIds.length === 0) return "Chuyên khoa";
+    return specializationIds
+      .map((spec) => {
+        return typeof spec === "object" ? spec.name : spec;
+      })
+      .join(", ");
+  };
+
+  // Fetch doctors from API
+  const fetchDoctors = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      params.append("page", 1);
+      params.append("limit", 6); // Limit to 6 doctors for display
+      params.append("verified", "true"); // Only show verified doctors
+
+      const url = `/api/doctors?${params.toString()}`;
+      const response = await api.get(url);
+
+      if (response.success) {
+        setDoctors(response.data.doctors || []);
+      } else {
+        console.log("❌ Failed to fetch doctors:", response);
+        message.error("Không thể tải danh sách bác sĩ");
+        setDoctors([]);
+      }
+    } catch (error) {
+      console.error("Error fetching doctors:", error);
+      message.error("Có lỗi xảy ra khi tải danh sách bác sĩ");
+      setDoctors([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch doctors on component mount
+  useEffect(() => {
+    fetchDoctors();
+  }, []);
 
   const benefits = [
     {
-      icon: <HomeOutlined style={{ fontSize: "48px", color: "#45c3d2" }} />,
-      title: "Tiện lợi tại nhà",
-      description: "Không cần di chuyển, bác sĩ sẽ đến tận nhà thăm khám",
+      icon: <VideoCameraOutlined style={{ fontSize: "48px", color: "#45c3d2" }} />,
+      title: "Khám từ xa",
+      description: "Khám bệnh trực tuyến qua video call, tiện lợi mọi lúc mọi nơi",
     },
     {
       icon: <SafetyOutlined style={{ fontSize: "48px", color: "#45c3d2" }} />,
-      title: "An toàn & Vệ sinh",
-      description: "Đội ngũ y tế được trang bị đầy đủ thiết bị bảo hộ",
+      title: "An toàn & Bảo mật",
+      description: "Thông tin bệnh nhân được bảo mật, tuân thủ quy định y tế",
     },
     {
       icon: (
         <ClockCircleOutlined style={{ fontSize: "48px", color: "#45c3d2" }} />
       ),
       title: "Tiết kiệm thời gian",
-      description: "Đặt lịch linh hoạt, không xếp hàng chờ đợi",
+      description: "Đặt lịch linh hoạt, không cần chờ đợi, khám ngay tại nhà",
     },
     {
       icon: <HeartOutlined style={{ fontSize: "48px", color: "#45c3d2" }} />,
-      title: "Chăm sóc tận tâm",
-      description: "Dịch vụ y tế chất lượng cao trong môi trường quen thuộc",
+      title: "Chăm sóc chuyên nghiệp",
+      description: "Đội ngũ bác sĩ giàu kinh nghiệm, tư vấn tận tâm",
     },
   ];
 
-  const handleServiceSelect = (serviceId) => {
-    setSelectedService(serviceId);
-  };
-
   const handleDoctorSelect = (doctor) => {
-    setSelectedDoctor(doctor);
-    setIsModalVisible(true);
+    // Check if user is logged in
+    if (!user) {
+      // If not logged in, redirect to login page
+      navigate("/dang-nhap", {
+        state: {
+          from: "/dat-lich/chon-thoi-gian",
+          doctor: doctor,
+          message: "Vui lòng đăng nhập để đặt lịch khám",
+        },
+      });
+      return;
+    }
+
+    // If logged in, navigate to time slot selection page with doctor data
+    navigate("/dat-lich/chon-thoi-gian", {
+      state: {
+        doctor: doctor,
+        specialization: doctor.specializationIds?.[0] || null,
+      },
+    });
   };
 
   const handleBooking = (values) => {
@@ -209,8 +224,8 @@ const KhamTaiNha = () => {
                   fontWeight: 700,
                 }}
               >
-                <HomeOutlined style={{ marginRight: "16px" }} />
-                Khám bệnh tại nhà
+                <VideoCameraOutlined style={{ marginRight: "16px" }} />
+                Dịch vụ khám bệnh trực tuyến
               </Title>
 
               <Paragraph
@@ -221,8 +236,7 @@ const KhamTaiNha = () => {
                   opacity: 0.95,
                 }}
               >
-                Dịch vụ y tế chuyên nghiệp đến tận nhà - An toàn, tiện lợi, chất
-                lượng cao
+                Kết nối với bác sĩ chuyên khoa - Khám trực tuyến tiện lợi, nhanh chóng và hiệu quả
               </Paragraph>
 
               <Space size="large">
@@ -271,7 +285,7 @@ const KhamTaiNha = () => {
             level={2}
             style={{ textAlign: "center", marginBottom: "60px" }}
           >
-            Lợi ích của dịch vụ khám tại nhà
+            Lợi ích của dịch vụ khám trực tuyến
           </Title>
           <Row gutter={[32, 32]}>
             {benefits.map((benefit, index) => (
@@ -308,63 +322,34 @@ const KhamTaiNha = () => {
             level={2}
             style={{ textAlign: "center", marginBottom: "60px" }}
           >
-            Dịch vụ khám bệnh tại nhà
+            Dịch vụ khám bệnh
           </Title>
           <Row gutter={[24, 24]}>
             {services.map((service) => (
               <Col xs={24} sm={12} lg={6} key={service.id}>
                 <Card
                   hoverable
-                  className={
-                    selectedService === service.id
-                      ? "service-card-selected"
-                      : "service-card"
-                  }
-                  onClick={() => handleServiceSelect(service.id)}
                   style={{
                     height: "100%",
                     borderRadius: "12px",
-                    cursor: "pointer",
-                    border:
-                      selectedService === service.id
-                        ? "2px solid #45c3d2"
-                        : "1px solid #f0f0f0",
+                    border: "1px solid #f0f0f0",
+                    transition: "all 0.3s ease",
                   }}
+                  bodyStyle={{
+                    padding: "24px",
+                  }}
+                  className="service-card-hover"
                 >
                   <div style={{ marginBottom: "16px" }}>{service.icon}</div>
                   <Title
                     level={4}
-                    style={{ marginBottom: "8px", color: "#333" }}
+                    style={{ marginBottom: "12px", color: "#333" }}
                   >
                     {service.title}
                   </Title>
-                  <div style={{ marginBottom: "12px" }}>
-                    <Text strong style={{ fontSize: "18px", color: "#45c3d2" }}>
-                      {service.price}
-                    </Text>
-                    <Text style={{ marginLeft: "8px", color: "#666" }}>
-                      ({service.duration})
-                    </Text>
-                  </div>
                   <Paragraph style={{ color: "#666", margin: 0 }}>
                     {service.description}
                   </Paragraph>
-                  {selectedService === service.id && (
-                    <div style={{ marginTop: "16px" }}>
-                      <CheckCircleOutlined
-                        style={{ color: "#45c3d2", fontSize: "20px" }}
-                      />
-                      <Text
-                        style={{
-                          marginLeft: "8px",
-                          color: "#45c3d2",
-                          fontWeight: 600,
-                        }}
-                      >
-                        Đã chọn
-                      </Text>
-                    </div>
-                  )}
                 </Card>
               </Col>
             ))}
@@ -384,80 +369,118 @@ const KhamTaiNha = () => {
           >
             Đội ngũ bác sĩ chuyên nghiệp
           </Title>
-          <Row gutter={[24, 24]}>
-            {doctors.map((doctor) => (
-              <Col xs={24} md={8} key={doctor.id}>
-                <Card
-                  hoverable
-                  style={{
-                    borderRadius: "12px",
-                    border: "none",
-                    boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
-                  }}
-                  actions={[
-                    <Button
-                      type="primary"
-                      block
-                      disabled={!doctor.available}
-                      onClick={() => handleDoctorSelect(doctor)}
+          {loading ? (
+            <div style={{ textAlign: "center", padding: "40px 0" }}>
+              <Spin size="large" />
+              <Text style={{ marginLeft: 16, display: "block", marginTop: 16 }}>
+                Đang tải danh sách bác sĩ...
+              </Text>
+            </div>
+          ) : doctors.length === 0 ? (
+            <Empty
+              description="Không tìm thấy bác sĩ nào"
+              style={{ margin: "50px 0" }}
+            />
+          ) : (
+            <Row gutter={[24, 24]}>
+              {doctors.map((doctor) => {
+                const fullName = doctor.fullName || doctor.userId?.fullName || "Bác sĩ";
+                const displayName = fullName?.startsWith("BS.") ? fullName : `BS. ${fullName}`;
+                const specialization = getSpecializationNames(doctor.specializationIds);
+                const rating = parseFloat(doctor.ratingAvg) || 0;
+                const ratingCount = parseInt(doctor.ratingCount) || 0;
+                const yearsExperience = doctor.yearsExperience || 0;
+                const avatarUrl = doctor.avatarUrl && !doctor.avatarUrl.includes("picsum.photos")
+                  ? doctor.avatarUrl
+                  : "/default-avatar.png";
+                const clinicName = doctor.clinicDefaultId?.name || "Phòng khám";
+                const clinicAddress = doctor.clinicDefaultId?.address || "";
+
+                return (
+                  <Col xs={24} md={8} key={doctor._id}>
+                    <Card
+                      hoverable
                       style={{
-                        background: doctor.available ? "#45c3d2" : "#ccc",
-                        borderColor: doctor.available ? "#45c3d2" : "#ccc",
+                        borderRadius: "12px",
+                        border: "none",
+                        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
                       }}
+                      actions={[
+                        <Button
+                          type="primary"
+                          block
+                          onClick={() => handleDoctorSelect(doctor)}
+                          style={{
+                            background: "#45c3d2",
+                            borderColor: "#45c3d2",
+                          }}
+                        >
+                          Đặt lịch
+                        </Button>,
+                      ]}
                     >
-                      {doctor.available ? "Đặt lịch" : "Không có lịch"}
-                    </Button>,
-                  ]}
-                >
-                  <Card.Meta
-                    avatar={
-                      <Badge
-                        dot
-                        status={doctor.available ? "success" : "default"}
-                        offset={[-5, 5]}
-                      >
-                        <Avatar size={64} src={doctor.avatar} />
-                      </Badge>
-                    }
-                    title={
-                      <div>
-                        <div>
-                          {(() => {
-                            const fullName = doctor.name;
-                            return fullName?.startsWith("BS.")
-                              ? fullName
-                              : `BS. ${fullName}`;
-                          })()}
-                        </div>
-                        <Text type="secondary" style={{ fontSize: "14px" }}>
-                          {doctor.specialty}
-                        </Text>
-                      </div>
-                    }
-                    description={
-                      <div>
-                        <div style={{ marginBottom: "8px" }}>
-                          <StarOutlined style={{ color: "#faad14" }} />
-                          <span style={{ marginLeft: "4px" }}>
-                            {doctor.rating} ({doctor.reviews} đánh giá)
-                          </span>
-                        </div>
-                        <div style={{ marginBottom: "8px" }}>
-                          <EnvironmentOutlined style={{ color: "#45c3d2" }} />
-                          <span style={{ marginLeft: "4px" }}>
-                            Cách {doctor.distance}
-                          </span>
-                        </div>
-                        <div style={{ marginBottom: "8px" }}>
-                          <Text>Kinh nghiệm: {doctor.experience}</Text>
-                        </div>
-                      </div>
-                    }
-                  />
-                </Card>
-              </Col>
-            ))}
-          </Row>
+                      <Card.Meta
+                        avatar={
+                          <Badge
+                            dot
+                            status="success"
+                            offset={[-5, 5]}
+                          >
+                            <Avatar
+                              size={64}
+                              src={avatarUrl}
+                              icon={<UserOutlined />}
+                              onError={() => {
+                                // Avatar will fallback to icon
+                              }}
+                            />
+                          </Badge>
+                        }
+                        title={
+                          <div>
+                            <div>{displayName}</div>
+                            <Text type="secondary" style={{ fontSize: "14px" }}>
+                              {specialization}
+                            </Text>
+                          </div>
+                        }
+                        description={
+                          <div>
+                            {rating > 0 && ratingCount > 0 ? (
+                              <div style={{ marginBottom: "8px" }}>
+                                <StarOutlined style={{ color: "#faad14" }} />
+                                <span style={{ marginLeft: "4px" }}>
+                                  {rating.toFixed(1)} ({ratingCount} đánh giá)
+                                </span>
+                              </div>
+                            ) : (
+                              <div style={{ marginBottom: "8px" }}>
+                                <StarOutlined style={{ color: "#d9d9d9" }} />
+                                <span style={{ marginLeft: "4px", color: "#999" }}>
+                                  Chưa có đánh giá
+                                </span>
+                              </div>
+                            )}
+                            {clinicAddress && (
+                              <div style={{ marginBottom: "8px" }}>
+                                <EnvironmentOutlined style={{ color: "#45c3d2" }} />
+                                <span style={{ marginLeft: "4px" }}>
+                                  {clinicName}
+                                </span>
+                              </div>
+                            )}
+                            <div style={{ marginBottom: "8px" }}>
+                              <Text>Kinh nghiệm: {yearsExperience} năm</Text>
+                            </div>
+                          </div>
+                        }
+                      />
+                    </Card>
+                  </Col>
+                );
+              })}
+            </Row>
+          )}
         </div>
       </section>
 
@@ -479,8 +502,8 @@ const KhamTaiNha = () => {
         {selectedDoctor && (
           <div>
             <Alert
-              message={`Bạn đang đặt lịch với ${selectedDoctor.name}`}
-              description={`Chuyên khoa: ${selectedDoctor.specialty} | Phí khám: ${selectedDoctor.price}`}
+              message={`Bạn đang đặt lịch với ${selectedDoctor.fullName || selectedDoctor.userId?.fullName || "Bác sĩ"}`}
+              description={`Chuyên khoa: ${getSpecializationNames(selectedDoctor.specializationIds)}`}
               type="info"
               style={{ marginBottom: "24px" }}
             />
@@ -598,57 +621,6 @@ const KhamTaiNha = () => {
           </div>
         )}
       </Modal>
-
-      {/* CTA Section */}
-      <section className="cta-section">
-        <div className="container">
-          <Row justify="center" align="middle" style={{ minHeight: "200px" }}>
-            <Col xs={24} lg={16} style={{ textAlign: "center" }}>
-              <Title level={3} style={{ color: "white", marginBottom: "16px" }}>
-                Cần hỗ trợ khẩn cấp?
-              </Title>
-              <Paragraph
-                style={{
-                  color: "white",
-                  fontSize: "1rem",
-                  marginBottom: "24px",
-                  opacity: 0.9,
-                }}
-              >
-                Liên hệ ngay hotline 24/7 để được tư vấn và hỗ trợ
-              </Paragraph>
-              <Space size="large">
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={<PhoneOutlined />}
-                  style={{
-                    background: "white",
-                    borderColor: "white",
-                    color: "#45c3d2",
-                    fontWeight: 600,
-                  }}
-                >
-                  Gọi ngay: 1900 2115
-                </Button>
-                <Button
-                  size="large"
-                  style={{
-                    background: "transparent",
-                    borderColor: "white",
-                    color: "white",
-                    fontWeight: 600,
-                  }}
-                >
-                  <Link to="/" style={{ color: "white" }}>
-                    Về trang chủ
-                  </Link>
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-        </div>
-      </section>
     </div>
   );
 };

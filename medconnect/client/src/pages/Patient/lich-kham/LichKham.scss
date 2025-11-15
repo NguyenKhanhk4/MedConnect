@@ -132,3 +132,37 @@
 .legend-dot.appointment {
   background: rgba(var(--accent), 0.4);
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .appointment-calendar {
+    margin-bottom: 1rem;
+  }
+
+  .calendar-card > div:first-child {
+    padding: 1rem 1rem 0.75rem 1rem !important;
+  }
+
+  .calendar-card > div:last-child {
+    padding: 0 1rem 1rem 1rem !important;
+  }
+
+  .calendar-title {
+    font-size: 1.125rem;
+  }
+
+  .calendar-month {
+    min-width: 120px;
+    font-size: 0.8125rem;
+  }
+
+  .calendar-day-header,
+  .calendar-day {
+    height: 2rem;
+    font-size: 0.8125rem;
+  }
+
+  .calendar-grid {
+    gap: 0.25rem;
+  }
+}

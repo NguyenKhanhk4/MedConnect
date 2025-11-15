@@ -387,6 +387,10 @@ export async function approveReschedule(req, res) {
         reason:
           originalAppointment.reason || originalAppointment.reasonForVisit,
         rescheduledFromId: originalAppointment._id,
+        // Copy payment information from original appointment
+        paymentStatus: originalAppointment.paymentStatus || "unpaid",
+        amountPaid: originalAppointment.amountPaid || 0,
+        totalPay: originalAppointment.totalPay || 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       };

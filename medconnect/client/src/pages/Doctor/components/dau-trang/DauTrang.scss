@@ -36,3 +36,30 @@
     min-width: 60px;
   }
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .doctor-header {
+    padding: 0 16px;
+    height: 56px;
+
+    .doctor-header-title {
+      font-size: 18px;
+    }
+
+    .doctor-header-right {
+      min-width: 50px;
+    }
+  }
+}
+
+@media (max-width: 576px) {
+  .doctor-header {
+    padding: 0 12px;
+    height: 52px;
+
+    .doctor-header-title {
+      font-size: 16px;
+    }
+  }
+}

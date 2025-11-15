@@ -193,3 +193,72 @@
     stroke-width: 2;
   }
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .current-consultation {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .consultation-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .consultation-title {
+    font-size: 1.25rem;
+  }
+
+  .status-text {
+    margin-left: 0;
+    margin-top: 0.5rem;
+  }
+
+  .doctor-info-section {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.75rem;
+  }
+
+  .doctor-avatar-container {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .doctor-avatar-fallback,
+  .doctor-avatar {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .doctor-name {
+    font-size: 1.125rem;
+  }
+
+  .doctor-specialty {
+    font-size: 0.8125rem;
+  }
+
+  .join-call-button {
+    padding: 0.625rem 1.5rem;
+    font-size: 0.8125rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .current-consultation {
+    padding: 0.875rem;
+  }
+
+  .consultation-title {
+    font-size: 1.125rem;
+  }
+
+  .doctor-name {
+    font-size: 1rem;
+  }
+}

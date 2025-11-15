@@ -585,7 +585,7 @@ export async function updatePatientProfile(req, res) {
 export async function getSpecializations(req, res) {
   try {
     const specializations = await Specialization.find({})
-      .select("_id name description")
+      .select("_id name description avatar")
       .sort({ name: 1 })
       .lean();
 
@@ -3677,7 +3677,7 @@ export async function createPaymentForSingleAppointment(req, res) {
 
     // Create payment record với appointmentData (chưa tạo appointment)
     const orderCode = Number(String(Date.now()).slice(-10));
-    const invoiceNumber = `INV-APT-${orderCode}`;
+    const invoiceNumber = `INV-APT`;
 
     // Lấy thông tin owner (người đặt) để set billTo email/phone
     // Nếu patient là người thân, lấy email/phone từ owner (self patient)
@@ -3827,11 +3827,28 @@ export async function createPaymentForSingleAppointment(req, res) {
       throw validationError;
     }
 
-    await payment.save();
-    console.log(
-      "✅ Payment saved successfully (single appointment):",
-      payment._id
-    );
+    // Save payment with error handling for duplicate invoiceNumber
+    try {
+      await payment.save();
+      console.log(
+        "✅ Payment saved successfully (single appointment):",
+        payment._id
+      );
+    } catch (saveError) {
+      // Handle duplicate invoiceNumber error
+      if (saveError.code === 11000 && saveError.keyPattern?.invoiceNumber) {
+        console.warn("⚠️ Duplicate invoiceNumber detected, retrying with orderCode...");
+        // Retry with orderCode appended to ensure uniqueness
+        payment.invoiceNumber = `INV-APT-${orderCode}`;
+        await payment.save();
+        console.log(
+          "✅ Payment saved successfully with orderCode (single appointment):",
+          payment._id
+        );
+      } else {
+        throw saveError;
+      }
+    }
 
     // Create PayOS payment link (if gateway is payos)
     if (gateway === "payos") {

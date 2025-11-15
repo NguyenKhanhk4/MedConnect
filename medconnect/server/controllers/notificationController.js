@@ -45,7 +45,7 @@ export async function getNotifications(req, res) {
     }
 
     console.log(`🔔 Fetching notifications for userId: ${userId}`);
-    console.log(`🔔 Filter:`, filter);
+    console.log(`🔔 Filter:`, JSON.stringify(filter, null, 2));
 
     const notifications = await Notification.find(filter)
       .sort({ createdAt: -1 })
@@ -58,6 +58,32 @@ export async function getNotifications(req, res) {
     console.log(
       `✅ Found ${notifications.length} notifications (total: ${total}) for userId: ${userId}`
     );
+    
+    // Debug: Log first few notifications to see their userId format
+    if (notifications.length > 0) {
+      console.log(`🔍 Sample notification userId: ${notifications[0].userId} (type: ${typeof notifications[0].userId})`);
+      console.log(`🔍 Sample notification:`, {
+        _id: notifications[0]._id,
+        title: notifications[0].title,
+        userId: notifications[0].userId,
+        userIdType: typeof notifications[0].userId,
+        userIdString: notifications[0].userId?.toString(),
+      });
+    } else {
+      // Check if there are any notifications in database for debugging
+      const allNotifications = await Notification.find({}).limit(5).lean();
+      console.log(`🔍 Total notifications in DB: ${await Notification.countDocuments({})}`);
+      if (allNotifications.length > 0) {
+        console.log(`🔍 Sample notification from DB:`, {
+          _id: allNotifications[0]._id,
+          userId: allNotifications[0].userId,
+          userIdType: typeof allNotifications[0].userId,
+          userIdString: allNotifications[0].userId?.toString(),
+          title: allNotifications[0].title,
+        });
+        console.log(`🔍 Requested userId: ${userId} (type: ${typeof userId}, string: ${userId.toString()})`);
+      }
+    }
 
     return ok(res, {
       notifications,
@@ -151,10 +177,32 @@ export async function getUnreadCount(req, res) {
       return fail(res, 401, ERROR_CODES.UNAUTHORIZED, "User not authenticated");
     }
 
+    // Convert appUserId to ObjectId for proper matching (same as getNotifications)
+    let userId;
+    try {
+      if (typeof appUserId === "string") {
+        userId = new mongoose.Types.ObjectId(appUserId);
+      } else {
+        userId = appUserId;
+      }
+    } catch (error) {
+      console.error("❌ Invalid userId format:", appUserId);
+      return fail(
+        res,
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        "Invalid user ID format"
+      );
+    }
+
+    console.log(`🔔 Getting unread count for userId: ${userId}`);
+
     const count = await Notification.countDocuments({
-      userId: appUserId,
+      userId: userId,
       isRead: false,
     });
+
+    console.log(`✅ Unread count: ${count} for userId: ${userId}`);
 
     return ok(res, { unreadCount: count });
   } catch (e) {

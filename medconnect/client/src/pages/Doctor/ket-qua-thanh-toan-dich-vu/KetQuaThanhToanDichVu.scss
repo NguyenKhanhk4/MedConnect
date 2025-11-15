@@ -57,3 +57,42 @@
     }
   }
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .service-payment-result-container {
+    padding: 16px;
+
+    .payment-card {
+      .loading-container {
+        padding: 32px 16px;
+      }
+
+      .failure-reasons {
+        padding: 12px;
+        margin-top: 16px;
+
+        ul {
+          padding-left: 20px;
+        }
+      }
+
+      .payment-details {
+        padding: 12px;
+        margin-top: 16px;
+      }
+    }
+  }
+}
+
+@media (max-width: 576px) {
+  .service-payment-result-container {
+    padding: 12px;
+
+    .payment-card {
+      .loading-container {
+        padding: 24px 12px;
+      }
+    }
+  }
+}

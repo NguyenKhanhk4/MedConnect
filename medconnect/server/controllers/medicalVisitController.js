@@ -2130,7 +2130,7 @@ async function createPaymentForExistingVisit(req, res, visitId) {
 
     // Create payment record với medicalVisitId và appointmentIds (visit đã tồn tại)
     const orderCode = Number(String(Date.now()).slice(-10));
-    const invoiceNumber = `INV-VISIT-${orderCode}`;
+    const invoiceNumber = `INV-VISIT`;
 
     // Get first appointment for billFrom
     const firstAppointment = appointments[0];
@@ -2167,7 +2167,24 @@ async function createPaymentForExistingVisit(req, res, visitId) {
       pendingOrderCode: orderCode, // Temporary, will be cleared after payment
     });
 
-    await payment.save();
+    // Save payment with error handling for duplicate invoiceNumber
+    try {
+      await payment.save();
+    } catch (saveError) {
+      // Handle duplicate invoiceNumber error
+      if (saveError.code === 11000 && saveError.keyPattern?.invoiceNumber) {
+        console.warn("⚠️ Duplicate invoiceNumber detected, retrying with orderCode...");
+        // Retry with orderCode appended to ensure uniqueness
+        payment.invoiceNumber = `INV-VISIT-${orderCode}`;
+        await payment.save();
+        console.log(
+          "✅ Payment saved successfully with orderCode (existing visit):",
+          payment._id
+        );
+      } else {
+        throw saveError;
+      }
+    }
 
     // Create PayOS payment link (if gateway is payos)
     if (gateway === "payos") {
@@ -2552,7 +2569,8 @@ export async function createPaymentForVisit(req, res) {
 
     // Create payment record với appointmentData (chưa tạo visit/appointments)
     const orderCode = Number(String(Date.now()).slice(-10));
-    const invoiceNumber = `INV-VISIT-${orderCode}`;
+    // Nếu chỉ có 1 appointment thì dùng INV-APT, nếu nhiều hơn thì dùng INV-VISIT
+    const invoiceNumber = appointmentData.length === 1 ? `INV-APT` : `INV-VISIT`;
 
     // Get first doctor for billFrom
     // Với multiple appointments, có thể có nhiều bác sĩ khác nhau
@@ -2700,8 +2718,26 @@ export async function createPaymentForVisit(req, res) {
       throw validationError;
     }
 
-    await payment.save();
-    console.log("✅ Payment saved successfully:", payment._id);
+    // Save payment with error handling for duplicate invoiceNumber
+    try {
+      await payment.save();
+      console.log("✅ Payment saved successfully:", payment._id);
+    } catch (saveError) {
+      // Handle duplicate invoiceNumber error
+      if (saveError.code === 11000 && saveError.keyPattern?.invoiceNumber) {
+        console.warn("⚠️ Duplicate invoiceNumber detected, retrying with orderCode...");
+        // Retry with orderCode appended to ensure uniqueness
+        const baseInvoiceNumber = appointmentData.length === 1 ? `INV-APT` : `INV-VISIT`;
+        payment.invoiceNumber = `${baseInvoiceNumber}-${orderCode}`;
+        await payment.save();
+        console.log(
+          "✅ Payment saved successfully with orderCode:",
+          payment._id
+        );
+      } else {
+        throw saveError;
+      }
+    }
 
     // Create PayOS payment link (if gateway is payos)
     if (gateway === "payos") {

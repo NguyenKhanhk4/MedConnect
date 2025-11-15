@@ -297,7 +297,7 @@ export async function getDoctorTimeSlotsForManager(req, res) {
           cancelled: "cancelled",
           done: "completed",
           rejected: "cancelled",
-          no_show: "cancelled",
+          no_show: "no_show", // Keep no_show status to display "Không đến" on frontend
         };
         displayStatus = statusMap[appointment.appointmentStatus] || slot.status;
       } else {

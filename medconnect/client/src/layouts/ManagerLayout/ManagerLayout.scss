@@ -33,7 +33,7 @@
       .logo-icon {
         width: 40px;
         height: 40px;
-        background: linear-gradient(135deg, #667eea, #764ba2);
+        background: linear-gradient(135deg, #40cccc, #45c3d2);
         border-radius: 8px;
         display: flex;
         align-items: center;
@@ -161,6 +161,10 @@
     margin-left: 280px;
     min-height: 100vh;
 
+    @media (max-width: 1024px) {
+      margin-left: 0;
+    }
+
     .manager-header {
       background: #fff;
       padding: 0 24px;
@@ -170,12 +174,21 @@
       justify-content: space-between;
       height: 64px;
 
+      @media (max-width: 768px) {
+        padding: 0 16px;
+        height: 56px;
+      }
+
       .header-left {
         .page-title {
           font-size: 1.5rem;
           font-weight: 600;
           color: #1f2937;
           margin: 0;
+
+          @media (max-width: 768px) {
+            font-size: 1.25rem;
+          }
         }
       }
 
@@ -183,6 +196,10 @@
         display: flex;
         align-items: center;
         gap: 16px;
+
+        @media (max-width: 768px) {
+          gap: 8px;
+        }
 
         .notification-btn {
           position: relative;
@@ -270,6 +287,11 @@
       min-height: calc(100vh - 64px);
       overflow-y: auto;
       overflow-x: hidden;
+
+      @media (max-width: 768px) {
+        padding: 16px;
+        min-height: calc(100vh - 56px);
+      }
       
       // Ẩn thanh trượt
       scrollbar-width: none;
@@ -328,19 +350,63 @@
 }
 
 // Responsive
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .manager-layout {
     .manager-sider {
       transform: translateX(-100%);
       transition: transform 0.3s ease;
+      width: 280px !important;
 
+      &.open,
       &.ant-layout-sider-collapsed {
         transform: translateX(0);
       }
     }
+  }
+}
 
+@media (max-width: 768px) {
+  .manager-layout {
+    .manager-sider {
+      width: 260px !important;
+    }
+  }
+}
+
+@media (max-width: 576px) {
+  .manager-layout {
     .manager-main {
-      margin-left: 0;
+      .manager-header {
+        padding: 0 12px;
+        height: 52px;
+
+        .header-left .page-title {
+          font-size: 1.125rem !important;
+        }
+
+        .header-right {
+          gap: 6px;
+
+          .notification-btn {
+            width: 36px;
+            height: 36px;
+
+            .bell-icon {
+              font-size: 18px;
+            }
+          }
+
+          .user-btn {
+            padding: 0 8px;
+            font-size: 0.875rem;
+          }
+        }
+      }
+
+      .manager-content {
+        padding: 12px;
+        min-height: calc(100vh - 52px);
+      }
     }
   }
 }

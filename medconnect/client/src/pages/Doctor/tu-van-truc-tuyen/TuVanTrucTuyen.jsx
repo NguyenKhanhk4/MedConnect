@@ -399,12 +399,6 @@ export default function TuVanTrucTuyen() {
               </strong>
             </p>
           </div>
-          <button
-            className="back-btn"
-            onClick={() => navigate("/bac-si/lich-hen")}
-          >
-            ← Quay lại
-          </button>
         </div>
 
         <div className="consultation-form-wrapper">

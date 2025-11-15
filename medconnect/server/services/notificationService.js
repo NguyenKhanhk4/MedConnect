@@ -437,11 +437,10 @@ export async function createServicePaymentNotification(
  */
 export async function createBookingNotification(appointmentId, options = {}) {
   try {
+    // First, get appointment with basic populate
     const appointment = await Appointment.findById(appointmentId)
       .populate("patientId", "userId fullName")
       .populate("doctorId", "userId fullName")
-      .populate("patientId.userId", "email phone")
-      .populate("doctorId.userId", "email phone")
       .lean();
 
     if (!appointment) {
@@ -449,10 +448,36 @@ export async function createBookingNotification(appointmentId, options = {}) {
       return null;
     }
 
-    const doctorUser = appointment.doctorId?.userId;
-    const patientUser = appointment.patientId?.userId;
-    const patientName = appointment.patientId?.fullName || "Bệnh nhân";
-    const doctorName = appointment.doctorId?.fullName || "Bác sĩ";
+    // Get doctor userId - always fetch from Doctor model to ensure we have it
+    let doctorUser = null;
+    let doctorName = "Bác sĩ";
+    
+    const doctorId = appointment.doctorId?._id || appointment.doctorId;
+    if (doctorId) {
+      const doctor = await Doctor.findById(doctorId).select("userId fullName").lean();
+      if (doctor) {
+        doctorUser = doctor.userId;
+        doctorName = doctor.fullName || doctorName;
+        console.log(`✅ Found doctor userId: ${doctorUser} for doctor: ${doctorId}`);
+      } else {
+        console.error(`❌ Doctor not found: ${doctorId}`);
+      }
+    } else {
+      console.error(`❌ Doctor ID not found in appointment: ${appointmentId}`);
+    }
+
+    // Get patient info
+    const patientId = appointment.patientId?._id || appointment.patientId;
+    let patientUser = null;
+    let patientName = "Bệnh nhân";
+    
+    if (patientId) {
+      const patient = await Patient.findById(patientId).select("userId fullName").lean();
+      if (patient) {
+        patientUser = patient.userId;
+        patientName = patient.fullName || patientName;
+      }
+    }
 
     const appointmentTime = new Date(appointment.scheduledStart).toLocaleString(
       "vi-VN",
@@ -491,41 +516,59 @@ export async function createBookingNotification(appointmentId, options = {}) {
       });
     }
 
-    // Notify doctor about new appointment request
-    // CHỈ thông báo cho bác sĩ nếu:
-    // 1. Appointment cần xác nhận (status !== "accepted") HOẶC
-    // 2. Được tạo bởi manager (cần bác sĩ xác nhận)
-    // KHÔNG thông báo nếu appointment đã được tự động chấp nhận (status = "accepted" và không phải manager tạo)
+    // Notify doctor about new appointment
+    // LUÔN thông báo cho bác sĩ khi có lịch hẹn mới, dù appointment đã được auto-accepted
     if (doctorUser) {
-      const shouldNotifyDoctor = 
-        appointment.status !== "accepted" || // Cần xác nhận
-        options.createdByManager; // Manager tạo thì vẫn cần bác sĩ xác nhận
-
-      if (shouldNotifyDoctor) {
-        const title = options.createdByManager
-          ? "Có lịch hẹn mới (Quản lý tạo)"
-          : "Có lịch hẹn mới";
-        const message = options.createdByManager
-          ? `Quản lý đã tạo lịch hẹn khám cho bệnh nhân ${patientName} vào ${appointmentTime}. Vui lòng xác nhận hoặc từ chối.`
-          : `Bệnh nhân ${patientName} đã đặt lịch hẹn khám vào ${appointmentTime}. Vui lòng xác nhận hoặc từ chối.`;
-
-        notifications.push({
-          userId: doctorUser._id,
-          type: "appointment",
-          title,
-          message,
-          priority: "high",
-          relatedId: appointmentId,
-          relatedType: "appointment",
-          metadata: {
-            appointmentId,
-            patientName,
-            appointmentTime,
-            status: appointment.status === "accepted" ? "accepted" : "pending_confirmation",
-            createdByManager: options.createdByManager || false,
-          },
-        });
+      const modeText = appointment.mode === "online" ? "trực tuyến" : "tại phòng khám";
+      
+      let title, message;
+      if (options.createdByManager) {
+        title = "Có lịch hẹn mới (Quản lý tạo)";
+        message = `Quản lý đã tạo lịch hẹn khám ${modeText} cho bệnh nhân ${patientName} vào ${appointmentTime}. Lịch hẹn đã được xác nhận.`;
+      } else if (appointment.status === "accepted") {
+        title = "Có lịch hẹn mới";
+        message = `Bệnh nhân ${patientName} đã đặt lịch hẹn khám ${modeText} vào ${appointmentTime}. Lịch hẹn đã được tự động xác nhận.`;
+      } else {
+        title = "Có lịch hẹn mới cần xác nhận";
+        message = `Bệnh nhân ${patientName} đã đặt lịch hẹn khám ${modeText} vào ${appointmentTime}. Vui lòng xác nhận hoặc từ chối.`;
       }
+
+      // Ensure userId is a valid ObjectId - convert to ObjectId if it's a string
+      let doctorUserId = doctorUser;
+      const mongoose = (await import("mongoose")).default;
+      if (typeof doctorUser === 'string') {
+        doctorUserId = new mongoose.Types.ObjectId(doctorUser);
+      } else if (doctorUser && doctorUser._id) {
+        doctorUserId = doctorUser._id;
+      }
+      
+      // Convert appointmentId to ObjectId if needed
+      let relatedId = appointmentId;
+      if (typeof appointmentId === 'string') {
+        relatedId = new mongoose.Types.ObjectId(appointmentId);
+      }
+      
+      notifications.push({
+        userId: doctorUserId,
+        type: "appointment",
+        title,
+        message,
+        priority: "high",
+        relatedId: relatedId,
+        relatedType: "appointment",
+        metadata: {
+          appointmentId: appointmentId.toString(),
+          patientName,
+          appointmentTime,
+          mode: appointment.mode,
+          status: appointment.status === "accepted" ? "accepted" : "pending_confirmation",
+          createdByManager: options.createdByManager || false,
+        },
+      });
+      
+      console.log(`✅ Created notification for doctor userId: ${doctorUserId} (type: ${typeof doctorUserId}), appointment: ${appointmentId}`);
+    } else {
+      console.error(`❌ Cannot create notification: doctor userId not found for appointment ${appointmentId}`);
     }
 
     // Create all notifications
@@ -1131,6 +1174,77 @@ export async function createNewDoctorRegistrationNotification(doctorId) {
     return createdNotifications;
   } catch (error) {
     console.error("❌ Error creating new doctor registration notification:", error);
+    throw error;
+  }
+}
+
+/**
+ * Create notification for new review (notify doctor)
+ */
+export async function createReviewNotification(reviewId) {
+  try {
+    const Review = (await import("../models/review.model.js")).default;
+    
+    const review = await Review.findById(reviewId)
+      .populate("patientId", "fullName userId")
+      .populate("doctorId", "userId fullName")
+      .populate("appointmentId", "scheduledStart mode")
+      .populate("doctorId.userId", "email phone")
+      .lean();
+
+    if (!review) {
+      console.error("❌ Review not found:", reviewId);
+      return null;
+    }
+
+    const doctorUser = review.doctorId?.userId;
+    const patientName = review.isAnonymous 
+      ? "Bệnh nhân" 
+      : (review.patientId?.fullName || "Bệnh nhân");
+    const rating = review.rating || 0;
+    const stars = "⭐".repeat(rating);
+    const comment = review.comment ? ` "${review.comment.substring(0, 100)}${review.comment.length > 100 ? '...' : ''}"` : "";
+
+    if (!doctorUser) {
+      console.error("❌ Doctor user not found for review:", reviewId);
+      return null;
+    }
+
+    // Format appointment time
+    const appointmentTime = review.appointmentId?.scheduledStart
+      ? new Date(review.appointmentId.scheduledStart).toLocaleString("vi-VN", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "";
+
+    const notification = await Notification.create({
+      userId: doctorUser._id,
+      type: "system",
+      title: "Có đánh giá mới từ bệnh nhân",
+      message: `Bệnh nhân ${patientName} đã đánh giá bạn ${stars} (${rating}/5 sao)${comment}.${appointmentTime ? ` Lịch hẹn: ${appointmentTime}` : ""}`,
+      priority: "medium",
+      relatedId: reviewId,
+      relatedType: "review",
+      metadata: {
+        reviewId: reviewId.toString(),
+        appointmentId: review.appointmentId?._id?.toString(),
+        doctorId: review.doctorId?._id?.toString(),
+        patientName,
+        rating,
+        comment: review.comment,
+        isAnonymous: review.isAnonymous,
+        appointmentTime,
+      },
+    });
+
+    return notification;
+  } catch (error) {
+    console.error("❌ Error creating review notification:", error);
     throw error;
   }
 }

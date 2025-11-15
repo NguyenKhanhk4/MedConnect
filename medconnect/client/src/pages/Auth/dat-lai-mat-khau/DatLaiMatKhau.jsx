@@ -156,6 +156,20 @@ export default function DatLaiMatKhau() {
                 cursor: "pointer",
                 color: "#4b7780",
                 padding: 4,
+                width: "auto",
+                height: "auto",
+                minWidth: 32,
+                minHeight: 32,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                outline: "none",
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "translateY(-50%)";
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.transform = "translateY(-50%)";
               }}
             >
               {showPassword ? "Ẩn" : "Hiện"}
@@ -201,6 +215,20 @@ export default function DatLaiMatKhau() {
                 cursor: "pointer",
                 color: "#4b7780",
                 padding: 4,
+                width: "auto",
+                height: "auto",
+                minWidth: 32,
+                minHeight: 32,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                outline: "none",
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "translateY(-50%)";
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.transform = "translateY(-50%)";
               }}
             >
               {showConfirm ? "Ẩn" : "Hiện"}

@@ -5,6 +5,99 @@ import dotenv from "dotenv";
 // Nạp biến môi trường từ file .env
 dotenv.config();
 
+/**
+ * Danh sách từ không phù hợp cần lọc
+ */
+const INAPPROPRIATE_WORDS = [
+  // Từ tục tĩu phổ biến
+  "dcmm", "đcm", "đcm m", "đcm mày", "đcm mẹ",
+  "cmm", "cm m", "cm mày", "cm mẹ",
+  "clmm", "clm", "cl m", "cl mày", "cl mẹ",
+  "dm", "đm", "đmm", "đmm mày", "đmm mẹ",
+  "vl", "vcl", "vkl", "vcc",
+  "đjt", "đjt mẹ", "đjt mày",
+  "đéo", "đéo biết", "đéo hiểu",
+  "đụ", "đụ má", "đụ mẹ",
+  "lồn", "buồi", "cặc",
+  "chó", "chó má", "chó mẹ",
+  "mẹ mày", "má mày",
+  // Các biến thể với dấu
+  "đcm", "đcmm", "đc m", "đc mày", "đc mẹ",
+  "c m", "c mày", "c mẹ",
+  "cl m", "cl mày", "cl mẹ",
+  "đm mày", "đm mẹ",
+  "đjt m", "đjt mày", "đjt mẹ",
+  "đéo", "đéo biết", "đéo hiểu",
+  "đụ m", "đụ má", "đụ mẹ",
+];
+
+/**
+ * Chuyển đổi ký tự có dấu thành pattern regex để match cả có dấu và không dấu
+ * @param {string} char - Ký tự cần chuyển đổi
+ * @returns {string} - Pattern regex
+ */
+function createAccentPattern(char) {
+  const accentMap = {
+    'a': '[àáạảãâầấậẩẫăằắặẳẵa]',
+    'e': '[èéẹẻẽêềếệểễe]',
+    'i': '[ìíịỉĩi]',
+    'o': '[òóọỏõôồốộổỗơờớợởỡo]',
+    'u': '[ùúụủũưừứựửữu]',
+    'y': '[ỳýỵỷỹy]',
+    'd': '[đd]',
+  };
+  
+  const lowerChar = char.toLowerCase();
+  if (accentMap[lowerChar]) {
+    return accentMap[lowerChar];
+  }
+  return char;
+}
+
+/**
+ * Tạo pattern regex từ word để match cả có dấu và không dấu
+ * @param {string} word - Từ cần tạo pattern
+ * @returns {RegExp} - Pattern regex
+ */
+function createWordPattern(word) {
+  let pattern = '';
+  for (let i = 0; i < word.length; i++) {
+    const char = word[i];
+    if (/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(char)) {
+      pattern += createAccentPattern(char);
+    } else {
+      pattern += char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+  }
+  return new RegExp(pattern, "gi");
+}
+
+/**
+ * Lọc từ không phù hợp trong text
+ * @param {string} text - Text cần lọc
+ * @returns {string} - Text đã được lọc
+ */
+function filterInappropriateWords(text) {
+  if (!text || typeof text !== "string") {
+    return text;
+  }
+
+  let filteredText = text;
+  
+  // Tạo regex pattern để tìm các từ không phù hợp (case-insensitive, có thể có dấu)
+  INAPPROPRIATE_WORDS.forEach((word) => {
+    // Tạo pattern để match cả có dấu và không dấu
+    const pattern = createWordPattern(word);
+    
+    filteredText = filteredText.replace(pattern, (match) => {
+      // Thay thế bằng dấu * với độ dài tương ứng
+      return "*".repeat(match.length);
+    });
+  });
+
+  return filteredText;
+}
+
 // Kiểm tra API key
 const apiKey = process.env.OPENAI_API_KEY;
 if (!apiKey) {
@@ -264,6 +357,9 @@ export async function callMedConnectAI(
 
     // Lấy nội dung phản hồi từ AI
     let aiResponse = response.choices[0].message.content;
+    
+    // Lọc từ không phù hợp
+    aiResponse = filterInappropriateWords(aiResponse);
     
     // Post-process: Kiểm tra xem câu hỏi có phải về đặt lịch không
     const isBookingQuestion = 

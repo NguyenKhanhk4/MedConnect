@@ -15,3 +15,32 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
+/* Responsive */
+@media (max-width: 768px) {
+  .clinic-map-page {
+    padding: 16px 0;
+  }
+
+  .clinic-map-page .container {
+    padding: 0 12px;
+  }
+
+  .clinic-map-page .ant-card {
+    margin-bottom: 16px;
+  }
+
+  .clinic-map-page .ant-card-body {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 576px) {
+  .clinic-map-page {
+    padding: 12px 0;
+  }
+
+  .clinic-map-page .container {
+    padding: 0 8px;
+  }
+}
+

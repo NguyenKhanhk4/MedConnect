@@ -100,6 +100,62 @@ body {
   padding: 0;
 }
 
+/* Responsive */
+@media (max-width: 768px) {
+  .doctor-video-call-page-container {
+    padding: 0 16px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+
+  .page-title {
+    font-size: 20px !important;
+  }
+
+  .title-icon {
+    font-size: 24px;
+  }
+
+  .page-subtitle {
+    font-size: 14px;
+  }
+
+  .appointment-info-card,
+  .video-call-history-card,
+  .instructions-card {
+    margin-bottom: 16px;
+  }
+}
+
+@media (max-width: 576px) {
+  .doctor-video-call-page-container {
+    padding: 0 12px;
+  }
+
+  .page-header {
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+
+  .page-title {
+    font-size: 18px !important;
+  }
+
+  .title-icon {
+    font-size: 20px;
+  }
+
+  .page-subtitle {
+    font-size: 13px;
+  }
+}
+
 .doctor-video-call-page-container {
   max-width: 1200px;
   margin: 0 auto;

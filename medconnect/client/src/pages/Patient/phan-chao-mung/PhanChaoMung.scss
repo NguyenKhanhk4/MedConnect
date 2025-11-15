@@ -158,3 +158,61 @@ $gray-900: #111827;
 .welcome-button-outline {
   background: transparent;
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .welcome-section-container {
+    margin-top: 0.5rem;
+  }
+
+  .welcome-header {
+    padding: 1rem 1.5rem !important;
+    margin-bottom: 1.5rem !important;
+  }
+
+  .welcome-page-title {
+    font-size: 1.75rem;
+  }
+
+  .welcome-page-subtitle {
+    font-size: 0.875rem;
+  }
+
+  .welcome-actions-wrapper {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+
+    .welcome-button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  .welcome-content {
+    padding: 1rem 1.5rem;
+  }
+
+  .welcome-title {
+    font-size: 1.25rem;
+  }
+
+  .welcome-actions {
+    flex-direction: column;
+    width: 100%;
+
+    .welcome-button {
+      width: 100%;
+    }
+  }
+}
+
+@media (max-width: 576px) {
+  .welcome-page-title {
+    font-size: 1.5rem;
+  }
+
+  .welcome-title {
+    font-size: 1.125rem;
+  }
+}

@@ -557,6 +557,8 @@ export default function QuanLyLichBacSi() {
         return "#10b981";
       case "blocked":
         return "#6b7280";
+      case "no_show":
+        return "#9ca3af"; // Màu xám cho không đến khám
       default:
         return "#6b7280";
     }
@@ -1259,7 +1261,10 @@ export default function QuanLyLichBacSi() {
                         }}
                       />
                     ) : null}
-                    <div className="avatar-placeholder">
+                    <div 
+                      className="avatar-placeholder"
+                      style={{ display: doctor.avatarUrl ? "none" : "flex" }}
+                    >
                       <User size={24} />
                     </div>
                   </div>

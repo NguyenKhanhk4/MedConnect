@@ -11,6 +11,7 @@ import {
   FileTextOutlined,
   DollarOutlined,
   CreditCardOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
 import { clearUserData } from "../../utils/clearUserData";
 import "./ManagerLayout.scss";
@@ -130,7 +131,7 @@ const ManagerLayout = () => {
           style={{ cursor: "pointer" }}
         >
           <div className="logo-icon">
-            <CalendarOutlined />
+            <PlusOutlined />
           </div>
           <div className="logo-text">
             <div className="logo-title">MedConnect</div>

@@ -13,6 +13,7 @@ import {
   BellOutlined,
   UserOutlined,
   DownOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
 import { clearUserData } from "../../utils/clearUserData";
 import "./AdminLayout.scss";
@@ -124,7 +125,7 @@ const AdminLayout = () => {
           style={{ cursor: "pointer" }}
         >
           <div className="logo-icon">
-            <MedicineBoxOutlined />
+            <PlusOutlined />
           </div>
           <div className="logo-text">
             <div className="logo-title">MedConnect</div>

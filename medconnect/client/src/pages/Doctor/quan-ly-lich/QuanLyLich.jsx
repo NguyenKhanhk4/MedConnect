@@ -354,6 +354,8 @@ export default function QuanLyLich() {
         return "#10b981"; // Màu xanh lá cho đã đặt (tương tự confirmed)
       case "blocked":
         return "#6b7280"; // Màu xám cho bị chặn
+      case "no_show":
+        return "#9ca3af"; // Màu xám cho không đến khám
       default:
         return "#6b7280";
     }
@@ -460,6 +462,8 @@ export default function QuanLyLich() {
         return "#3b82f6"; // Chấm xanh dương
       case "booked":
         return "#10b981"; // Chấm xanh lá cho đã đặt
+      case "no_show":
+        return "#6b7280"; // Chấm xám cho không đến khám
       default:
         return "#6b7280";
     }

@@ -136,3 +136,44 @@
   transform: translateY(-2px);
 }
 
+/* Responsive */
+@media (max-width: 768px) {
+  .multi-specialization-booking {
+    padding: 16px 0;
+  }
+
+  .multi-specialization-booking .container {
+    padding: 0 16px;
+  }
+
+  .multi-specialization-booking .page-header {
+    margin-bottom: 20px;
+  }
+
+  .multi-specialization-booking .specialization-avatar {
+    height: 100px;
+    margin-bottom: 10px;
+  }
+
+  .multi-specialization-booking .ant-card-body {
+    padding: 12px;
+  }
+
+  .multi-specialization-booking .ant-modal-body {
+    max-height: 80vh;
+    padding: 16px;
+  }
+}
+
+@media (max-width: 576px) {
+  .multi-specialization-booking .specialization-avatar {
+    height: 80px;
+  }
+
+  .multi-specialization-booking .check-icon {
+    font-size: 18px;
+    top: 6px;
+    right: 6px;
+  }
+}
+
