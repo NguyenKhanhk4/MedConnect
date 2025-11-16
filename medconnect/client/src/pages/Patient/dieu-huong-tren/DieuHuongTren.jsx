@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
-import { Menu, Calendar, User, Stethoscope } from "lucide-react";
+import { Menu, Calendar, User, Plus } from "lucide-react";
 import { BrandLogo } from "../../../components/ui/BrandLogo";
 import "./DieuHuongTren.scss";
 
@@ -33,7 +33,7 @@ export function DieuHuongTren() {
             <Menu className="menu-icon" />
           </Button>
 
-          <BrandLogo icon={Stethoscope} tagline={null} />
+          <BrandLogo icon={Plus} tagline={null} />
         </div>
 
         {/* Center - Navigation Links */}

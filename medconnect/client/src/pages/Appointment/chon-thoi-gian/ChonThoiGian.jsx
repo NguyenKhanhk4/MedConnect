@@ -1114,10 +1114,13 @@ const ChonThoiGian = () => {
   };
 
   const disabledDate = (current) => {
-    // Disable dates before today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Set to start of day
-    return current && current < today;
+    // Disable dates before today and after 7 days from today
+    const today = dayjs().startOf("day");
+    const maxDate = today.add(7, "day"); // 7 ngày từ hôm nay
+    return (
+      current &&
+      (current < today || current > maxDate)
+    );
   };
 
   const isSlotPassed = (slot) => {

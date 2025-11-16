@@ -1,5 +1,5 @@
 import React from "react";
-import { Search } from "lucide-react";
+import { Plus } from "lucide-react";
 
 /**
  * Brand Logo Component
@@ -7,13 +7,13 @@ import { Search } from "lucide-react";
  * @param {Object} props
  * @param {string} props.brandName - Brand name (default: "MedConnect")
  * @param {string} props.tagline - Brand tagline (default: "Chăm sóc sức khỏe")
- * @param {React.Component} props.icon - Custom icon component (default: Search)
+ * @param {React.Component} props.icon - Custom icon component (default: Plus)
  * @param {string} props.className - Additional CSS classes
  */
 export function BrandLogo({
   brandName = "MedConnect",
   tagline = "Chăm sóc sức khỏe",
-  icon: Icon = Search,
+  icon: Icon = Plus,
   className = "",
 }) {
   return (

@@ -90,10 +90,10 @@ export async function requestReschedule(req, res) {
       );
     }
 
-    // Check if there's already a pending reschedule request
+    // Check if there's already ANY reschedule request (pending, approved, or rejected)
+    // Patient can only reschedule once
     const existingRequest = await RescheduleRequest.findOne({
       originalAppointmentId: appointmentId,
-      status: "pending",
     });
 
     if (existingRequest) {
@@ -101,7 +101,7 @@ export async function requestReschedule(req, res) {
         res,
         400,
         ERROR_CODES.INVALID_INPUT,
-        "There is already a pending reschedule request for this appointment"
+        "Bạn chỉ có thể dời lịch 1 lần. Đã có yêu cầu dời lịch cho lịch hẹn này."
       );
     }
 
@@ -511,10 +511,18 @@ export async function rejectReschedule(req, res) {
       return fail(res, 404, ERROR_CODES.USER_NOT_FOUND, "Doctor not found");
     }
 
-    // Find reschedule request
-    const request = await RescheduleRequest.findById(requestId).populate(
-      "originalAppointmentId"
-    );
+    // Find reschedule request with populated patient data
+    const request = await RescheduleRequest.findById(requestId).populate({
+      path: "originalAppointmentId",
+      populate: {
+        path: "patientId",
+        select: "fullName userId",
+        populate: {
+          path: "userId",
+          select: "email fullName",
+        },
+      },
+    });
 
     if (!request) {
       return fail(
@@ -577,6 +585,23 @@ export async function rejectReschedule(req, res) {
         "❌ Error creating reschedule rejected notification:",
         notificationError
       );
+    }
+
+    // Send email notification to patient
+    try {
+      await sendAppointmentRescheduleRejectedEmail(
+        originalAppointment,
+        request,
+        doctor,
+        reviewNotes
+      );
+      console.log("✅ Reschedule rejection email sent successfully");
+    } catch (emailError) {
+      console.error(
+        "⚠️ Failed to send reschedule rejection email:",
+        emailError.message
+      );
+      // Don't block rejection if email fails
     }
 
     return ok(res, {
@@ -872,6 +897,255 @@ MedConnect
   } catch (error) {
     console.error(
       "❌ Error sending reschedule confirmation email:",
+      error?.message || error
+    );
+    // Không throw error để không ảnh hưởng đến flow chính
+  }
+}
+
+/**
+ * Helper function: Send reschedule rejection email to patient
+ */
+export async function sendAppointmentRescheduleRejectedEmail(
+  originalAppointment,
+  request,
+  doctor,
+  reviewNotes
+) {
+  try {
+    console.log(`📧 sendAppointmentRescheduleRejectedEmail called with:`, {
+      originalAppointmentId: originalAppointment?._id,
+      requestId: request?._id,
+      patientEmail: originalAppointment?.patientId?.userId?.email,
+    });
+
+    // Lấy email từ Patient userId
+    let patientEmail = null;
+
+    if (
+      originalAppointment?.patientId?.userId &&
+      typeof originalAppointment.patientId.userId === "object" &&
+      originalAppointment.patientId.userId.email
+    ) {
+      // userId đã được populate
+      patientEmail = originalAppointment.patientId.userId.email;
+      console.log(`📧 Found email from populated userId: ${patientEmail}`);
+    } else if (originalAppointment?.patientId?.userId) {
+      // userId là ObjectId, cần query
+      console.log(
+        `📧 Querying User for email, userId: ${originalAppointment.patientId.userId}`
+      );
+      const patientUser = await User.findById(
+        originalAppointment.patientId.userId
+      )
+        .select("email fullName")
+        .lean();
+      if (patientUser) {
+        patientEmail = patientUser.email;
+        console.log(`📧 Found email from User query: ${patientEmail}`);
+      } else {
+        console.log(
+          `⚠️ User not found for userId: ${originalAppointment.patientId.userId}`
+        );
+      }
+    }
+
+    // Nếu vẫn không có email, không gửi
+    if (!patientEmail) {
+      console.log(
+        "⚠️ Patient email not found, skipping reschedule rejection email notification. Patient data:",
+        {
+          patientId: originalAppointment?.patientId?._id,
+          userId: originalAppointment?.patientId?.userId,
+        }
+      );
+      return;
+    }
+
+    console.log(`📧 Sending reschedule rejection email to: ${patientEmail}`);
+
+    // Format thời gian lịch hẹn gốc
+    const scheduledStart = new Date(originalAppointment.scheduledStart);
+    const scheduledEnd = new Date(originalAppointment.scheduledEnd);
+    const dateStr = scheduledStart.toLocaleDateString("vi-VN", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const timeStr = `${scheduledStart.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })} - ${scheduledEnd.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+
+    // Format thời gian yêu cầu dời lịch
+    const requestedDateTime = new Date(request.newDateTime);
+    const requestedDateStr = requestedDateTime.toLocaleDateString("vi-VN", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const requestedTimeStr = requestedDateTime.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const modeText =
+      originalAppointment.mode === "online"
+        ? "Tư vấn online"
+        : "Trực tiếp tại phòng khám";
+
+    // Lấy tên bác sĩ và bệnh nhân
+    const doctorName = doctor?.fullName || "Bác sĩ";
+    const patientName =
+      originalAppointment?.patientId?.fullName ||
+      originalAppointment?.patientId?.userId?.fullName ||
+      "Bệnh nhân";
+
+    // Tạo nội dung email
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">
+          Yêu cầu dời lịch của bạn đã bị từ chối
+        </h2>
+        <p>Xin chào <strong>${patientName}</strong>,</p>
+        <p>Chúng tôi rất tiếc phải thông báo rằng yêu cầu dời lịch hẹn của bạn đã bị <strong style="color: #dc2626;">bác sĩ từ chối</strong>.</p>
+        
+        <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #0284c7;">Thông tin bác sĩ:</h3>
+          <p style="margin: 8px 0;"><strong>Bác sĩ:</strong> ${doctorName}</p>
+          ${
+            originalAppointment.reason
+              ? `<p style="margin: 8px 0;"><strong>Lý do khám:</strong> ${originalAppointment.reason}</p>`
+              : ""
+          }
+        </div>
+
+        <div style="background-color: #ecfdf5; border-left: 4px solid #059669; padding: 15px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #047857;">Lịch hẹn hiện tại (vẫn còn hiệu lực):</h3>
+          <p style="margin: 8px 0;"><strong>Ngày:</strong> ${dateStr}</p>
+          <p style="margin: 8px 0;"><strong>Giờ:</strong> ${timeStr}</p>
+          <p style="margin: 8px 0;"><strong>Hình thức:</strong> ${modeText}</p>
+          <p style="margin: 8px 0;"><strong>Trạng thái:</strong> <span style="color: #059669; font-weight: bold;">Vẫn còn hiệu lực</span></p>
+        </div>
+
+        <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #b91c1c;">Thời gian yêu cầu dời lịch (đã bị từ chối):</h3>
+          <p style="margin: 8px 0;"><strong>Ngày:</strong> ${requestedDateStr}</p>
+          <p style="margin: 8px 0;"><strong>Giờ:</strong> ${requestedTimeStr}</p>
+        </div>
+
+        ${
+          request.reason
+            ? `
+        <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #d97706;">Lý do bạn yêu cầu dời lịch:</h3>
+          <p style="margin: 0; white-space: pre-wrap;">${request.reason}</p>
+        </div>
+        `
+            : ""
+        }
+
+        ${
+          reviewNotes
+            ? `
+        <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #b91c1c;">Lý do từ chối từ bác sĩ:</h3>
+          <p style="margin: 0; white-space: pre-wrap;">${reviewNotes}</p>
+        </div>
+        `
+            : ""
+        }
+
+        <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #0284c7;">Lưu ý:</h3>
+          <ul style="margin: 10px 0; padding-left: 20px;">
+            <li>Lịch hẹn ban đầu của bạn vẫn còn hiệu lực</li>
+            <li>Vui lòng đảm bảo bạn có mặt đúng giờ hẹn ban đầu</li>
+            <li>Nếu bạn không thể tham gia, vui lòng hủy lịch hẹn trước 24 giờ</li>
+            ${
+              originalAppointment.mode === "online"
+                ? "<li><strong>Lưu ý:</strong> Đây là cuộc hẹn online. Vui lòng chuẩn bị kết nối internet ổn định và tham gia cuộc gọi video đúng giờ.</li>"
+                : ""
+            }
+          </ul>
+        </div>
+
+        <p style="margin-top: 30px;">Cảm ơn bạn đã sử dụng dịch vụ của MedConnect.</p>
+        
+        <p style="margin-top: 30px;">Trân trọng,<br><strong>MedConnect</strong></p>
+      </div>
+    `;
+
+    const textContent = `
+Yêu cầu dời lịch của bạn đã bị từ chối
+
+Xin chào ${patientName},
+
+Chúng tôi rất tiếc phải thông báo rằng yêu cầu dời lịch hẹn của bạn đã bị bác sĩ từ chối.
+
+Thông tin bác sĩ:
+- Bác sĩ: ${doctorName}
+${
+  originalAppointment.reason
+    ? `- Lý do khám: ${originalAppointment.reason}`
+    : ""
+}
+
+Lịch hẹn hiện tại (vẫn còn hiệu lực):
+- Ngày: ${dateStr}
+- Giờ: ${timeStr}
+- Hình thức: ${modeText}
+- Trạng thái: Vẫn còn hiệu lực
+
+Thời gian yêu cầu dời lịch (đã bị từ chối):
+- Ngày: ${requestedDateStr}
+- Giờ: ${requestedTimeStr}
+
+${request.reason ? `Lý do bạn yêu cầu dời lịch: ${request.reason}` : ""}
+
+${reviewNotes ? `Lý do từ chối từ bác sĩ: ${reviewNotes}` : ""}
+
+Lưu ý:
+- Lịch hẹn ban đầu của bạn vẫn còn hiệu lực
+- Vui lòng đảm bảo bạn có mặt đúng giờ hẹn ban đầu
+- Nếu bạn không thể tham gia, vui lòng hủy lịch hẹn trước 24 giờ
+${
+  originalAppointment.mode === "online"
+    ? "- Lưu ý: Đây là cuộc hẹn online. Vui lòng chuẩn bị kết nối internet ổn định và tham gia cuộc gọi video đúng giờ."
+    : ""
+}
+
+Cảm ơn bạn đã sử dụng dịch vụ của MedConnect.
+
+Trân trọng,
+MedConnect
+    `;
+
+    console.log(
+      `📧 Attempting to send reschedule rejection email via sendMail...`
+    );
+    const emailResult = await sendMail({
+      to: patientEmail,
+      subject: "Yêu cầu dời lịch của bạn đã bị từ chối - MedConnect",
+      text: textContent,
+      html: htmlContent,
+    });
+
+    console.log(
+      `✅ Reschedule rejection email sent successfully to ${patientEmail}`
+    );
+    console.log(`📧 Email result:`, {
+      messageId: emailResult?.messageId,
+      response: emailResult?.response,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Error sending reschedule rejection email:",
       error?.message || error
     );
     // Không throw error để không ảnh hưởng đến flow chính

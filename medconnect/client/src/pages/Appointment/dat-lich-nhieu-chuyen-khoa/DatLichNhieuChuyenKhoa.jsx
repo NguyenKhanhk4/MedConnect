@@ -1472,9 +1472,14 @@ const DatLichNhieuChuyenKhoa = () => {
                       style={{ width: "100%" }}
                       placeholder="dd/mm/yyyy"
                       format="DD/MM/YYYY"
-                      disabledDate={(current) =>
-                        current && current < dayjs().startOf("day")
-                      }
+                      disabledDate={(current) => {
+                        const today = dayjs().startOf("day");
+                        const maxDate = today.add(7, "day"); // 7 ngày từ hôm nay
+                        return (
+                          current &&
+                          (current < today || current > maxDate)
+                        );
+                      }}
                       onChange={handleDateSelect}
                       disabled={loading}
                     />

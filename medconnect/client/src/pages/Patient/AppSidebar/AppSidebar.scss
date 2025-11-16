@@ -45,15 +45,15 @@
   justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
-  background: linear-gradient(135deg, #40cccc 0%, #45c3d2 100%) !important;
+  background: #40E0D0 !important;
   border-radius: 0.75rem;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(64, 204, 204, 0.3);
+  box-shadow: 0 4px 12px rgba(64, 224, 208, 0.3);
   transition: all 0.3s ease;
 
   &:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(64, 204, 204, 0.4);
+    box-shadow: 0 6px 16px rgba(64, 224, 208, 0.4);
   }
 }
 

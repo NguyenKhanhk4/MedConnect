@@ -86,7 +86,7 @@ export function LichHenCuaToi() {
   const { userProfile } = useUserProfile();
 
   const handleCancelAppointment = async (appointmentId) => {
-    showConfirm("Bạn có chắc chắn muốn hủy lịch hẹn này?", async () => {
+    showConfirm("Bạn sẽ bị trừ 50% số tiền nếu bạn hủy. Bạn có chắc chắn muốn hủy lịch hẹn này?", async () => {
       try {
         // Gọi API endpoint mới
         const response = await api.put(
@@ -238,7 +238,10 @@ export function LichHenCuaToi() {
               Quản lý và theo dõi các lịch hẹn khám bệnh
             </p>
             <p className="page-note">
-              Lưu ý : Bạn chỉ có thể dời lịch trước 24h
+              Lưu ý : Bạn chỉ có thể dời lịch trước 24h.
+            </p>
+             <p className="page-note">
+               Mọi thắc mắc xin vui lòng liên hệ với quản lý để được giải quyết sớm nhất. Hotline 0398723124 
             </p>
           </div>
           {/* Doctor Search Filter */}

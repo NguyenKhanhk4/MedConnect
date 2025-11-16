@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
 import {
   Button,
   Input,
@@ -558,9 +559,14 @@ const KhamTaiNha = () => {
                     <DatePicker
                       style={{ width: "100%" }}
                       placeholder="Chọn ngày"
-                      disabledDate={(current) =>
-                        current && current < new Date()
-                      }
+                      disabledDate={(current) => {
+                        const today = dayjs().startOf("day");
+                        const maxDate = today.add(7, "day"); // 7 ngày từ hôm nay
+                        return (
+                          current &&
+                          (current < today || current > maxDate)
+                        );
+                      }}
                     />
                   </Form.Item>
                 </Col>

@@ -12,6 +12,7 @@ import {
   Select,
   Typography,
 } from "antd";
+import { ExclamationCircleOutlined } from "@ant-design/icons";
 import { CalendarOutlined, EnvironmentOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { api } from "../../lib/api";
@@ -35,7 +36,7 @@ export function RescheduleModal({
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
-  const [selectedMode, setSelectedMode] = useState(null); // No default - user must choose
+  const [selectedMode, setSelectedMode] = useState(null); // Mode from appointment (cannot be changed)
   const [clinics, setClinics] = useState([]);
   const [clinicLoading, setClinicLoading] = useState(false);
   const [doctors, setDoctors] = useState([]);
@@ -162,11 +163,10 @@ export function RescheduleModal({
         fetchDoctors();
       }
 
-      // Set mode from current appointment (default to current mode)
+      // Set mode from current appointment (cannot be changed during reschedule)
       if (appointment?.mode) {
         const currentMode = appointment.mode;
         setSelectedMode(currentMode);
-        form.setFieldsValue({ mode: currentMode });
 
         // If current mode is offline, fetch clinics and set current clinicId
         if (currentMode === "offline") {
@@ -187,22 +187,6 @@ export function RescheduleModal({
       setSelectedSpecializationId(null);
     }
   }, [visible, form, appointment, allowDoctorChange]);
-
-  // Fetch clinics when mode is changed to offline manually
-  useEffect(() => {
-    if (
-      visible &&
-      selectedMode === "offline" &&
-      clinics.length === 0 &&
-      appointment.mode !== "offline" // Only fetch if user changed from online to offline
-    ) {
-      const doctorId =
-        selectedDoctorId || appointment?.doctorId?._id || appointment?.doctorId;
-      if (doctorId) {
-        fetchClinics(doctorId);
-      }
-    }
-  }, [visible, selectedMode, appointment, clinics.length, selectedDoctorId]);
 
   // Fetch time slots when date or doctor changes
   useEffect(() => {
@@ -280,22 +264,37 @@ export function RescheduleModal({
     }
   };
 
+  // Helper function to check if date is weekend (Saturday = 6, Sunday = 0)
+  const isWeekend = (date) => {
+    if (!date) return false;
+    const dayOfWeek = dayjs(date).day();
+    return dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+  };
+
+  // Helper function to check if date is weekday (Monday-Friday)
+  const isWeekday = (date) => {
+    if (!date) return false;
+    const dayOfWeek = dayjs(date).day();
+    return dayOfWeek >= 1 && dayOfWeek <= 5; // Monday to Friday
+  };
+
   const handleSubmit = async (values) => {
     try {
-      setLoading(true);
-
+      // Validate form first
       if (!selectedTimeSlot) {
         message.error("Vui lòng chọn một khung giờ khám");
         return;
       }
 
-      if (!selectedMode) {
-        message.error("Vui lòng chọn hình thức khám");
+      // Get mode from appointment (cannot be changed during reschedule)
+      const currentMode = appointment?.mode || selectedMode;
+      if (!currentMode) {
+        message.error("Không thể xác định hình thức khám");
         return;
       }
 
       // If offline mode, clinicId is required
-      if (selectedMode === "offline" && !values.clinicId) {
+      if (currentMode === "offline" && !values.clinicId) {
         message.error("Vui lòng chọn phòng khám");
         return;
       }
@@ -310,15 +309,73 @@ export function RescheduleModal({
         return;
       }
 
+      // Check date restrictions based on current appointment date
+      const currentAppointmentDate = appointment?.scheduledStart
+        ? new Date(appointment.scheduledStart)
+        : null;
+      const newAppointmentDate = new Date(newDateTime);
+
+      // Validation: If current appointment is weekday, cannot reschedule to weekend
+      if (currentAppointmentDate && isWeekday(currentAppointmentDate)) {
+        if (isWeekend(newAppointmentDate)) {
+          Modal.warning({
+            title: "Không thể dời lịch",
+            icon: <ExclamationCircleOutlined />,
+            content:
+              "Lịch hẹn hiện tại của bạn là ngày trong tuần (thứ 2 - thứ 6). Bạn không thể dời lịch sang thứ 7 hoặc chủ nhật. Vui lòng chọn một ngày trong tuần khác.",
+            okText: "Đã hiểu",
+          });
+          return;
+        }
+      }
+
+      // Prepare confirmation message based on date change
+      let confirmationContent =
+        "Bạn chỉ có thể dời lịch được 1 lần và sau khi dời lịch bạn không thể quay lại được lịch cũ. Bạn có chắc chắn muốn dời lịch không?";
+
+      // If current appointment is weekend and new appointment is weekday, show warning about price difference
+      if (currentAppointmentDate && isWeekend(currentAppointmentDate)) {
+        if (isWeekday(newAppointmentDate)) {
+          confirmationContent =
+            "Lịch hẹn hiện tại của bạn là thứ 7 hoặc chủ nhật. Nếu bạn dời lịch sang ngày trong tuần, bạn sẽ bị mất phần chênh lệch giá do giá khám của thứ 7/chủ nhật và ngày trong tuần khác nhau. Bạn có chắc chắn muốn dời lịch không?";
+        }
+      }
+
+      // Show confirmation dialog before submitting
+      // Only show confirmation for patient requests (not for manager/admin)
+      if (!customSubmitHandler) {
+        Modal.confirm({
+          title: "Xác nhận dời lịch",
+          icon: <ExclamationCircleOutlined />,
+          content: confirmationContent,
+          okText: "Xác nhận",
+          cancelText: "Hủy",
+          onOk: async () => {
+            await submitRescheduleRequest(values, currentMode, newDateTime);
+          },
+        });
+      } else {
+        // For manager/admin, submit directly without confirmation
+        await submitRescheduleRequest(values, currentMode, newDateTime);
+      }
+    } catch (error) {
+      console.error("Error in handleSubmit:", error);
+    }
+  };
+
+  const submitRescheduleRequest = async (values, currentMode, newDateTime) => {
+    try {
+      setLoading(true);
+
       const requestBody = {
         appointmentId: appointment._id,
         newDateTime: newDateTime,
         reason: values.reason,
-        mode: selectedMode,
+        mode: currentMode,
       };
 
       // Only include clinicId if mode is offline
-      if (selectedMode === "offline" && values.clinicId) {
+      if (currentMode === "offline" && values.clinicId) {
         requestBody.clinicId = values.clinicId;
       }
 
@@ -344,8 +401,8 @@ export function RescheduleModal({
           appointmentId: appointment._id,
           newDateTime: newDateTime,
           reason: values.reason,
-          mode: selectedMode,
-          clinicId: selectedMode === "offline" ? values.clinicId : undefined,
+          mode: currentMode,
+          clinicId: currentMode === "offline" ? values.clinicId : undefined,
           newDoctorId:
             allowDoctorChange &&
             values.doctorId &&
@@ -415,9 +472,33 @@ export function RescheduleModal({
   };
 
   const disabledDate = (current) => {
-    // Disable dates before tomorrow
+    if (!current) return false;
+    
+    // Disable dates before tomorrow and after 7 days from today
     const tomorrow = dayjs().add(1, "day").startOf("day");
-    return current && current < tomorrow;
+    const maxDate = dayjs().add(7, "day").startOf("day"); // 7 ngày từ hôm nay
+    
+    // Basic date range validation
+    if (current < tomorrow || current > maxDate) {
+      return true;
+    }
+    
+    // If current appointment is weekday, disable weekends (Saturday = 6, Sunday = 0)
+    if (appointment?.scheduledStart) {
+      const currentAppointmentDate = dayjs(appointment.scheduledStart);
+      const dayOfWeek = currentAppointmentDate.day();
+      
+      // If current appointment is weekday (Monday-Friday: 1-5), disable weekends
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        const selectedDayOfWeek = current.day();
+        // Disable Saturday (6) and Sunday (0)
+        if (selectedDayOfWeek === 0 || selectedDayOfWeek === 6) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
   };
 
   return (
@@ -708,41 +789,6 @@ export function RescheduleModal({
               )}
             </Form.Item>
           )}
-
-          {/* Mode Selection - Show immediately with current appointment mode selected */}
-          <Form.Item
-            name="mode"
-            label="Hình thức khám"
-            rules={[
-              {
-                required: true,
-                message: "Vui lòng chọn hình thức khám",
-              },
-            ]}
-          >
-            <Radio.Group
-              value={selectedMode}
-              onChange={(e) => {
-                setSelectedMode(e.target.value);
-                form.setFieldsValue({ mode: e.target.value });
-                // Reset clinicId when changing mode to online
-                if (e.target.value === "online") {
-                  form.setFieldsValue({ clinicId: undefined });
-                  setClinics([]);
-                }
-                // Fetch clinics when changing to offline
-                else if (
-                  e.target.value === "offline" &&
-                  appointment?.doctorId?._id
-                ) {
-                  fetchClinics();
-                }
-              }}
-            >
-              <Radio value="online">Tư vấn online</Radio>
-              <Radio value="offline">Khám tại phòng khám</Radio>
-            </Radio.Group>
-          </Form.Item>
 
           {/* Clinic Selection - Only show when mode is offline */}
           {selectedMode === "offline" && (
