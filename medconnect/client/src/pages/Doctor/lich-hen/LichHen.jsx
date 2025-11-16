@@ -613,6 +613,26 @@ export default function LichHen() {
     );
   };
 
+  // ==========================================
+  // [LOCK] [FEATURE] KIEM_TRA_NGAY_KHAM - CODE DA COMMENT [LOCK]
+  // Tính năng: Chỉ hiển thị nút khám khi đã đến ngày khám
+  // Để kích hoạt tính năng này, uncomment các dòng code bên dưới
+  // Tìm kiếm: "KIEM_TRA_NGAY_KHAM" hoặc "[LOCK]" hoặc "[FEATURE]"
+  // ==========================================
+  // Helper function để kiểm tra xem ngày khám đã đến chưa
+  // const isAppointmentDateReached = (scheduledStart) => {
+  //   if (!scheduledStart) return false;
+  //   const appointmentDate = new Date(scheduledStart);
+  //   const today = new Date();
+  //   
+  //   // Set time to midnight for date comparison
+  //   appointmentDate.setHours(0, 0, 0, 0);
+  //   today.setHours(0, 0, 0, 0);
+  //   
+  //   // Trả về true nếu ngày khám <= hôm nay
+  //   return appointmentDate <= today;
+  // };
+
   // Accept all pending appointments (cả online và offline)
   const handleAcceptAll = async () => {
     // Lấy tất cả appointments đang chờ xác nhận (cả online và offline)
@@ -1062,6 +1082,9 @@ export default function LichHen() {
                       <div className="appointment-list-action-buttons">
                         {/* Cả online và offline: Bỏ qua bước xác nhận, vào thẳng bắt đầu khám/không đến khám */}
                         {/* Note: pending_doctor status has been removed - all appointments are auto-accepted */}
+                        {/* [LOCK] [FEATURE] KIEM_TRA_NGAY_KHAM - DE KICH HOAT, THAY DOI DIEU KIEN BEN DUOI [LOCK] */}
+                        {/* [UNLOCK] Uncomment dòng này và comment dòng {apt.status === "accepted" && ( bên dưới: */}
+                        {/* {apt.status === "accepted" && isAppointmentDateReached(apt.scheduledStart) && ( */}
                         {apt.status === "accepted" && (
                           <>
                             <Button
@@ -1274,6 +1297,9 @@ export default function LichHen() {
                     <h4>Thay đổi trạng thái</h4>
                     <div className="appointment-status-buttons">
                       {/* Note: pending_doctor status has been removed - all appointments are auto-accepted */}
+                      {/* [LOCK] [FEATURE] KIEM_TRA_NGAY_KHAM - DE KICH HOAT, THAY DOI DIEU KIEN BEN DUOI [LOCK] */}
+                      {/* [UNLOCK] Uncomment dòng này và comment dòng {selectedAppointment.status === "accepted" && ( bên dưới: */}
+                      {/* {selectedAppointment.status === "accepted" && isAppointmentDateReached(selectedAppointment.scheduledStart) && ( */}
                       {selectedAppointment.status === "accepted" && (
                         <>
                           <Button

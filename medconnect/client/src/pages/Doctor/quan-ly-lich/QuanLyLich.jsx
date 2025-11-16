@@ -883,6 +883,26 @@ export default function QuanLyLich() {
     }
   };
 
+  // ==========================================
+  // [LOCK] [FEATURE] KIEM_TRA_NGAY_KHAM - CODE DA COMMENT [LOCK]
+  // Tính năng: Chỉ hiển thị nút khám khi đã đến ngày khám
+  // Để kích hoạt tính năng này, uncomment các dòng code bên dưới
+  // Tìm kiếm: "KIEM_TRA_NGAY_KHAM" hoặc "[LOCK]" hoặc "[FEATURE]"
+  // ==========================================
+  // Helper function để kiểm tra xem ngày khám đã đến chưa
+  // const isAppointmentDateReached = (scheduledStart) => {
+  //   if (!scheduledStart) return false;
+  //   const appointmentDate = new Date(scheduledStart);
+  //   const today = new Date();
+  //   
+  //   // Set time to midnight for date comparison
+  //   appointmentDate.setHours(0, 0, 0, 0);
+  //   today.setHours(0, 0, 0, 0);
+  //   
+  //   // Trả về true nếu ngày khám <= hôm nay
+  //   return appointmentDate <= today;
+  // };
+
   // Removed: handleDeleteSlot - doctors can no longer delete slots
   const _handleDeleteSlot_removed = async (slot) => {
     // Check for slot ID (could be _id or id depending on mapping)
@@ -1628,6 +1648,17 @@ export default function QuanLyLich() {
                 </div>
               )}
 
+              {/* [LOCK] [FEATURE] KIEM_TRA_NGAY_KHAM - DE KICH HOAT, THAY DOI DIEU KIEN BEN DUOI [LOCK] */}
+              {/* [UNLOCK] Uncomment dòng này và comment dòng {selectedAppointmentDetail.mode === "online" && bên dưới: */}
+              {/* {selectedAppointmentDetail.mode === "online" &&
+                (selectedAppointmentDetail.status === "confirmed" ||
+                  selectedAppointmentDetail.status === "booked" ||
+                  selectedAppointmentDetail.status === "accepted" ||
+                  selectedAppointmentDetail.status === "in_progress") &&
+                isAppointmentDateReached(
+                  selectedAppointmentDetail.scheduledStart ||
+                  selectedAppointmentDetail.slotId?.startAt
+                ) && ( */}
               {selectedAppointmentDetail.mode === "online" &&
                 (selectedAppointmentDetail.status === "confirmed" ||
                   selectedAppointmentDetail.status === "booked" ||
