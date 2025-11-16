@@ -240,7 +240,7 @@ export default function TuVanTrucTuyen() {
             : formData.notes,
         });
 
-        showAlert("AI đã đưa ra gợi ý điều trị. Vui lòng xem xét và verify trước khi lưu!");
+        showAlert("AI đã đưa ra gợi ý điều trị. Vui lòng xem xét và xác nhận trước khi lưu!");
       }
     } catch (error) {
       console.error("Error getting AI suggestion:", error);

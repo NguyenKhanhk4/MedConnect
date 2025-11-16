@@ -157,7 +157,9 @@ export default function KhamTrucTiep() {
       try {
         setLoadingServices(true);
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/service-prices/active`,
+          `${
+            import.meta.env.VITE_API_URL || "http://localhost:3000"
+          }/api/service-prices/active`,
           {
             method: "GET",
             credentials: "include",
@@ -166,7 +168,7 @@ export default function KhamTrucTiep() {
 
         if (response.ok) {
           const data = await response.json();
-          
+
           if (data.success && data.data?.servicePrices) {
             // Lấy danh sách tên dịch vụ từ servicePrices
             const serviceNames = data.data.servicePrices.map(
@@ -179,7 +181,11 @@ export default function KhamTrucTiep() {
           }
         } else {
           const errorText = await response.text();
-          console.error("❌ Failed to fetch clinical services:", response.status, errorText);
+          console.error(
+            "❌ Failed to fetch clinical services:",
+            response.status,
+            errorText
+          );
           setClinicalServices([]);
         }
       } catch (error) {
@@ -192,7 +198,6 @@ export default function KhamTrucTiep() {
 
     fetchClinicalServices();
   }, []);
-
 
   useEffect(() => {
     const fetchAppointment = async () => {
@@ -502,20 +507,24 @@ export default function KhamTrucTiep() {
           <div className="header-content" style={{ flex: 1 }}>
             <h1>Hoàn thành khám bệnh trực tiếp</h1>
             <div style={{ marginTop: "12px", marginLeft: "-20px" }}>
-              <p style={{ 
-                margin: 0, 
-                fontSize: "14px", 
-                color: "#fff",
-                marginBottom: "4px"
-              }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "14px",
+                  color: "#fff",
+                  marginBottom: "4px",
+                }}
+              >
                 Bệnh nhân:
               </p>
-              <p style={{ 
-                margin: 0, 
-                fontSize: "24px", 
-                fontWeight: "600",
-                color: "#fff"
-              }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "24px",
+                  fontWeight: "600",
+                  color: "#fff",
+                }}
+              >
                 {appointment?.patientId?.fullName ||
                   appointment?.patient?.fullName ||
                   appointment?.patientName ||
@@ -592,9 +601,11 @@ export default function KhamTrucTiep() {
                     />
                   </div>
                 </div>
-                
+
                 {/* Vitals Section - Gộp vào tab Thông tin cơ bản */}
-                <h3 className="section-title" style={{ marginTop: "2rem" }}>📊 Chỉ số Sinh Học</h3>
+                <h3 className="section-title" style={{ marginTop: "2rem" }}>
+                  📊 Chỉ số Sinh Học
+                </h3>
                 <div className="vitals-grid">
                   <div className="form-group">
                     <label>Chiều cao (cm)</label>
@@ -755,7 +766,7 @@ export default function KhamTrucTiep() {
                             cursor: "pointer",
                           }}
                         >
-                          ✓ Đã xem xét
+                          ✓ Đã xác nhận
                         </Button>
                       )}
                       {isAIVerified && (
@@ -1098,72 +1109,81 @@ export default function KhamTrucTiep() {
                 {formData.labResults.map((lab, index) => {
                   // Tính toán filteredServices trước khi render
                   const searchTerm = (serviceSearch[index] || "").toLowerCase();
-                  const filteredServices = clinicalServices.filter((service) => {
-                    return (
-                      searchTerm === "" ||
-                      service.toLowerCase().includes(searchTerm)
-                    );
-                  });
-                  
+                  const filteredServices = clinicalServices.filter(
+                    (service) => {
+                      return (
+                        searchTerm === "" ||
+                        service.toLowerCase().includes(searchTerm)
+                      );
+                    }
+                  );
+
                   return (
-                  <div key={index} className="array-item">
-                    <div className="item-header">
-                      <span className="item-number">
-                        Dịch vụ cận lâm sàng #{index + 1}
-                      </span>
-                      {formData.labResults.length > 1 && (
-                        <button
-                          type="button"
-                          className="btn-remove"
-                          onClick={() => removeArrayItem("labResults", index)}
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                    <div className="item-content" style={{ position: "relative", zIndex: 1, overflow: "visible" }}>
-                      <div className="form-group">
-                        <label>Chọn dịch vụ cận lâm sàng</label>
-                        <div
-                          onClick={() => {
-                            setOpenModal(index);
-                            setServiceSearch({
-                              ...serviceSearch,
-                              [index]: "",
-                            });
-                          }}
-                          style={{
-                            padding: "8px 12px",
-                            border: "1px solid #d9d9d9",
-                            borderRadius: "4px",
-                            cursor: "pointer",
-                            backgroundColor: "#fff",
-                            minHeight: "32px",
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                        >
-                          {lab.testName || "-- Chọn dịch vụ --"}
-                          <span style={{ marginLeft: "auto" }}>▼</span>
+                    <div key={index} className="array-item">
+                      <div className="item-header">
+                        <span className="item-number">
+                          Dịch vụ cận lâm sàng #{index + 1}
+                        </span>
+                        {formData.labResults.length > 1 && (
+                          <button
+                            type="button"
+                            className="btn-remove"
+                            onClick={() => removeArrayItem("labResults", index)}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                      <div
+                        className="item-content"
+                        style={{
+                          position: "relative",
+                          zIndex: 1,
+                          overflow: "visible",
+                        }}
+                      >
+                        <div className="form-group">
+                          <label>Chọn dịch vụ cận lâm sàng</label>
+                          <div
+                            onClick={() => {
+                              setOpenModal(index);
+                              setServiceSearch({
+                                ...serviceSearch,
+                                [index]: "",
+                              });
+                            }}
+                            style={{
+                              padding: "8px 12px",
+                              border: "1px solid #d9d9d9",
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                              backgroundColor: "#fff",
+                              minHeight: "32px",
+                              display: "flex",
+                              alignItems: "center",
+                            }}
+                          >
+                            {lab.testName || "-- Chọn dịch vụ --"}
+                            <span style={{ marginLeft: "auto" }}>▼</span>
+                          </div>
+                        </div>
+                        <div className="form-group">
+                          <label>Kết quả</label>
+                          <Input
+                            type="text"
+                            value={lab.result}
+                            onChange={(e) =>
+                              handleArrayChange(
+                                "labResults",
+                                index,
+                                "result",
+                                e.target.value
+                              )
+                            }
+                          />
                         </div>
                       </div>
-                      <div className="form-group">
-                        <label>Kết quả</label>
-                        <Input
-                          type="text"
-                          value={lab.result}
-                          onChange={(e) =>
-                            handleArrayChange(
-                              "labResults",
-                              index,
-                              "result",
-                              e.target.value
-                            )
-                          }
-                        />
-                      </div>
                     </div>
-                  </div>
                   );
                 })}
                 <Button
@@ -1248,167 +1268,164 @@ export default function KhamTrucTiep() {
       </div>
 
       {/* Modal chọn dịch vụ cận lâm sàng */}
-      {openModal !== null && (() => {
-        const currentIndex = openModal;
-        const searchTerm = (serviceSearch[currentIndex] || "").toLowerCase();
-        const filteredServices = clinicalServices.filter((service) => {
-          return (
-            searchTerm === "" ||
-            service.toLowerCase().includes(searchTerm)
-          );
-        });
-        const currentLab = formData.labResults[currentIndex];
+      {openModal !== null &&
+        (() => {
+          const currentIndex = openModal;
+          const searchTerm = (serviceSearch[currentIndex] || "").toLowerCase();
+          const filteredServices = clinicalServices.filter((service) => {
+            return (
+              searchTerm === "" || service.toLowerCase().includes(searchTerm)
+            );
+          });
+          const currentLab = formData.labResults[currentIndex];
 
-        return (
-          <div
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
-              zIndex: 10000,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "20px",
-            }}
-            onClick={() => {
-              setOpenModal(null);
-              setServiceSearch({
-                ...serviceSearch,
-                [currentIndex]: "",
-              });
-            }}
-          >
+          return (
             <div
               style={{
-                backgroundColor: "#fff",
-                borderRadius: "8px",
-                width: "100%",
-                maxWidth: "600px",
-                maxHeight: "80vh",
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                zIndex: 10000,
                 display: "flex",
-                flexDirection: "column",
-                boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "20px",
               }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={() => {
+                setOpenModal(null);
+                setServiceSearch({
+                  ...serviceSearch,
+                  [currentIndex]: "",
+                });
+              }}
             >
-              {/* Modal Header */}
               <div
                 style={{
-                  padding: "16px 20px",
-                  borderBottom: "1px solid #e8e8e8",
+                  backgroundColor: "#fff",
+                  borderRadius: "8px",
+                  width: "100%",
+                  maxWidth: "600px",
+                  maxHeight: "80vh",
                   display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
+                  flexDirection: "column",
+                  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)",
                 }}
+                onClick={(e) => e.stopPropagation()}
               >
-                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: "600" }}>
-                  Chọn dịch vụ cận lâm sàng
-                </h3>
-                <button
-                  onClick={() => {
-                    setOpenModal(null);
-                    setServiceSearch({
-                      ...serviceSearch,
-                      [currentIndex]: "",
-                    });
-                  }}
+                {/* Modal Header */}
+                <div
                   style={{
-                    background: "none",
-                    border: "none",
-                    fontSize: "24px",
-                    cursor: "pointer",
-                    color: "#999",
-                    padding: 0,
-                    width: "30px",
-                    height: "30px",
+                    padding: "16px 20px",
+                    borderBottom: "1px solid #e8e8e8",
                     display: "flex",
+                    justifyContent: "space-between",
                     alignItems: "center",
-                    justifyContent: "center",
                   }}
                 >
-                  ×
-                </button>
-              </div>
+                  <h3
+                    style={{ margin: 0, fontSize: "18px", fontWeight: "600" }}
+                  >
+                    Chọn dịch vụ cận lâm sàng
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setOpenModal(null);
+                      setServiceSearch({
+                        ...serviceSearch,
+                        [currentIndex]: "",
+                      });
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      fontSize: "24px",
+                      cursor: "pointer",
+                      color: "#999",
+                      padding: 0,
+                      width: "30px",
+                      height: "30px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
 
-              {/* Search Input */}
-              <div style={{ padding: "16px 20px", borderBottom: "1px solid #e8e8e8" }}>
-                <Input
-                  type="text"
-                  placeholder="🔍 Tìm dịch vụ..."
-                  value={serviceSearch[currentIndex] || ""}
-                  onChange={(e) => {
-                    setServiceSearch({
-                      ...serviceSearch,
-                      [currentIndex]: e.target.value,
-                    });
+                {/* Search Input */}
+                <div
+                  style={{
+                    padding: "16px 20px",
+                    borderBottom: "1px solid #e8e8e8",
                   }}
-                  style={{ width: "100%" }}
-                  autoFocus
-                />
-              </div>
+                >
+                  <Input
+                    type="text"
+                    placeholder="🔍 Tìm dịch vụ..."
+                    value={serviceSearch[currentIndex] || ""}
+                    onChange={(e) => {
+                      setServiceSearch({
+                        ...serviceSearch,
+                        [currentIndex]: e.target.value,
+                      });
+                    }}
+                    style={{ width: "100%" }}
+                    autoFocus
+                  />
+                </div>
 
-              {/* Services List */}
-              <div
-                style={{
-                  flex: 1,
-                  overflowY: "auto",
-                  padding: "8px 0",
-                  maxHeight: "400px",
-                }}
-              >
-                {loadingServices ? (
-                  <div style={{ padding: "20px", textAlign: "center", color: "#999" }}>
-                    Đang tải danh sách dịch vụ...
-                  </div>
-                ) : clinicalServices.length === 0 ? (
-                  <div style={{ padding: "20px", textAlign: "center", color: "#999" }}>
-                    Chưa có dịch vụ nào. Vui lòng thêm dịch vụ trong quản lý.
-                  </div>
-                ) : filteredServices.length === 0 ? (
-                  <div style={{ padding: "20px", textAlign: "center", color: "#999" }}>
-                    Không tìm thấy dịch vụ phù hợp
-                  </div>
-                ) : (
-                  <>
+                {/* Services List */}
+                <div
+                  style={{
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: "8px 0",
+                    maxHeight: "400px",
+                  }}
+                >
+                  {loadingServices ? (
                     <div
-                      onClick={() => {
-                        handleArrayChange("labResults", currentIndex, "testName", "");
-                        setOpenModal(null);
-                        setServiceSearch({
-                          ...serviceSearch,
-                          [currentIndex]: "",
-                        });
-                      }}
                       style={{
-                        padding: "12px 20px",
-                        cursor: "pointer",
-                        backgroundColor: !currentLab?.testName ? "#e6f7ff" : "#fff",
-                        borderBottom: "1px solid #f0f0f0",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!currentLab?.testName) return;
-                        e.target.style.backgroundColor = "#f5f5f5";
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!currentLab?.testName) return;
-                        e.target.style.backgroundColor = "#fff";
+                        padding: "20px",
+                        textAlign: "center",
+                        color: "#999",
                       }}
                     >
-                      -- Chọn dịch vụ --
+                      Đang tải danh sách dịch vụ...
                     </div>
-                    {filteredServices.map((service, idx) => (
+                  ) : clinicalServices.length === 0 ? (
+                    <div
+                      style={{
+                        padding: "20px",
+                        textAlign: "center",
+                        color: "#999",
+                      }}
+                    >
+                      Chưa có dịch vụ nào. Vui lòng thêm dịch vụ trong quản lý.
+                    </div>
+                  ) : filteredServices.length === 0 ? (
+                    <div
+                      style={{
+                        padding: "20px",
+                        textAlign: "center",
+                        color: "#999",
+                      }}
+                    >
+                      Không tìm thấy dịch vụ phù hợp
+                    </div>
+                  ) : (
+                    <>
                       <div
-                        key={`modal-service-${currentIndex}-${idx}`}
                         onClick={() => {
                           handleArrayChange(
                             "labResults",
                             currentIndex,
                             "testName",
-                            service
+                            ""
                           );
                           setOpenModal(null);
                           setServiceSearch({
@@ -1419,54 +1436,91 @@ export default function KhamTrucTiep() {
                         style={{
                           padding: "12px 20px",
                           cursor: "pointer",
-                          backgroundColor:
-                            currentLab?.testName === service ? "#e6f7ff" : "#fff",
+                          backgroundColor: !currentLab?.testName
+                            ? "#e6f7ff"
+                            : "#fff",
                           borderBottom: "1px solid #f0f0f0",
                         }}
                         onMouseEnter={(e) => {
-                          if (currentLab?.testName === service) return;
+                          if (!currentLab?.testName) return;
                           e.target.style.backgroundColor = "#f5f5f5";
                         }}
                         onMouseLeave={(e) => {
-                          if (currentLab?.testName === service) return;
+                          if (!currentLab?.testName) return;
                           e.target.style.backgroundColor = "#fff";
                         }}
                       >
-                        {service}
+                        -- Chọn dịch vụ --
                       </div>
-                    ))}
-                  </>
-                )}
-              </div>
+                      {filteredServices.map((service, idx) => (
+                        <div
+                          key={`modal-service-${currentIndex}-${idx}`}
+                          onClick={() => {
+                            handleArrayChange(
+                              "labResults",
+                              currentIndex,
+                              "testName",
+                              service
+                            );
+                            setOpenModal(null);
+                            setServiceSearch({
+                              ...serviceSearch,
+                              [currentIndex]: "",
+                            });
+                          }}
+                          style={{
+                            padding: "12px 20px",
+                            cursor: "pointer",
+                            backgroundColor:
+                              currentLab?.testName === service
+                                ? "#e6f7ff"
+                                : "#fff",
+                            borderBottom: "1px solid #f0f0f0",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (currentLab?.testName === service) return;
+                            e.target.style.backgroundColor = "#f5f5f5";
+                          }}
+                          onMouseLeave={(e) => {
+                            if (currentLab?.testName === service) return;
+                            e.target.style.backgroundColor = "#fff";
+                          }}
+                        >
+                          {service}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
 
-              {/* Modal Footer */}
-              <div
-                style={{
-                  padding: "16px 20px",
-                  borderTop: "1px solid #e8e8e8",
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: "10px",
-                }}
-              >
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setOpenModal(null);
-                    setServiceSearch({
-                      ...serviceSearch,
-                      [currentIndex]: "",
-                    });
+                {/* Modal Footer */}
+                <div
+                  style={{
+                    padding: "16px 20px",
+                    borderTop: "1px solid #e8e8e8",
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: "10px",
                   }}
-                  variant="outline"
                 >
-                  Hủy
-                </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setOpenModal(null);
+                      setServiceSearch({
+                        ...serviceSearch,
+                        [currentIndex]: "",
+                      });
+                    }}
+                    variant="outline"
+                  >
+                    Hủy
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
       {/* Custom Alert */}
       <CustomAlert
