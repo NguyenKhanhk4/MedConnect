@@ -877,6 +877,28 @@ export async function rescheduleAppointmentByManager(
   return r.json();
 }
 
+export async function getManagerAppointments(params = {}) {
+  const queryParams = new URLSearchParams();
+  if (params.status) queryParams.append("status", params.status);
+  if (params.startDate) queryParams.append("startDate", params.startDate);
+  if (params.endDate) queryParams.append("endDate", params.endDate);
+  if (params.doctorId) queryParams.append("doctorId", params.doctorId);
+
+  const r = await fetch(`${BASE}/api/managers/appointments?${queryParams}`, {
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getManagerDoctors() {
+  const r = await fetch(`${BASE}/api/managers/doctors`, {
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 // Payment functions
 export async function makePayment(paymentData) {
   const r = await fetch(`${BASE}/api/payments`, {
@@ -1341,6 +1363,9 @@ const apiObject = {
   // Auth functions
   getCurrentUser,
   logout,
+
+  // Manager functions
+  getManagerAppointments,
 
   // Patient functions
   getCurrentPatientProfile,

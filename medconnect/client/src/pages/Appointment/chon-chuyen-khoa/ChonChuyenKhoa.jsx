@@ -74,6 +74,14 @@ const ChonChuyenKhoa = () => {
     });
   };
 
+  // // Sort specializations theo tên, bỏ qua chữ "Khám"
+  // const sortedSpecs = specs.sort((a, b) => {
+  //   const nameA = a.name.replace(/^Khám\s*/i, "").trim();
+  //   const nameB = b.name.replace(/^Khám\s*/i, "").trim();
+  //   return nameA.localeCompare(nameB, "vi");
+  // });
+  // setSpecializations(sortedSpecs);
+
   const handleSearch = (value) => {
     setSearchTerm(value);
   };

@@ -72,6 +72,7 @@ const AppointmentSchema = new Schema(
       type: String,
       enum: [
         "pending_doctor",
+        "checkin",
         "accepted",
         "rejected",
         "in_progress",

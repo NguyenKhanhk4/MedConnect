@@ -396,10 +396,9 @@ export default function LichHen() {
         );
 
         showAlert(
-          `Đã từ chối lịch hẹn với ${
-            selectedAppointment.patientId?.fullName ||
-            selectedAppointment.patient?.fullName ||
-            "bệnh nhân"
+          `Đã từ chối lịch hẹn với ${selectedAppointment.patientId?.fullName ||
+          selectedAppointment.patient?.fullName ||
+          "bệnh nhân"
           }. Lý do: ${rejectionReason}`
         );
 
@@ -472,7 +471,19 @@ export default function LichHen() {
             }
           }, 1000);
         } catch (error) {
-          showAlert("Có lỗi xảy ra khi bắt đầu khám: " + error.message);
+          let errorMessage = error.message;
+          try {
+            // Try to parse if it's a JSON string
+            if (errorMessage.startsWith("{")) {
+              const parsed = JSON.parse(errorMessage);
+              if (parsed.message) {
+                errorMessage = parsed.message;
+              }
+            }
+          } catch (e) {
+            // Ignore parse error, use original message
+          }
+          showAlert(errorMessage);
         }
       }
     );
@@ -612,26 +623,6 @@ export default function LichHen() {
       }
     );
   };
-
-  // ==========================================
-  // [LOCK] [FEATURE] KIEM_TRA_NGAY_KHAM - CODE DA COMMENT [LOCK]
-  // Tính năng: Chỉ hiển thị nút khám khi đã đến ngày khám
-  // Để kích hoạt tính năng này, uncomment các dòng code bên dưới
-  // Tìm kiếm: "KIEM_TRA_NGAY_KHAM" hoặc "[LOCK]" hoặc "[FEATURE]"
-  // ==========================================
-  // Helper function để kiểm tra xem ngày khám đã đến chưa
-  // const isAppointmentDateReached = (scheduledStart) => {
-  //   if (!scheduledStart) return false;
-  //   const appointmentDate = new Date(scheduledStart);
-  //   const today = new Date();
-  //   
-  //   // Set time to midnight for date comparison
-  //   appointmentDate.setHours(0, 0, 0, 0);
-  //   today.setHours(0, 0, 0, 0);
-  //   
-  //   // Trả về true nếu ngày khám <= hôm nay
-  //   return appointmentDate <= today;
-  // };
 
   // Accept all pending appointments (cả online và offline)
   const handleAcceptAll = async () => {
@@ -1015,13 +1006,13 @@ export default function LichHen() {
                           → Dời đến:{" "}
                           {apt.rescheduledToId.scheduledStart
                             ? `${new Date(
-                                apt.rescheduledToId.scheduledStart
-                              ).toLocaleDateString("vi-VN")} ${new Date(
-                                apt.rescheduledToId.scheduledStart
-                              ).toLocaleTimeString("vi-VN", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}`
+                              apt.rescheduledToId.scheduledStart
+                            ).toLocaleDateString("vi-VN")} ${new Date(
+                              apt.rescheduledToId.scheduledStart
+                            ).toLocaleTimeString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}`
                             : "Đang cập nhật..."}
                         </div>
                       )}
@@ -1031,8 +1022,8 @@ export default function LichHen() {
                         {apt.mode === "online"
                           ? "Trực tuyến"
                           : apt.mode === "offline"
-                          ? "Trực tiếp"
-                          : apt.mode || "Không xác định"}
+                            ? "Trực tiếp"
+                            : apt.mode || "Không xác định"}
                       </Badge>
                     </td>
                     <td className="appointment-list-td appointment-list-reason">
@@ -1046,24 +1037,24 @@ export default function LichHen() {
                         {(apt.rescheduledFromId ||
                           apt.rescheduleReason ||
                           apt.rescheduledAt) && (
-                          <Badge
-                            className="cursor-pointer"
-                            style={{
-                              backgroundColor: "#6366f1",
-                              color: "#ffffff",
-                              borderColor: "#4f46e5",
-                              fontWeight: 600,
-                              fontSize: "12px",
-                              padding: "4px 8px",
-                              borderRadius: "6px",
-                              width: "fit-content",
-                              marginBottom: "4px",
-                            }}
-                            onClick={() => handleViewRescheduleInfo(apt)}
-                          >
-                            📅 Đã dời lịch
-                          </Badge>
-                        )}
+                            <Badge
+                              className="cursor-pointer"
+                              style={{
+                                backgroundColor: "#6366f1",
+                                color: "#ffffff",
+                                borderColor: "#4f46e5",
+                                fontWeight: 600,
+                                fontSize: "12px",
+                                padding: "4px 8px",
+                                borderRadius: "6px",
+                                width: "fit-content",
+                                marginBottom: "4px",
+                              }}
+                              onClick={() => handleViewRescheduleInfo(apt)}
+                            >
+                              📅 Đã dời lịch
+                            </Badge>
+                          )}
                         <span>{apt.notes || apt.reason || "Không có"}</span>
                       </div>
                     </td>
@@ -1082,9 +1073,6 @@ export default function LichHen() {
                       <div className="appointment-list-action-buttons">
                         {/* Cả online và offline: Bỏ qua bước xác nhận, vào thẳng bắt đầu khám/không đến khám */}
                         {/* Note: pending_doctor status has been removed - all appointments are auto-accepted */}
-                        {/* [LOCK] [FEATURE] KIEM_TRA_NGAY_KHAM - DE KICH HOAT, THAY DOI DIEU KIEN BEN DUOI [LOCK] */}
-                        {/* [UNLOCK] Uncomment dòng này và comment dòng {apt.status === "accepted" && ( bên dưới: */}
-                        {/* {apt.status === "accepted" && isAppointmentDateReached(apt.scheduledStart) && ( */}
                         {apt.status === "accepted" && (
                           <>
                             <Button
@@ -1155,8 +1143,8 @@ export default function LichHen() {
                         {(apt.status === "rejected" ||
                           apt.status === "cancelled" ||
                           apt.status === "no_show") && (
-                          <span className="appointment-list-no-action">-</span>
-                        )}
+                            <span className="appointment-list-no-action">-</span>
+                          )}
                         {/* Không hiển thị nút khi status là "done" (cho cả online và offline) */}
                         {apt.status === "done" && (
                           <span className="appointment-list-no-action">-</span>
@@ -1235,8 +1223,8 @@ export default function LichHen() {
                     <p className="appointment-detail-value">
                       {selectedAppointment.patientId?.dob
                         ? new Date(
-                            selectedAppointment.patientId.dob
-                          ).toLocaleDateString("vi-VN")
+                          selectedAppointment.patientId.dob
+                        ).toLocaleDateString("vi-VN")
                         : "Không có"}
                     </p>
                   </div>
@@ -1297,9 +1285,6 @@ export default function LichHen() {
                     <h4>Thay đổi trạng thái</h4>
                     <div className="appointment-status-buttons">
                       {/* Note: pending_doctor status has been removed - all appointments are auto-accepted */}
-                      {/* [LOCK] [FEATURE] KIEM_TRA_NGAY_KHAM - DE KICH HOAT, THAY DOI DIEU KIEN BEN DUOI [LOCK] */}
-                      {/* [UNLOCK] Uncomment dòng này và comment dòng {selectedAppointment.status === "accepted" && ( bên dưới: */}
-                      {/* {selectedAppointment.status === "accepted" && isAppointmentDateReached(selectedAppointment.scheduledStart) && ( */}
                       {selectedAppointment.status === "accepted" && (
                         <>
                           <Button

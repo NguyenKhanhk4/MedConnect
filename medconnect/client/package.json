@@ -28,6 +28,7 @@
     "react-router-dom": "^6.19.0",
     "react-slick": "^0.31.0",
     "recharts": "^3.3.0",
+    "simple-peer": "^9.11.1",
     "slick-carousel": "^1.8.1",
     "vnpay": "^2.4.4"
   },

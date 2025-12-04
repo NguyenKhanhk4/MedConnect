@@ -982,6 +982,13 @@ $shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
   color: white !important;
   border-radius: 0.75rem !important;
 }
+// Force colors by data attributes
+.appointment-list-card [data-status="checkin"],
+.appointment-list-td [data-status="checkin"] {
+  background-color: purple !important;
+  color: white !important;
+  border-radius: 0.75rem !important;
+}
 
 .appointment-list-card [data-status="pending_doctor"],
 .appointment-list-td [data-status="pending_doctor"] {

@@ -52,6 +52,11 @@ const ManagerLayout = () => {
       icon: <HomeOutlined />,
       label: "Tổng quan",
     },
+    // {
+    //   key: "/manager/lich-hen",
+    //   icon: <CalendarOutlined />,
+    //   label: "Quản lý lịch hẹn",
+    // },
     {
       key: "/manager/quan-ly-lich",
       icon: <CalendarOutlined />,

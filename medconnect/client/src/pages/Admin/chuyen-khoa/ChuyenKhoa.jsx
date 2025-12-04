@@ -222,6 +222,7 @@ const ChuyenKhoa = () => {
     } finally {
       setUploading(false);
     }
+
   };
 
   // Convert file to base64 with compression

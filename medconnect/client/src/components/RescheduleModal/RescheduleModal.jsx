@@ -384,7 +384,7 @@ export function RescheduleModal({
         allowDoctorChange &&
         values.doctorId &&
         values.doctorId !==
-          (appointment?.doctorId?._id || appointment?.doctorId)
+        (appointment?.doctorId?._id || appointment?.doctorId)
       ) {
         requestBody.newDoctorId = values.doctorId;
       }
@@ -405,8 +405,8 @@ export function RescheduleModal({
           clinicId: currentMode === "offline" ? values.clinicId : undefined,
           newDoctorId:
             allowDoctorChange &&
-            values.doctorId &&
-            values.doctorId !==
+              values.doctorId &&
+              values.doctorId !==
               (appointment?.doctorId?._id || appointment?.doctorId)
               ? values.doctorId
               : undefined,
@@ -473,21 +473,22 @@ export function RescheduleModal({
 
   const disabledDate = (current) => {
     if (!current) return false;
-    
-    // Disable dates before tomorrow and after 7 days from today
+
+    // Disable dates before tomorrow and after 30 days from today
     const tomorrow = dayjs().add(1, "day").startOf("day");
-    const maxDate = dayjs().add(7, "day").startOf("day"); // 7 ngày từ hôm nay
-    
+    const maxDate = dayjs().add(30, "day").startOf("day"); // 30 ngày từ hôm nay
+
     // Basic date range validation
-    if (current < tomorrow || current > maxDate) {
+    // Use isBefore/isAfter for Dayjs objects comparison
+    if (current.isBefore(tomorrow, 'day') || current.isAfter(maxDate, 'day')) {
       return true;
     }
-    
+
     // If current appointment is weekday, disable weekends (Saturday = 6, Sunday = 0)
     if (appointment?.scheduledStart) {
       const currentAppointmentDate = dayjs(appointment.scheduledStart);
       const dayOfWeek = currentAppointmentDate.day();
-      
+
       // If current appointment is weekday (Monday-Friday: 1-5), disable weekends
       if (dayOfWeek >= 1 && dayOfWeek <= 5) {
         const selectedDayOfWeek = current.day();
@@ -497,7 +498,7 @@ export function RescheduleModal({
         }
       }
     }
-    
+
     return false;
   };
 
@@ -539,8 +540,8 @@ export function RescheduleModal({
                 {appointment?.status === "accepted"
                   ? "Đã xác nhận"
                   : appointment?.status === "pending_doctor"
-                  ? "Chờ xác nhận"
-                  : appointment?.status}
+                    ? "Chờ xác nhận"
+                    : appointment?.status}
               </span>
             </div>
             <div className="detail-item">
@@ -549,8 +550,8 @@ export function RescheduleModal({
                 {appointment?.mode === "online"
                   ? "Tư vấn online"
                   : appointment?.mode === "offline"
-                  ? "Khám tại phòng khám"
-                  : "Chưa xác định"}
+                    ? "Khám tại phòng khám"
+                    : "Chưa xác định"}
               </span>
             </div>
           </div>
@@ -765,7 +766,7 @@ export function RescheduleModal({
                         key={slot._id || slot.startTime}
                         type={
                           selectedTimeSlot?._id === slot._id ||
-                          selectedTimeSlot?.startTime === slot.startTime
+                            selectedTimeSlot?.startTime === slot.startTime
                             ? "primary"
                             : "default"
                         }

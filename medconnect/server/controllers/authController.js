@@ -962,9 +962,29 @@ export function logout(req, res) {
   }
 }
 
-// -------------------------------------------------- OTP & RESET PASSWORD
+// ================================================
+// PHẦN 8: QUẢN LÝ OTP VÀ ĐẶT LẠI MẬT KHẨU
+// ================================================
 
-/* Helper gửi mail OTP đơn giản, dùng cấu hình SMTP từ .env */
+/**
+ * HÀM GỬI EMAIL OTP ĐẶT LẠI MẬT KHẨU
+ * 
+ * Helper function để gửi email chứa mã OTP 6 số cho user.
+ * Email có hiệu lực 10 phút.
+ * 
+ * @param {string} to - Địa chỉ email người nhận
+ * @param {string} otp - Mã OTP 6 số (vd: "123456")
+ * 
+ * @returns {Promise<void>} - Không trả về giá trị, throw error nếu gửi thất bại
+ * 
+ * @description
+ * - Email chứa cả plain text và HTML format
+ * - Nhấn mạnh thời gian hết hạn (10 phút)
+ * - Sử dụng sendMail() từ utils/email.js
+ * 
+ * @example
+ * await sendOtpMail("user@example.com", "123456");
+ */
 async function sendOtpMail(to, otp) {
   await sendMail({
     to,
@@ -974,12 +994,58 @@ async function sendOtpMail(to, otp) {
   });
 }
 
-/* Helper tạo OTP 6 số ngẫu nhiên từ 100000 đến 999999 */
+/**
+ * HÀM TẠO MÃ OTP NGẪU NHIÊN
+ * 
+ * Tạo mã OTP 6 chữ số ngẫu nhiên trong khoảng 100000-999999.
+ * 
+ * @returns {string} - Chuỗi OTP 6 số (vd: "123456")
+ * 
+ * @description
+ * - Sử dụng Math.random() để tạo số ngẫu nhiên
+ * - Đảm bảo luôn có đủ 6 chữ số (100000 - 999999)
+ * - Convert sang string để dễ xử lý và lưu trữ
+ * 
+ * @security
+ * - OTP được lưu trong database với thời gian hết hạn
+ * - Giới hạn số lần nhập sai (5 lần)
+ * - Chỉ sử dụng được 1 lần
+ * 
+ * @example
+ * const otp = generateOTP(); // "456789"
+ */
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-/* Helper function: Send welcome email to patient */
+/**
+ * HÀM GỬI EMAIL CHÀO MỪNG BỆNH NHÂN MỚI
+ * 
+ * Gửi email chào mừng sau khi bệnh nhân đăng ký tài khoản thành công.
+ * Email chứa thông tin tài khoản và giới thiệu các tính năng chính.
+ * 
+ * @param {object} user - Object User từ database
+ * @param {string} user.email - Email của user
+ * @param {string} user.fullName - Tên đầy đủ của user
+ * 
+ * @returns {Promise<void>} - Không trả về giá trị
+ * 
+ * @description
+ * - Email có HTML format đẹp với styling inline
+ * - Liệt kê các tính năng chính của hệ thống
+ * - Có cả text version cho email client cũ
+ * - Error được catch và log, không throw (non-critical operation)
+ * 
+ * @features_listed
+ * - 🔍 Tìm kiếm bác sĩ theo chuyên khoa
+ * - 📅 Đặt lịch hẹn online hoặc offline
+ * - 💊 Quản lý hồ sơ sức khỏe gia đình
+ * - 💬 Tư vấn trực tuyến qua video call
+ * - ⭐ Đánh giá bác sĩ sau mỗi lần khám
+ * 
+ * @example
+ * await sendPatientWelcomeEmail(newUser);
+ */
 async function sendPatientWelcomeEmail(user) {
   try {
     if (!user || !user.email) {
@@ -1106,7 +1172,7 @@ export async function forgotPassword(req, res) {
     const { email } = req.body || {};
     if (!email) return fail(res, 400, ERROR_CODES.BAD_REQUEST, "Thiếu email");
 
-    // Validate email format
+    // Validate email format bằng regex
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
     if (!emailRegex.test(email)) {
       return fail(res, 400, ERROR_CODES.BAD_REQUEST, "Email không hợp lệ");

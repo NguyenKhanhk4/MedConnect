@@ -650,7 +650,7 @@ const ThongKe = () => {
                     Bệnh Nhân Đến Khám Nhiều Nhất
                   </div>
                   <div className="chart-card-subtitle">
-                    Top 3 bệnh nhân có lần khám nhiều nhất
+                    Top 5 bệnh nhân có lần khám nhiều nhất
                   </div>
                 </div>
               }
@@ -670,7 +670,7 @@ const ThongKe = () => {
                         </div>
                       </div>
                     ))
-                  : [1, 2, 3].map((index) => (
+                  : [1, 2, 3, 4, 5].map((index) => (
                       <div key={index} className="patient-item">
                         <div className="patient-info">
                           <div className="patient-name">{index}. --</div>

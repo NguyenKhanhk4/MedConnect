@@ -660,7 +660,10 @@ const ChonThoiGian = () => {
           // If patientIdForBooking is already set (selected from dropdown), use it
           if (currentPatientIdForBooking && selectedFamilyMember) {
             // Using existing family member, no need to create new
-            console.log("Using existing family member:", currentPatientIdForBooking);
+            console.log(
+              "Using existing family member:",
+              currentPatientIdForBooking
+            );
           } else {
             // Validate family form for new member (giống đặt nhiều lịch)
             let familyValues;
@@ -760,7 +763,9 @@ const ChonThoiGian = () => {
                 const missingFields = validationError.errorFields
                   .map((f) => f.name)
                   .join(", ");
-                message.error(`Vui lòng điền đầy đủ thông tin: ${missingFields}`);
+                message.error(
+                  `Vui lòng điền đầy đủ thông tin: ${missingFields}`
+                );
               } else {
                 message.error("Vui lòng kiểm tra lại thông tin đã nhập");
               }
@@ -896,7 +901,9 @@ const ChonThoiGian = () => {
             // General error
             message.error(error.message);
           } else {
-            message.error("Có lỗi xảy ra khi thêm người thân. Vui lòng thử lại.");
+            message.error(
+              "Có lỗi xảy ra khi thêm người thân. Vui lòng thử lại."
+            );
           }
           setLoading(false);
           return;
@@ -918,7 +925,9 @@ const ChonThoiGian = () => {
       // Add clinicId for offline appointments (bắt buộc)
       if (selectedMode === "offline") {
         if (!defaultClinic || !defaultClinic._id) {
-          message.error("Vui lòng chọn phòng khám hoặc bác sĩ chưa có phòng khám mặc định");
+          message.error(
+            "Vui lòng chọn phòng khám hoặc bác sĩ chưa có phòng khám mặc định"
+          );
           setLoading(false);
           return;
         }
@@ -1116,11 +1125,8 @@ const ChonThoiGian = () => {
   const disabledDate = (current) => {
     // Disable dates before today and after 7 days from today
     const today = dayjs().startOf("day");
-    const maxDate = today.add(7, "day"); // 7 ngày từ hôm nay
-    return (
-      current &&
-      (current < today || current > maxDate)
-    );
+    const maxDate = today.add(30, "day"); // 30 ngày từ hôm nay
+    return current && (current < today || current > maxDate);
   };
 
   const isSlotPassed = (slot) => {
@@ -1322,6 +1328,7 @@ const ChonThoiGian = () => {
                   disabledDate={disabledDate}
                   onChange={handleDateChange}
                   value={selectedDate}
+                  popupClassName="custom-date-picker-popup"
                 />
               </Card>
 
@@ -1420,16 +1427,17 @@ const ChonThoiGian = () => {
                     trước khi xác nhận.
                   </Paragraph>
 
-
                   <Divider />
 
                   {/* Appointment Details Table */}
                   {(() => {
                     // Support both old structure (appointmentSummary) and new structure (appointmentSummaries array)
-                    const appointmentData = paymentSummary.appointmentSummaries && paymentSummary.appointmentSummaries.length > 0
-                      ? paymentSummary.appointmentSummaries[0] // Use first appointment from array (giống đặt nhiều lịch)
-                      : paymentSummary.appointmentSummary; // Fallback to old structure for backward compatibility
-                    
+                    const appointmentData =
+                      paymentSummary.appointmentSummaries &&
+                      paymentSummary.appointmentSummaries.length > 0
+                        ? paymentSummary.appointmentSummaries[0] // Use first appointment from array (giống đặt nhiều lịch)
+                        : paymentSummary.appointmentSummary; // Fallback to old structure for backward compatibility
+
                     return appointmentData ? (
                       <Table
                         dataSource={[appointmentData]}
@@ -1439,76 +1447,79 @@ const ChonThoiGian = () => {
                           "appointment"
                         }
                         pagination={false}
-                      columns={[
-                        {
-                          title: "Bác sĩ",
-                          dataIndex: "doctorName",
-                          key: "doctor",
-                          render: (text) => text || "N/A",
-                        },
-                        {
-                          title: "Chuyên khoa",
-                          dataIndex: "specializationName",
-                          key: "specialization",
-                          render: (text) => text || "N/A",
-                        },
-                        {
-                          title: "Lý do",
-                          dataIndex: "reason",
-                          key: "reason",
-                          render: (text) => (
-                            <Text
-                              ellipsis={{ tooltip: text }}
-                              style={{ maxWidth: 200 }}
-                            >
-                              {text || "Không có"}
-                            </Text>
-                          ),
-                        },
-                        {
-                          title: "Thời gian",
-                          key: "time",
-                          render: (_, record) => {
-                            if (record.timeText) {
-                              return record.timeText;
-                            }
-                            if (record.scheduledStart && record.scheduledEnd) {
-                              return `${dayjs(record.scheduledStart).format(
-                                "HH:mm"
-                              )} - ${dayjs(record.scheduledEnd).format(
-                                "HH:mm"
-                              )}`;
-                            }
-                            if (selectedTimeSlot?.timeRange) {
-                              return selectedTimeSlot.timeRange;
-                            }
-                            return "N/A";
+                        columns={[
+                          {
+                            title: "Bác sĩ",
+                            dataIndex: "doctorName",
+                            key: "doctor",
+                            render: (text) => text || "N/A",
                           },
-                        },
-                        {
-                          title: "Hình thức",
-                          dataIndex: "mode",
-                          key: "mode",
-                          render: (mode) => (
-                            <Tag color={mode === "online" ? "blue" : "green"}>
-                              {mode === "online"
-                                ? "Trực tuyến"
-                                : "Tại phòng khám"}
-                            </Tag>
-                          ),
-                        },
-                        {
-                          title: "Phí đặt lịch",
-                          dataIndex: "price",
-                          key: "price",
-                          align: "right",
-                          render: (price) => (
-                            <Text strong>
-                              {price ? price.toLocaleString("vi-VN") : "0"} đ
-                            </Text>
-                          ),
-                        },
-                      ]}
+                          {
+                            title: "Chuyên khoa",
+                            dataIndex: "specializationName",
+                            key: "specialization",
+                            render: (text) => text || "N/A",
+                          },
+                          {
+                            title: "Lý do",
+                            dataIndex: "reason",
+                            key: "reason",
+                            render: (text) => (
+                              <Text
+                                ellipsis={{ tooltip: text }}
+                                style={{ maxWidth: 200 }}
+                              >
+                                {text || "Không có"}
+                              </Text>
+                            ),
+                          },
+                          {
+                            title: "Thời gian",
+                            key: "time",
+                            render: (_, record) => {
+                              if (record.timeText) {
+                                return record.timeText;
+                              }
+                              if (
+                                record.scheduledStart &&
+                                record.scheduledEnd
+                              ) {
+                                return `${dayjs(record.scheduledStart).format(
+                                  "HH:mm"
+                                )} - ${dayjs(record.scheduledEnd).format(
+                                  "HH:mm"
+                                )}`;
+                              }
+                              if (selectedTimeSlot?.timeRange) {
+                                return selectedTimeSlot.timeRange;
+                              }
+                              return "N/A";
+                            },
+                          },
+                          {
+                            title: "Hình thức",
+                            dataIndex: "mode",
+                            key: "mode",
+                            render: (mode) => (
+                              <Tag color={mode === "online" ? "blue" : "green"}>
+                                {mode === "online"
+                                  ? "Trực tuyến"
+                                  : "Tại phòng khám"}
+                              </Tag>
+                            ),
+                          },
+                          {
+                            title: "Phí đặt lịch",
+                            dataIndex: "price",
+                            key: "price",
+                            align: "right",
+                            render: (price) => (
+                              <Text strong>
+                                {price ? price.toLocaleString("vi-VN") : "0"} đ
+                              </Text>
+                            ),
+                          },
+                        ]}
                         style={{ marginBottom: 16 }}
                       />
                     ) : null;
@@ -1720,7 +1731,8 @@ const ChonThoiGian = () => {
                                     ? "Vợ/Chồng"
                                     : member.relationshipToOwner === "child"
                                     ? "Con"
-                                    : member.relationshipToOwner === "grandparent"
+                                    : member.relationshipToOwner ===
+                                      "grandparent"
                                     ? "Ông/Bà"
                                     : "Khác"}
                                   )
@@ -1802,9 +1814,11 @@ const ChonThoiGian = () => {
                                 const duplicate = familyMembers.find(
                                   (member) =>
                                     // Skip if this is the selected family member being edited
-                                    (!selectedFamilyMember || member._id !== selectedFamilyMember._id) &&
+                                    (!selectedFamilyMember ||
+                                      member._id !==
+                                        selectedFamilyMember._id) &&
                                     (member.citizenId === value ||
-                                    member.nationalId === value)
+                                      member.nationalId === value)
                                 );
                                 if (duplicate) {
                                   return Promise.reject(
@@ -2018,7 +2032,10 @@ const ChonThoiGian = () => {
                                 const duplicate = familyMembers.find(
                                   (member) => {
                                     // Skip if this is the selected family member being edited
-                                    if (selectedFamilyMember && member._id === selectedFamilyMember._id) {
+                                    if (
+                                      selectedFamilyMember &&
+                                      member._id === selectedFamilyMember._id
+                                    ) {
                                       return false;
                                     }
                                     const memberPhone = member.phone

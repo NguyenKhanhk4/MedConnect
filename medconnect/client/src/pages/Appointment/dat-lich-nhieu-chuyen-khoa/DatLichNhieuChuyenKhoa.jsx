@@ -212,8 +212,13 @@ const DatLichNhieuChuyenKhoa = () => {
         // Direct array response
         specs = response;
       }
-
-      setSpecializations(specs);
+      
+      const sortedSpecs = specs.sort((a, b) => {
+        const nameA = a.name.replace(/^Khám\s*/i, "").trim();
+        const nameB = b.name.replace(/^Khám\s*/i, "").trim();
+        return nameA.localeCompare(nameB, "vi");
+      });
+      setSpecializations(sortedSpecs);
     } catch (error) {
       message.error("Không thể tải danh sách chuyên khoa");
       setSpecializations([]);
@@ -788,7 +793,10 @@ const DatLichNhieuChuyenKhoa = () => {
         // If patientIdForBooking is already set (selected from dropdown), use it
         if (currentPatientIdForBooking && selectedFamilyMember) {
           // Using existing family member, no need to create new
-          console.log("Using existing family member:", currentPatientIdForBooking);
+          console.log(
+            "Using existing family member:",
+            currentPatientIdForBooking
+          );
         } else {
           // Validate family form for new member
           let familyValues;
@@ -1476,8 +1484,7 @@ const DatLichNhieuChuyenKhoa = () => {
                         const today = dayjs().startOf("day");
                         const maxDate = today.add(7, "day"); // 7 ngày từ hôm nay
                         return (
-                          current &&
-                          (current < today || current > maxDate)
+                          current && (current < today || current > maxDate)
                         );
                       }}
                       onChange={handleDateSelect}

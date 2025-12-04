@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { CalendarOutlined, TeamOutlined, FileTextOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { Card, Button, Row, Col, Badge, List, Empty } from "antd";
-import { api } from "../../../lib/api";
+import { Card, Button, Row, Col, Badge, List, Empty, Alert } from "antd";
+import { api, getManagerAppointments } from "../../../lib/api";
 import { DollarSign, Receipt } from "lucide-react";
 import "./TrangChu.scss";
 
@@ -12,9 +12,30 @@ export default function TrangChu() {
   const [pendingPayments, setPendingPayments] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [overtimeAppointments, setOvertimeAppointments] = useState([]);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     loadData();
+
+    // Initial load for overtime appointments
+    checkOvertimeAppointments();
+
+    // Set up polling for overtime check (every 30 seconds)
+    const overtimeInterval = setInterval(() => {
+      checkOvertimeAppointments();
+      setCurrentTime(new Date());
+    }, 30000);
+
+    // Update current time every minute for display calculation
+    const timeInterval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+
+    return () => {
+      clearInterval(overtimeInterval);
+      clearInterval(timeInterval);
+    };
   }, []);
 
   const loadData = async () => {
@@ -29,6 +50,36 @@ export default function TrangChu() {
       console.error("Error loading dashboard data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkOvertimeAppointments = async () => {
+    try {
+      // Fetch all "in_progress" appointments
+      const response = await getManagerAppointments({ status: "in_progress" });
+
+      if (response && (response.data || Array.isArray(response))) {
+        // Handle different response structures if needed, but usually it's response.data or response directly if api wrapper handles it
+        // Based on api.js, getManagerAppointments returns r.json()
+        // And managerController returns { success: true, count: ..., appointments: ... } or just array?
+        // Let's check managerController.js again if needed, but usually response.data is safe if using axios, but here it's fetch.
+        // api.js: return r.json();
+        // managerController.js: res.status(200).json({ success: true, count: ..., appointments: ... });
+        // So it should be response.appointments
+
+        const appointments = response.appointments || response.data || [];
+        const now = new Date();
+
+        const overtime = appointments.filter(apt => {
+          if (!apt.scheduledEnd) return false;
+          const scheduledEnd = new Date(apt.scheduledEnd);
+          return now > scheduledEnd;
+        });
+
+        setOvertimeAppointments(overtime);
+      }
+    } catch (error) {
+      console.error("Error checking overtime appointments:", error);
     }
   };
 
@@ -114,6 +165,33 @@ export default function TrangChu() {
         <h1>Quản lý</h1>
         <p>Quản lý lịch làm việc của các bác sĩ</p>
       </div>
+
+      {/* Overtime Alerts */}
+      {overtimeAppointments.length > 0 && (
+        <div className="overtime-alerts" style={{ marginBottom: 24 }}>
+          {overtimeAppointments.map(apt => {
+            const scheduledEnd = new Date(apt.scheduledEnd);
+            const now = new Date();
+            const diffMs = now - scheduledEnd;
+            const diffMins = Math.floor(diffMs / 60000);
+
+            return (
+              <Alert
+                key={apt._id}
+                message="Cảnh báo quá giờ"
+                description={
+                  <span>
+                    Bác sĩ <strong>{apt.doctorId?.fullName || apt.doctorName}</strong> đang khám quá giờ <strong>{diffMins} phút</strong> (Bệnh nhân: {apt.patientId?.fullName || apt.patientName})
+                  </span>
+                }
+                type="warning"
+                showIcon
+                style={{ marginBottom: 8 }}
+              />
+            );
+          })}
+        </div>
+      )}
 
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={8}>

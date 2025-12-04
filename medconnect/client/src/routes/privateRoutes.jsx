@@ -64,6 +64,7 @@ import QuanLyThanhToanDichVu from "../pages/Manager/quan-ly-thanh-toan-dich-vu/Q
 import { ThongBao as ManagerNotifications } from "../pages/Manager/thong-bao/ThongBao";
 import QuanLyGiaTheoTrinhDo from "../pages/Manager/quan-ly-gia-theo-trinh-do/QuanLyGiaTheoTrinhDo";
 import ManagerLayout from "../layouts/ManagerLayout/ManagerLayout";
+import LichHenManager from "../pages/Manager/lich-hen/LichHenManager";
 
 /**
  * Private Routes - Routes requiring authentication
@@ -229,6 +230,7 @@ export const privateRoutes = (
       <Route element={<ManagerLayout />}>
         <Route path="/manager/trang-chu" element={<TrangChuManager />} />
         <Route path="/manager" element={<TrangChuManager />} />
+        <Route path="/manager/lich-hen" element={<LichHenManager />} />
         <Route path="/manager/quan-ly-lich" element={<QuanLyLichBacSi />} />
         <Route path="/manager/danh-sach-bac-si" element={<DanhSachBacSi />} />
         <Route path="/manager/quan-ly-gia" element={<QuanLyGiaTheoTrinhDo />} />

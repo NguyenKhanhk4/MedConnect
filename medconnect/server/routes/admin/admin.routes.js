@@ -45,7 +45,10 @@ import {
   getAdminInvoices,
   
   // Statistics controller
-  getStatistics
+  getStatistics,
+  
+  // Top patients controller
+  getTop5PatientsByVisitCount
 } from '../../controllers/adminController.js';
 
 const adminRouter = express.Router();
@@ -98,5 +101,8 @@ adminRouter.get("/payment/invoices", getAdminInvoices);
 
 // ================== STATISTICS ROUTES ==================
 adminRouter.get('/statistics', getStatistics);
+
+// ================== PATIENTS ROUTES ==================
+adminRouter.get('/patients/top-5-visits', getTop5PatientsByVisitCount);
 
 export default adminRouter;

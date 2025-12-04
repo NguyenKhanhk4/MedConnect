@@ -293,6 +293,7 @@ export async function getDoctorTimeSlotsForManager(req, res) {
         const statusMap = {
           pending_doctor: "pending",
           accepted: "confirmed",
+          checkin: "checkin",
           in_progress: "in_progress",
           cancelled: "cancelled",
           done: "completed",
@@ -788,7 +789,7 @@ export async function createAppointmentByManager(req, res) {
       scheduledStart: scheduledStartDate,
       scheduledEnd: scheduledEndDate,
       reason,
-      status: "accepted",
+      status: "checkin",
     };
 
     // Add clinicId if mode is offline
@@ -1533,7 +1534,7 @@ export async function rescheduleAppointmentByManager(req, res) {
     }
 
     // Check if appointment can be rescheduled
-    if (!["pending_doctor", "accepted"].includes(originalAppointment.status)) {
+    if (!["pending_doctor", "checkin"].includes(originalAppointment.status)) {
       return fail(
         res,
         400,
@@ -1693,7 +1694,7 @@ export async function rescheduleAppointmentByManager(req, res) {
         scheduledStart: newScheduledStart,
         scheduledEnd: newScheduledEnd,
         mode: mode,
-        status: "accepted", // Keep as accepted, NOT "rescheduled"
+        status: "checkin", // Keep as accepted, NOT "rescheduled"
         rescheduledBy: userId,
         rescheduledAt: new Date(),
         rescheduleReason: reason.trim(),
@@ -2512,7 +2513,7 @@ export async function createBookingPaymentByManager(req, res) {
     if (slotId) {
       const existingAppointment = await Appointment.findOne({
         slotId: slotId,
-        status: { $in: ["pending_doctor", "accepted", "in_progress", "done"] },
+        status: { $in: ["pending_doctor", "checkin", "in_progress", "done"] },
       });
 
       if (existingAppointment) {
@@ -2567,7 +2568,7 @@ export async function createBookingPaymentByManager(req, res) {
         scheduledStart: scheduledStartDate,
         scheduledEnd: scheduledEndDate,
         reason,
-        status: "accepted",
+        status: "checkin",
         // Mark as pending payment - will be activated after payment
         paymentStatus: "unpaid",
       });
@@ -2670,10 +2671,53 @@ export async function deleteEducationLevelPrice(req, res) {
  * POST /api/managers/service-payments/:paymentId/cash
  * body: { amountPaid: number }
  */
+/* ============================================================================
+ * FUNCTION: processCashPayment
+ * ============================================================================
+ * Xử lý thanh toán tiền mặt (Cash Payment) bởi Manager
+ *
+ * Endpoint: POST /api/managers/service-payments/:paymentId/cash
+ * Auth: Required (Manager role)
+ *
+ * Params:
+ * - paymentId: string (MongoDB ObjectId)
+ *
+ * Request Body:
+ * - amountPaid: number (số tiền bệnh nhân đã trả bằng tiền mặt)
+ *
+ * Response:
+ * - message: string
+ * - payment: object (Payment info updated)
+ *
+ * LUỒNG XỬ LÝ:
+ * 1. Validate input (paymentId, amountPaid)
+ * 2. Tìm payment record
+ * 3. Validate payment status (phải "pending_manager" hoặc "initiated")
+ * 4. Validate amountPaid không vượt quá total
+ * 5. Update payment:
+ *    - gateway = "cash", method = "cash"
+ *    - status = "captured" (nếu amountPaid >= total)
+ *    - amountPaid, paidAt, capturedAt
+ * 6. Update appointment (tùy loại payment: booking vs service)
+ * 7. Gửi email xác nhận cho bệnh nhân
+ * 8. Tạo in-app notification
+ *
+ * PHÂN BIỆT BOOKING VS SERVICE:
+ * - Booking Payment: Update appointment.paymentStatus, mark slot as "booked"
+ * - Service Payment: Tính tổng amountPaid, update appointment.status = "done"
+ * ============================================================================ */
 export async function processCashPayment(req, res) {
   try {
+    /* ------------------------------------
+     * BƯỚC 1: PARSE REQUEST
+     * ------------------------------------ */
+
     const { paymentId } = req.params;
     const { amountPaid } = req.body;
+
+    /* ------------------------------------
+     * BƯỚC 2: VALIDATE INPUT
+     * ------------------------------------ */
 
     if (!paymentId) {
       return fail(
@@ -2684,6 +2728,7 @@ export async function processCashPayment(req, res) {
       );
     }
 
+    // amountPaid phải là số nguyên dương
     if (
       !amountPaid ||
       amountPaid <= 0 ||
@@ -2697,14 +2742,21 @@ export async function processCashPayment(req, res) {
       );
     }
 
-    // Find payment
+    /* ------------------------------------
+     * BƯỚC 3: TÌM PAYMENT RECORD
+     * ------------------------------------ */
+
     const payment = await Payment.findById(paymentId).populate("appointmentId");
 
     if (!payment) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Payment not found");
     }
 
-    // Validate payment status - chỉ cho phép pending_manager hoặc initiated
+    /* ------------------------------------
+     * BƯỚC 4: VALIDATE PAYMENT STATUS
+     * ------------------------------------ */
+
+    // Chỉ cho phép xử lý payment đang chờ (pending_manager hoặc initiated)
     if (
       payment.status !== "pending_manager" &&
       payment.status !== "initiated"
@@ -2717,7 +2769,7 @@ export async function processCashPayment(req, res) {
       );
     }
 
-    // Nếu đã captured thì không cho thanh toán lại
+    // Không cho thanh toán lại nếu đã captured
     if (payment.status === "captured") {
       return fail(
         res,
@@ -2727,7 +2779,7 @@ export async function processCashPayment(req, res) {
       );
     }
 
-    // Validate amountPaid <= total
+    // Validate số tiền thanh toán không vượt quá tổng tiền
     if (Number(amountPaid) > payment.total) {
       return fail(
         res,
@@ -2737,10 +2789,14 @@ export async function processCashPayment(req, res) {
       );
     }
 
-    // Update payment
+    /* ------------------------------------
+     * BƯỚC 5: UPDATE PAYMENT RECORD
+     * ------------------------------------ */
+
     payment.amountPaid = Number(amountPaid);
-    payment.gateway = "cash";
-    payment.method = "cash";
+    payment.gateway = "cash"; // Gateway = cash
+    payment.method = "cash"; // Method = cash
+    // Status = captured nếu đã thanh toán đủ, ngược lại vẫn pending_manager
     payment.status =
       Number(amountPaid) >= payment.total ? "captured" : "pending_manager";
     payment.paidAt = new Date();
@@ -2915,9 +2971,11 @@ export async function processCashPayment(req, res) {
 
               // Create in-app notification for patient about successful cash payment
               try {
-                const Notification = (await import("../models/notification.model.js")).default;
+                const Notification = (
+                  await import("../models/notification.model.js")
+                ).default;
                 const patientUserId = patient?.userId?._id || patient?.userId;
-                
+
                 if (patientUserId) {
                   const appointmentTimeStr = `${formattedDate} ${formattedTime}`;
                   const doctorName = doctor?.fullName || "Bác sĩ";
@@ -2990,12 +3048,49 @@ export async function processCashPayment(req, res) {
   }
 }
 
-/**
- * Create bank transfer payment link (PayOS)
- * POST /api/managers/service-payments/:paymentId/bank-transfer
- */
+/* ============================================================================
+ * FUNCTION: createBankTransferPayment
+ * ============================================================================
+ * Tạo link thanh toán chuyển khoản (PayOS) bởi Manager
+ *
+ * Endpoint: POST /api/managers/service-payments/:paymentId/bank-transfer
+ * Auth: Required (Manager role)
+ *
+ * Params:
+ * - paymentId: string (MongoDB ObjectId)
+ *
+ * Response:
+ * - message: string
+ * - payment: object (Payment with payUrl)
+ *
+ * LUỒNG XỬ LÝ:
+ * 1. Validate input
+ * 2. Tìm payment record
+ * 3. Validate payment status (phải "pending_manager")
+ * 4. Tạo PayOS payment link:
+ *    - Generate orderCode
+ *    - Tạo description (phân biệt booking vs service)
+ *    - Tạo returnUrl và cancelUrl
+ *    - Call PayOS API
+ * 5. Update payment:
+ *    - payUrl = checkoutUrl từ PayOS
+ *    - pendingOrderCode = orderCode
+ *    - gateway = "payos", method = "qr"
+ *    - status = "initiated"
+ * 6. Return payUrl để manager hiển thị QR code cho bệnh nhân
+ *
+ * SAU ĐÓ:
+ * - Bệnh nhân scan QR và thanh toán
+ * - PayOS gửi webhook → handlePayosWebhook() xử lý
+ * - Payment status → "captured"
+ * - Appointment được update tương ứng
+ * ============================================================================ */
 export async function createBankTransferPayment(req, res) {
   try {
+    /* ------------------------------------
+     * BƯỚC 1: PARSE REQUEST & VALIDATE
+     * ------------------------------------ */
+
     const { paymentId } = req.params;
 
     if (!paymentId) {
@@ -3007,15 +3102,23 @@ export async function createBankTransferPayment(req, res) {
       );
     }
 
-    // Find payment
+    /* ------------------------------------
+     * BƯỚC 2: TÌM PAYMENT RECORD
+     * ------------------------------------ */
+
     const payment = await Payment.findById(paymentId).populate("appointmentId");
 
     if (!payment) {
       return fail(res, 404, ERROR_CODES.NOT_FOUND, "Payment not found");
     }
 
-    // Validate payment status - chỉ cho phép pending_manager
+    /* ------------------------------------
+     * BƯỚC 3: VALIDATE PAYMENT STATUS
+     * ------------------------------------ */
+
+    // Chỉ cho phép tạo link cho payment đang pending_manager
     if (payment.status !== "pending_manager") {
+      // Nếu đã captured → không cho tạo link mới
       if (payment.status === "captured") {
         return fail(
           res,
@@ -3024,8 +3127,8 @@ export async function createBankTransferPayment(req, res) {
           "Payment has already been completed. Cannot create payment link again."
         );
       }
+      // Nếu đã initiated và có payUrl → trả về link cũ
       if (payment.status === "initiated" && payment.payUrl) {
-        // Nếu đã có link PayOS, trả về link hiện có
         return ok(res, {
           message: "Link thanh toán đã được tạo trước đó",
           payment: {
@@ -3045,8 +3148,12 @@ export async function createBankTransferPayment(req, res) {
       );
     }
 
-    // Create PayOS payment link
+    /* ------------------------------------
+     * BƯỚC 4: TẠO PAYOS PAYMENT LINK
+     * ------------------------------------ */
+
     try {
+      // Import PayOS SDK
       const { PayOS } = await import("@payos/node");
       const payos = new PayOS(
         process.env.PAYOS_CLIENT_ID,
@@ -3064,14 +3171,17 @@ export async function createBankTransferPayment(req, res) {
         );
       }
 
+      // Generate orderCode: 10 số cuối của timestamp
       const orderCode = Number(String(Date.now()).slice(-10));
-      // Use different description based on invoiceType to help webhook distinguish
-      // PayOS requires description max 25 characters
+
+      // Tạo description khác nhau cho booking vs service
+      // PayOS yêu cầu description tối đa 25 ký tự
       const description =
         payment.invoiceType === "booking"
           ? `MC Booking ${String(orderCode).slice(-6)}`
           : `MC Service ${String(orderCode).slice(-6)}`;
 
+      // Prepare PayOS payment data
       const payosPaymentData = {
         orderCode,
         amount: payment.total,
@@ -3080,17 +3190,25 @@ export async function createBankTransferPayment(req, res) {
         cancelUrl: `${process.env.FRONTEND_URL}/manager/thanh-toan-dich-vu?status=failed&orderCode=${orderCode}`,
       };
 
+      // Call PayOS API để tạo payment link
       const link = await payos.paymentRequests.create(payosPaymentData);
 
-      // Update payment with PayOS info
-      payment.payUrl = link.checkoutUrl;
-      payment.pendingOrderCode = orderCode;
-      payment.gateway = "payos";
-      payment.method = "qr";
-      payment.status = "initiated"; // Chờ thanh toán qua PayOS
+      /* ------------------------------------
+       * BƯỚC 5: UPDATE PAYMENT RECORD
+       * ------------------------------------ */
+
+      payment.payUrl = link.checkoutUrl; // URL thanh toán từ PayOS
+      payment.pendingOrderCode = orderCode; // Lưu orderCode tạm
+      payment.gateway = "payos"; // Gateway = PayOS
+      payment.method = "qr"; // Method = QR Code
+      payment.status = "initiated"; // Status = chờ thanh toán
       await payment.save();
 
       console.log(`✅ Manager created PayOS link for payment ${paymentId}`);
+
+      /* ------------------------------------
+       * BƯỚC 6: RETURN RESPONSE
+       * ------------------------------------ */
 
       return ok(res, {
         message: "Link thanh toán chuyển khoản đã được tạo",
@@ -3098,7 +3216,7 @@ export async function createBankTransferPayment(req, res) {
           _id: payment._id,
           invoiceNumber: payment.invoiceNumber,
           total: payment.total,
-          payUrl: payment.payUrl,
+          payUrl: payment.payUrl, // URL để hiển thị QR code
           orderCode: payment.pendingOrderCode,
         },
       });
@@ -3121,3 +3239,178 @@ export async function createBankTransferPayment(req, res) {
     );
   }
 }
+
+// Helper functions
+function formatDate(date) {
+  if (!date) return "Chưa có ngày";
+  try {
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      return "Chưa có ngày";
+    }
+    return dateObj.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch (error) {
+    console.error("Error formatting date:", error, date);
+    return "Chưa có ngày";
+  }
+}
+
+function formatTime(date) {
+  return new Date(date).toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Get all appointments for manager with Overtime logic
+ */
+export const getAllAppointmentsForManager = async (req, res) => {
+  try {
+    const { status, startDate, endDate, doctorId } = req.query;
+    const filter = {};
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (doctorId) {
+      filter.doctorId = doctorId;
+    }
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.scheduledStart = { $gte: start, $lte: end };
+    }
+
+    const appointments = await Appointment.find(filter)
+      .populate({
+        path: "patientId",
+        populate: { path: "userId", select: "email" },
+      })
+      .populate({
+        path: "doctorId",
+        populate: { path: "userId", select: "email" },
+      })
+      .populate({
+        path: "doctorId",
+        populate: { path: "specializationIds", select: "name" },
+      })
+      .populate("clinicId")
+      .sort({ scheduledStart: -1 })
+      .lean();
+
+    // Ensure default values for new fields
+    const appointmentsWithDefaults = appointments.map((apt) => {
+      const aptObj = apt; // apt is already a plain object due to .lean()
+      return {
+        ...aptObj,
+        services: aptObj.services || [],
+        totalPay:
+          aptObj.totalPay !== undefined && aptObj.totalPay !== null
+            ? aptObj.totalPay
+            : 0,
+        amountPaid:
+          aptObj.amountPaid !== undefined && aptObj.amountPaid !== null
+            ? aptObj.amountPaid
+            : 0,
+        paymentStatus: aptObj.paymentStatus || "unpaid",
+      };
+    });
+
+    const formattedAppointments = appointmentsWithDefaults.map(
+      (appointment, index) => {
+        const patient = appointment.patientId;
+        const doctor = appointment.doctorId;
+        const specializations = appointment.doctorId?.specializationIds;
+        const clinic = appointment.clinicId;
+
+        return {
+          id: appointment._id,
+          sequentialId: index + 1, // ID bắt đầu từ 1
+
+          // Thông tin bệnh nhân
+          patientName: patient?.fullName || "Chưa có tên",
+          patientEmail: patient?.userId?.email || "Chưa có email",
+          patientPhone: patient?.phone || null,
+          patientAddress: patient?.address || null,
+
+          // Thông tin bác sĩ
+          doctorName:
+            doctor?.fullName || doctor?.userId?.fullName || "Chưa có tên",
+          doctorEmail: doctor?.userId?.email || "Chưa có email",
+          doctorSpecialty:
+            specializations?.map((s) => s.name).join(", ") ||
+            "Chưa chọn chuyên khoa",
+          doctorLicense: doctor?.licenseNo || null,
+          doctorBio: doctor?.bio || null,
+
+          // Thông tin phòng khám
+          clinicName: clinic?.name || null,
+
+          // Thông tin lịch hẹn
+          appointmentDate: formatDate(appointment.scheduledStart),
+          appointmentTime: formatTime(appointment.scheduledStart),
+          scheduledStart: appointment.scheduledStart,
+          scheduledEnd: appointment.scheduledEnd,
+          status: appointment.status,
+          mode: appointment.mode,
+          reason: appointment.reason || "Không có lý do",
+
+          // Overtime Calculation (Operational Workflow Support)
+          overtimeMinutes: (() => {
+            if (appointment.status === "in_progress") {
+              const now = new Date();
+              const end = new Date(appointment.scheduledEnd);
+              if (now > end) {
+                return Math.floor((now - end) / (1000 * 60));
+              }
+            }
+            return 0;
+          })(),
+          isOvertime: (() => {
+            if (appointment.status === "in_progress") {
+              const now = new Date();
+              const end = new Date(appointment.scheduledEnd);
+              return now > end;
+            }
+            return false;
+          })(),
+
+          // Thông tin thanh toán mới
+          services: appointment.services || [],
+          totalPay: appointment.totalPay || 0,
+          amountPaid: appointment.amountPaid || 0,
+          paymentStatus: appointment.paymentStatus || "unpaid",
+
+          // Thông tin hủy lịch
+          cancelledAt: appointment.cancelledAt,
+          cancelledBy: appointment.cancelledBy,
+          cancelReason: appointment.cancelReason,
+
+          // Thông tin hệ thống
+          createdAt: appointment.createdAt,
+          updatedAt: appointment.updatedAt,
+        };
+      }
+    );
+
+    res.json({
+      success: true,
+      data: formattedAppointments,
+    });
+  } catch (error) {
+    console.error("Error fetching appointments for manager:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi tải danh sách lịch hẹn",
+    });
+  }
+};

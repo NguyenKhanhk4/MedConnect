@@ -334,7 +334,7 @@ export async function getDoctorAppointments(req, res) {
             typeof originalPatientId === "string"
               ? originalPatientId
               : originalPatientId._id?.toString() ||
-                originalPatientId.toString();
+              originalPatientId.toString();
 
           try {
             // Try to fetch patient manually
@@ -811,19 +811,17 @@ async function sendAppointmentAcceptanceEmail(appointment, patient, doctor) {
           <p style="margin: 8px 0;"><strong>Thời gian:</strong> ${dateStr}</p>
           <p style="margin: 8px 0;"><strong>Giờ:</strong> ${timeStr}</p>
           <p style="margin: 8px 0;"><strong>Hình thức:</strong> ${modeText}</p>
-          ${
-            appointment.reason
-              ? `<p style="margin: 8px 0;"><strong>Lý do khám:</strong> ${appointment.reason}</p>`
-              : ""
-          }
+          ${appointment.reason
+        ? `<p style="margin: 8px 0;"><strong>Lý do khám:</strong> ${appointment.reason}</p>`
+        : ""
+      }
         </div>
 
         <p>Vui lòng đảm bảo bạn có mặt đúng giờ hẹn.</p>
-        ${
-          appointment.mode === "online"
-            ? "<p><strong>Lưu ý:</strong> Đây là cuộc hẹn online. Vui lòng chuẩn bị kết nối internet ổn định và tham gia cuộc gọi video đúng giờ.</p>"
-            : ""
-        }
+        ${appointment.mode === "online"
+        ? "<p><strong>Lưu ý:</strong> Đây là cuộc hẹn online. Vui lòng chuẩn bị kết nối internet ổn định và tham gia cuộc gọi video đúng giờ.</p>"
+        : ""
+      }
         
         <p style="margin-top: 30px;">Trân trọng,<br><strong>MedConnect</strong></p>
       </div>
@@ -844,11 +842,10 @@ Thông tin lịch hẹn:
 ${appointment.reason ? `- Lý do khám: ${appointment.reason}` : ""}
 
 Vui lòng đảm bảo bạn có mặt đúng giờ hẹn.
-${
-  appointment.mode === "online"
-    ? "\nLưu ý: Đây là cuộc hẹn online. Vui lòng chuẩn bị kết nối internet ổn định và tham gia cuộc gọi video đúng giờ."
-    : ""
-}
+${appointment.mode === "online"
+        ? "\nLưu ý: Đây là cuộc hẹn online. Vui lòng chuẩn bị kết nối internet ổn định và tham gia cuộc gọi video đúng giờ."
+        : ""
+      }
 
 Trân trọng,
 MedConnect
@@ -982,16 +979,14 @@ async function sendAppointmentRejectionEmail(
           <p style="margin: 8px 0;"><strong>Thời gian:</strong> ${dateStr}</p>
           <p style="margin: 8px 0;"><strong>Giờ:</strong> ${timeStr}</p>
           <p style="margin: 8px 0;"><strong>Hình thức:</strong> ${modeText}</p>
-          ${
-            appointment.reason
-              ? `<p style="margin: 8px 0;"><strong>Lý do khám:</strong> ${appointment.reason}</p>`
-              : ""
-          }
-          ${
-            rejectReason
-              ? `<p style="margin: 8px 0;"><strong>Lý do từ chối:</strong> ${rejectReason}</p>`
-              : ""
-          }
+          ${appointment.reason
+        ? `<p style="margin: 8px 0;"><strong>Lý do khám:</strong> ${appointment.reason}</p>`
+        : ""
+      }
+          ${rejectReason
+        ? `<p style="margin: 8px 0;"><strong>Lý do từ chối:</strong> ${rejectReason}</p>`
+        : ""
+      }
         </div>
 
         <p>Bạn có thể đặt lịch hẹn mới với bác sĩ khác hoặc chọn thời gian khác phù hợp hơn.</p>
@@ -1144,6 +1139,25 @@ export async function updateAppointmentStatus(req, res) {
       );
     }
 
+    // CRITICAL: Enforce sequential appointments
+    // If trying to start an appointment (status -> in_progress), check if there's already one in progress
+    if (status === "in_progress") {
+      const existingInProgress = await Appointment.findOne({
+        doctorId: doctor._id,
+        status: "in_progress",
+        _id: { $ne: appointmentId }, // Exclude current appointment
+      });
+
+      if (existingInProgress) {
+        return fail(
+          res,
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          "Bạn đang có một ca khám khác đang diễn ra. Vui lòng hoàn thành ca khám hiện tại trước khi bắt đầu ca mới."
+        );
+      }
+    }
+
     const updateData = { status };
 
     // Handle different status updates
@@ -1236,7 +1250,7 @@ export async function updateAppointmentStatus(req, res) {
               cancelReason || populatedAppointment.rejectReason
             );
             console.log(`✅ sendAppointmentRejectionEmail completed`);
-            } else if (status === "done") {
+          } else if (status === "done") {
             // Gửi email thông báo hoàn thành khám cho bệnh nhân
             // Sử dụng hàm mới từ payos.service.js hỗ trợ single và multiple appointments
             console.log(`📧 Calling sendAppointmentCompletedEmail...`);
@@ -1921,8 +1935,7 @@ export async function getAllDoctors(req, res) {
           `   Doctor is at index ${doctorIndex} of ${allDoctorsBeforePagination.length}`
         );
         console.log(
-          `   Should appear on page ${
-            Math.floor(doctorIndex / parseInt(limit)) + 1
+          `   Should appear on page ${Math.floor(doctorIndex / parseInt(limit)) + 1
           }`
         );
       }
@@ -3608,8 +3621,7 @@ export async function autoGenerateTimeSlots(req, res) {
       }
 
       console.log(
-        `📅 Processing ${currentDate.toDateString()} (weekday ${weekday}) with ${
-          dayRule.blocks.length
+        `📅 Processing ${currentDate.toDateString()} (weekday ${weekday}) with ${dayRule.blocks.length
         } blocks`
       );
       let daySlotCount = 0;
@@ -3622,8 +3634,7 @@ export async function autoGenerateTimeSlots(req, res) {
       });
 
       console.log(
-        `🔍 Generated ${
-          generatedSlots.length
+        `🔍 Generated ${generatedSlots.length
         } slots for ${currentDate.toDateString()}`
       );
 
@@ -4814,8 +4825,7 @@ async function createDefaultScheduleRules(doctorId) {
     if (defaultRules.length > 0) {
       await DoctorScheduleRule.insertMany(defaultRules);
       console.log(
-        `Created ${
-          defaultRules.length
+        `Created ${defaultRules.length
         } default schedule rules for doctor ${doctorId} (missing weekdays: ${defaultRules
           .map((r) => r.weekday)
           .join(", ")})`

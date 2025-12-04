@@ -2792,7 +2792,77 @@ export async function getDoctorVisitCount(req, res) {
 }
 
 /**
- * Helper function: Send cancellation confirmation email to patient
+ * ================================================================
+ * HÀM GỬI EMAIL XÁC NHẬN HỦY LỊCH HẸN
+ * ================================================================
+ * 
+ * Gửi email thông báo cho bệnh nhân khi lịch hẹn được hủy thành công.
+ * Email chứa đầy đủ thông tin lịch hẹn đã hủy và lý do hủy.
+ * 
+ * @param {object} appointment - Appointment object đã được hủy
+ * @param {object} appointment._id - ID của appointment
+ * @param {Date} appointment.scheduledStart - Thời gian bắt đầu đã hủy
+ * @param {Date} appointment.scheduledEnd - Thời gian kết thúc đã hủy
+ * @param {string} appointment.mode - Hình thức khám (online/offline)
+ * @param {string} appointment.reason - Lý do khám ban đầu
+ * @param {Date} appointment.cancelledAt - Thời điểm hủy
+ * @param {string} appointment.status - Trạng thái = "cancelled"
+ * 
+ * @param {object} patient - Thông tin bệnh nhân
+ * @param {object} patient._id - ID của patient
+ * @param {string} patient.fullName - Tên bệnh nhân
+ * @param {object|string} patient.userId - User object (populated) hoặc ObjectId
+ * 
+ * @param {object} doctor - Thông tin bác sĩ
+ * @param {string} doctor.fullName - Tên bác sĩ
+ * @param {Array} doctor.specializationIds - Danh sách chuyên khoa
+ * 
+ * @param {string} cancelReason - Lý do hủy lịch do bệnh nhân cung cấp
+ * 
+ * @returns {Promise<void>} - Không trả về giá trị
+ * 
+ * @description
+ * LOGIC XỬ LÝ EMAIL:
+ * 1. Lấy email từ patient.userId (hỗ trợ cả populated và ObjectId)
+ * 2. Nếu không có email → return sớm (không gửi)
+ * 3. Format thời gian theo locale "vi-VN"
+ * 4. Tạo HTML email với các phần:
+ *    - Tiêu đề: "Lịch hẹn của bạn đã được hủy"
+ *    - Thông tin lịch hẹn đã hủy (background đỏ):
+ *      + Bác sĩ
+ *      + Ngày giờ
+ *      + Hình thức khám
+ *      + Phòng khám (nếu offline)
+ *    - Lý do hủy (background vàng - nếu có)
+ *    - Hướng dẫn đặt lịch mới nếu cần
+ * 5. Gửi email với cả HTML và text format
+ * 6. Error được catch và log, không throw
+ * 
+ * @use_cases
+ * - Bệnh nhân tự hủy lịch
+ * - Bác sĩ hủy lịch
+ * - Admin/Manager hủy lịch
+ * - Hệ thống tự động hủy (timeout thanh toán)
+ * 
+ * @email_content
+ * - Tiêu đề: "Lịch hẹn của bạn đã được hủy - MedConnect"
+ * - Màu sắc: Đỏ cho cancelled (#dc2626), Vàng cho reason (#f59e0b)
+ * - Tone: Trung lập, thông báo rõ ràng
+ * - CTA: "Nếu bạn cần đặt lịch mới, vui lòng truy cập hệ thống"
+ * 
+ * @error_handling
+ * - Không throw error để không ảnh hưởng flow chính
+ * - Log chi tiết để debug
+ * - Email là non-critical operation
+ * - Cho phép hủy lịch thành công ngay cả khi email fail
+ * 
+ * @example
+ * await sendAppointmentCancellationEmail(
+ *   cancelledAppointment,
+ *   patientInfo,
+ *   doctorInfo,
+ *   "Có việc đột xuất không thể đến"
+ * );
  */
 async function sendAppointmentCancellationEmail(
   appointment,
@@ -2807,7 +2877,14 @@ async function sendAppointmentCancellationEmail(
       patientUserId: patient?.userId,
     });
 
-    // Lấy email từ Patient userId
+    /**
+     * BƯỚC 1: LẤY EMAIL CỦA BỆNH NHÂN
+     * 
+     * Xử lý nhiều trường hợp:
+     * - userId đã được populate (object có email)
+     * - userId là ObjectId (cần query User)
+     * - Không tìm thấy email → return sớm
+     */
     let patientEmail = null;
 
     if (
@@ -3392,21 +3469,60 @@ export async function calculatePaymentSummaryForSingleAppointment(req, res) {
   }
 }
 
-/**
- * Create payment for single appointment (pre-payment flow)
- * POST /api/patients/appointments/create-payment
- *
- * Flow mới:
- * 1. Nhận appointment data từ request body (chưa tạo appointment trong DB)
- * 2. Validate appointment data
- * 3. Tính toán payment
- * 4. Tạo Payment record với appointmentData (lưu appointment data để tạo sau khi thanh toán thành công)
- * 5. Tạo PayOS payment link
- * 6. Return payUrl để redirect user đến PayOS
- * 7. Sau khi thanh toán thành công (webhook), tạo appointment từ payment.appointmentData
- */
+/* ============================================================================
+ * CONTROLLER: createPaymentForSingleAppointment
+ * ============================================================================
+ * Tạo payment cho single appointment (PRE-PAYMENT FLOW)
+ * 
+ * Endpoint: POST /api/patients/appointments/create-payment
+ * Auth: Required (authGuard middleware)
+ * 
+ * Request Body:
+ * - doctorId: string (MongoDB ObjectId)
+ * - slotId: string (DoctorTimeSlot ID)
+ * - mode: string ("online" | "offline")
+ * - clinicId: string (required nếu mode = "offline")
+ * - scheduledStart: string (ISO date)
+ * - scheduledEnd: string (ISO date)
+ * - reason: string (lý do khám)
+ * - patientId: string (optional - để booking cho người thân)
+ * - gateway: string (default "payos")
+ * - method: string (default "qr")
+ * 
+ * Response:
+ * - paymentId: string
+ * - payUrl: string (URL để redirect đến PayOS)
+ * - orderCode: number
+ * - totalAmount: number
+ * - appointmentSummary: object
+ * 
+ * LUỒNG PRE-PAYMENT (MỚI):
+ * -------------------------
+ * 1. Nhận appointment data từ request (CHƯA tạo appointment trong DB)
+ * 2. Validate tất cả dữ liệu appointment
+ * 3. Verify slot còn available (check active appointments)
+ * 4. Tính phí đặt lịch (calculateAppointmentBookingFee)
+ * 5. Tạo Payment record với appointmentData (lưu data để dùng sau)
+ * 6. Tạo PayOS payment link
+ * 7. Return payUrl để frontend redirect user đến PayOS
+ * 8. User thanh toán trên PayOS
+ * 9. PayOS webhook → handlePayosWebhook() → TẠO appointment từ appointmentData
+ * 
+ * LỢI ÍCH PRE-PAYMENT:
+ * - Không tạo appointment "rác" nếu user không thanh toán
+ * - Slot không bị lock khi chưa thanh toán
+ * - Clean architecture: payment first, appointment sau
+ * 
+ * HỖ TRỢ FAMILY MEMBER BOOKING:
+ * - Nếu có patientId → booking cho người thân
+ * - Nếu không có patientId → booking cho chính mình (self patient)
+ * ============================================================================ */
 export async function createPaymentForSingleAppointment(req, res) {
   try {
+    /* ------------------------------------
+     * BƯỚC 1: AUTHENTICATE USER
+     * ------------------------------------ */
+    
     const claims = req.user || {};
     const appUserId = claims.app_user_id;
 
@@ -3419,20 +3535,28 @@ export async function createPaymentForSingleAppointment(req, res) {
       );
     }
 
+    /* ------------------------------------
+     * BƯỚC 2: PARSE REQUEST BODY
+     * ------------------------------------ */
+    
     const {
-      doctorId,
-      slotId,
-      mode,
-      clinicId,
-      reason,
-      scheduledStart,
-      scheduledEnd,
-      patientId,
-      gateway = "payos",
-      method = "qr",
+      doctorId,           // ID bác sĩ
+      slotId,             // ID time slot
+      mode,               // "online" hoặc "offline"
+      clinicId,           // ID phòng khám (required nếu offline)
+      reason,             // Lý do khám
+      scheduledStart,     // Thời gian bắt đầu (ISO string)
+      scheduledEnd,       // Thời gian kết thúc (ISO string)
+      patientId,          // ID bệnh nhân (optional - cho family booking)
+      gateway = "payos",  // Payment gateway (default PayOS)
+      method = "qr",      // Payment method (default QR)
     } = req.body;
 
-    // Validate gateway
+    /* ------------------------------------
+     * BƯỚC 3: VALIDATE INPUT
+     * ------------------------------------ */
+    
+    // Validate payment gateway
     if (!["payos", "vnpay", "momo"].includes(gateway)) {
       return fail(
         res,
@@ -3462,7 +3586,7 @@ export async function createPaymentForSingleAppointment(req, res) {
       );
     }
 
-    // If offline mode, clinicId is required
+    // Nếu offline mode, clinicId là bắt buộc
     if (mode === "offline" && !clinicId) {
       return fail(
         res,

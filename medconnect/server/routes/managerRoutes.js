@@ -21,6 +21,7 @@ import {
   processCashPayment,
   createBankTransferPayment,
   createBookingPaymentByManager,
+  getAllAppointmentsForManager,
 } from "../controllers/managerController.js";
 import {
   getLeaveRequests,
@@ -77,6 +78,7 @@ router.get(
   authGuard,
   getAppointmentDetailForManager
 );
+router.get("/appointments", authGuard, getAllAppointmentsForManager);
 router.post("/appointments", authGuard, createAppointmentByManager);
 router.put(
   "/appointments/:appointmentId/reschedule",

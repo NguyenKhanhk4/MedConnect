@@ -83,12 +83,12 @@ function getTimeAgo(date) {
   // Nếu chưa đến 1 giờ (60 phút), hiển thị theo phút
   if (diffInMinutes < 60) {
     return `${diffInMinutes} phút trước`;
-  } 
+  }
   // Nếu chưa đến 1 ngày (1440 phút = 24 giờ), hiển thị theo giờ
   else if (diffInMinutes < 1440) {
     const hours = Math.floor(diffInMinutes / 60);
     return `${hours} giờ trước`;
-  } 
+  }
   // Nếu hơn 1 ngày, hiển thị theo ngày
   else {
     const days = Math.floor(diffInMinutes / 1440);
@@ -163,7 +163,7 @@ export const getDashboardStats = async (req, res) => {
 
     // Get total appointments (all time)
     const totalAppointments = await Appointment.countDocuments({});
-    
+
     // Revenue calculation using MongoDB aggregation for accurate and efficient calculation
     // Calculate total revenue from all successful payments (captured or authorized status)
     // Total revenue = sum of (payment.total - refundAmount) for all successful payments
@@ -190,10 +190,10 @@ export const getDashboardStats = async (req, res) => {
         }
       }
     ]);
-    
+
     // Extract revenue from aggregation result, default to 0 if no payments found
-    const revenue = revenueResult.length > 0 && revenueResult[0].totalRevenue 
-      ? revenueResult[0].totalRevenue 
+    const revenue = revenueResult.length > 0 && revenueResult[0].totalRevenue
+      ? revenueResult[0].totalRevenue
       : 0;
 
     const stats = {
@@ -246,9 +246,8 @@ export const getDashboardActivities = async (req, res) => {
         if (user && user.createdAt) {
           const roleText = user.role === "doctor" ? "bác sĩ" : "bệnh nhân";
           activities.push({
-            title: `${
-              user.fullName || "Người dùng"
-            } đã đăng ký tài khoản ${roleText}`,
+            title: `${user.fullName || "Người dùng"
+              } đã đăng ký tài khoản ${roleText}`,
             time: getTimeAgo(user.createdAt),
             createdAt: user.createdAt, // Store original date for sorting
           });
@@ -431,7 +430,7 @@ export const getAllDoctors = async (req, res) => {
 export const getPendingDoctors = async (req, res) => {
   try {
     // Get doctors that are not verified AND not rejected (no rejectedAt)
-    const pendingDoctors = await Doctor.find({ 
+    const pendingDoctors = await Doctor.find({
       isVerified: false,
       rejectedAt: { $exists: false } // Exclude rejected doctors
     })
@@ -446,7 +445,7 @@ export const getPendingDoctors = async (req, res) => {
 
     // Format doctors data - license image comes from licenseNo field
     const doctorUploadDir = path.resolve('uploads/doctors');
-    
+
     const formattedDoctors = pendingDoctors.map((doctor) => {
       try {
         // Build license image URL - if licenseNo exists, it's a filename in uploads/doctors/
@@ -614,7 +613,7 @@ export const getVerifiedDoctors = async (req, res) => {
 export const getRejectedDoctors = async (req, res) => {
   try {
     // Get doctors that have been rejected (have rejectedAt field)
-    const rejectedDoctors = await Doctor.find({ 
+    const rejectedDoctors = await Doctor.find({
       rejectedAt: { $exists: true, $ne: null } // Has rejection date
     })
       .populate("userId", "fullName email phone")
@@ -628,7 +627,7 @@ export const getRejectedDoctors = async (req, res) => {
 
     // Format doctors data - license image comes from licenseNo field
     const doctorUploadDir = path.resolve('uploads/doctors');
-    
+
     const formattedDoctors = rejectedDoctors.map((doctor) => {
       try {
         // Build license image URL - if licenseNo exists, it's a filename in uploads/doctors/
@@ -752,7 +751,7 @@ async function sendDoctorApprovalEmail(doctor, user, canBeActive = true, activeC
     // Tạo nội dung email dựa trên canBeActive
     let htmlContent = "";
     let subject = "";
-    
+
     if (canBeActive && missingInfo.length === 0) {
       // Trường hợp đầy đủ thông tin - email phê duyệt thông thường
       subject = "Tài khoản bác sĩ của bạn đã được phê duyệt - MedConnect";
@@ -802,7 +801,7 @@ async function sendDoctorApprovalEmail(doctor, user, canBeActive = true, activeC
       // Trường hợp thiếu thông tin - email như trong ảnh
       subject = "Tài khoản của bạn đã được xác minh - Cần bổ sung thông tin";
       const missingInfoList = missingInfo.map(info => `<li>${info}</li>`).join("");
-      
+
       htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #f59e0b; border-bottom: 2px solid #f59e0b; padding-bottom: 10px; font-size: 24px;">
@@ -922,7 +921,7 @@ MedConnect - Đội ngũ quản trị
     }
 
     const { sendMail } = await import("../utils/email.js");
-    
+
     await sendMail({
       to: user.email,
       subject: subject,
@@ -970,16 +969,14 @@ async function sendDoctorSuspensionEmail(doctor, user) {
 
         <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #0284c7;">Hướng dẫn:</h3>
-          <p>1. Đăng nhập vào hệ thống MedConnect bằng email: <strong>${
-            user.email
-          }</strong></p>
+          <p>1. Đăng nhập vào hệ thống MedConnect bằng email: <strong>${user.email
+      }</strong></p>
           <p>2. Vào phần <strong>"Cài đặt"</strong> hoặc <strong>"Hồ sơ"</strong> để cập nhật thông tin</p>
           <p>3. Điền đầy đủ các thông tin còn thiếu</p>
           <p>4. Sau khi điền đủ thông tin, tài khoản của bạn sẽ tự động được kích hoạt</p>
           <p style="margin-top: 15px;">
-            <a href="${
-              process.env.CLIENT_URL || "http://localhost:5173"
-            }/auth/login" 
+            <a href="${process.env.CLIENT_URL || "http://localhost:5173"
+      }/auth/login" 
                style="background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
               Đăng nhập ngay
             </a>
@@ -1083,9 +1080,8 @@ async function sendDoctorRejectionEmail(doctor, user, reason, rejectedBy) {
         <div style="background-color: #fff7ed; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #d97706;">Lý do từ chối:</h3>
           <div style="background-color: white; padding: 15px; border-radius: 4px; border: 1px solid #fcd34d;">
-            <p style="margin: 0; white-space: pre-wrap;">${
-              reason || "Không có lý do cụ thể"
-            }</p>
+            <p style="margin: 0; white-space: pre-wrap;">${reason || "Không có lý do cụ thể"
+      }</p>
           </div>
         </div>
 
@@ -1098,9 +1094,8 @@ async function sendDoctorRejectionEmail(doctor, user, reason, rejectedBy) {
             <li>Kiểm tra lại các tài liệu đã gửi và đảm bảo chúng đáp ứng đầy đủ yêu cầu</li>
           </ul>
           <p style="margin-top: 15px;">
-            <a href="${
-              process.env.CLIENT_URL || "http://localhost:5173"
-            }/auth/doctor-register" 
+            <a href="${process.env.CLIENT_URL || "http://localhost:5173"
+      }/auth/doctor-register" 
                style="background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
               Đăng ký lại
             </a>
@@ -1135,9 +1130,8 @@ Bạn có thể:
 - Liên hệ với chúng tôi nếu bạn có thắc mắc về quyết định này
 - Kiểm tra lại các tài liệu đã gửi và đảm bảo chúng đáp ứng đầy đủ yêu cầu
 
-Link đăng ký lại: ${
-      process.env.CLIENT_URL || "http://localhost:5173"
-    }/auth/doctor-register
+Link đăng ký lại: ${process.env.CLIENT_URL || "http://localhost:5173"
+      }/auth/doctor-register
 
 Nếu bạn có bất kỳ câu hỏi hoặc cần hỗ trợ, vui lòng liên hệ với chúng tôi.
 
@@ -1146,7 +1140,7 @@ MedConnect - Đội ngũ quản trị
     `;
 
     const { sendMail } = await import("../utils/email.js");
-    
+
     await sendMail({
       to: user.email,
       subject: "Thông báo về đơn đăng ký tài khoản bác sĩ - MedConnect",
@@ -1278,7 +1272,7 @@ export const approveDoctor = async (req, res) => {
         // Không phụ thuộc vào canBeActive
         // Đảm bảo có user object với email
         let userForEmail = user;
-        
+
         if (!userForEmail || !userForEmail.email) {
           // Nếu user chưa có hoặc không có email, lấy từ doctor.userId
           if (doctor.userId) {
@@ -1293,7 +1287,7 @@ export const approveDoctor = async (req, res) => {
             }
           }
         }
-        
+
         if (userForEmail && userForEmail.email) {
           await sendDoctorApprovalEmail(doctor, userForEmail, canBeActive, activeCheck);
         }
@@ -1409,48 +1403,48 @@ export const rejectDoctor = async (req, res) => {
     doctor.approvedAt = null;
     await doctor.save();
 
-      // Update User status to 'rejected' (allows re-registration)
-      if (doctor.userId) {
-        const userId = doctor.userId._id || doctor.userId;
-        const updatedUser = await User.findByIdAndUpdate(
-          userId,
-          { status: "rejected" },
-          { new: true }
-        );
+    // Update User status to 'rejected' (allows re-registration)
+    if (doctor.userId) {
+      const userId = doctor.userId._id || doctor.userId;
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { status: "rejected" },
+        { new: true }
+      );
 
-        // Gửi email từ chối tài khoản bác sĩ
-        try {
-          // Đảm bảo có user object với email
-          let userForEmail = updatedUser;
-          
-          if (!userForEmail || !userForEmail.email) {
-            // Nếu user chưa có hoặc không có email, lấy từ doctor.userId
-            if (doctor.userId) {
-              if (typeof doctor.userId === "object" && doctor.userId.email) {
-                // userId đã được populate
-                userForEmail = doctor.userId;
-              } else {
-                // userId là ObjectId, cần query
-                const User = (await import("../models/user.model.js")).default;
-                const userId = doctor.userId._id || doctor.userId;
-                userForEmail = await User.findById(userId).lean();
-              }
+      // Gửi email từ chối tài khoản bác sĩ
+      try {
+        // Đảm bảo có user object với email
+        let userForEmail = updatedUser;
+
+        if (!userForEmail || !userForEmail.email) {
+          // Nếu user chưa có hoặc không có email, lấy từ doctor.userId
+          if (doctor.userId) {
+            if (typeof doctor.userId === "object" && doctor.userId.email) {
+              // userId đã được populate
+              userForEmail = doctor.userId;
+            } else {
+              // userId là ObjectId, cần query
+              const User = (await import("../models/user.model.js")).default;
+              const userId = doctor.userId._id || doctor.userId;
+              userForEmail = await User.findById(userId).lean();
             }
           }
-          
-          if (userForEmail && userForEmail.email) {
-            await sendDoctorRejectionEmail(
-              doctor,
-              userForEmail,
-              reason,
-              reviewer
-            );
-          }
-        } catch (emailError) {
-          console.error("Failed to send rejection email:", emailError);
-          // Continue even if email fails
         }
+
+        if (userForEmail && userForEmail.email) {
+          await sendDoctorRejectionEmail(
+            doctor,
+            userForEmail,
+            reason,
+            reviewer
+          );
+        }
+      } catch (emailError) {
+        console.error("Failed to send rejection email:", emailError);
+        // Continue even if email fails
       }
+    }
 
     // Create in-app notification for doctor
     try {
@@ -1648,7 +1642,7 @@ export const getAllUsers = async (req, res) => {
     );
 
     console.log(`📊 getAllUsers: Returning ${formattedUsers.length} formatted users`);
-    
+
     res.json({
       success: true,
       data: formattedUsers,
@@ -1958,6 +1952,9 @@ export const updateUser = async (req, res) => {
 
     // Remove password from update data if present
     delete updateData.password;
+
+    // Remove role from update data - role cannot be changed, only displayed
+    delete updateData.role;
 
     // Extract doctor-specific fields
     const {
@@ -2765,6 +2762,26 @@ export const getAllAppointments = async (req, res) => {
           mode: appointment.mode,
           reason: appointment.reason || "Không có lý do",
 
+          // Overtime Calculation (Operational Workflow Support)
+          overtimeMinutes: (() => {
+            if (appointment.status === 'in_progress') {
+              const now = new Date();
+              const end = new Date(appointment.scheduledEnd);
+              if (now > end) {
+                return Math.floor((now - end) / (1000 * 60));
+              }
+            }
+            return 0;
+          })(),
+          isOvertime: (() => {
+            if (appointment.status === 'in_progress') {
+              const now = new Date();
+              const end = new Date(appointment.scheduledEnd);
+              return now > end;
+            }
+            return false;
+          })(),
+
           // Thông tin thanh toán mới
           services: appointment.services || [],
           totalPay: appointment.totalPay || 0,
@@ -2795,6 +2812,7 @@ export const getAllAppointments = async (req, res) => {
     });
   }
 };
+
 
 // Update appointment status
 export const updateAppointmentStatus = async (req, res) => {
@@ -3037,8 +3055,8 @@ export const getPaymentRevenueStats = async (req, res) => {
       previousRevenue > 0
         ? Math.round(((totalRevenue - previousRevenue) / previousRevenue) * 100)
         : totalRevenue > 0
-        ? 100
-        : 0;
+          ? 100
+          : 0;
 
     // Count completed orders (payments)
     const totalCompletedOrders = currentPayments.length;
@@ -3047,13 +3065,13 @@ export const getPaymentRevenueStats = async (req, res) => {
     const ordersChange =
       previousCompletedOrders > 0
         ? Math.round(
-            ((totalCompletedOrders - previousCompletedOrders) /
-              previousCompletedOrders) *
-              100
-          )
+          ((totalCompletedOrders - previousCompletedOrders) /
+            previousCompletedOrders) *
+          100
+        )
         : totalCompletedOrders > 0
-        ? 100
-        : 0;
+          ? 100
+          : 0;
 
     // Phân tích doanh thu theo kênh thanh toán
     // Thuật toán: Duyệt qua tất cả payments, nhóm theo gateway (kênh thanh toán)
@@ -3116,9 +3134,9 @@ export const getPaymentRevenueStats = async (req, res) => {
         const dateStr = `${(startDate.getMonth() + 1)
           .toString()
           .padStart(2, "0")}-${startDate
-          .getDate()
-          .toString()
-          .padStart(2, "0")}`;
+            .getDate()
+            .toString()
+            .padStart(2, "0")}`;
         revenueTrend.push({
           label: `Th${dateStr} ${hour.toString().padStart(2, "0")}`,
           amount: hourRevenue,
@@ -3318,7 +3336,7 @@ export const getAdminInvoices = async (req, res) => {
 export const getStatistics = async (req, res) => {
   try {
     let { period = 'today', startDate: startDateParam, endDate: endDateParam } = req.query;
-    
+
     // Ánh xạ các key period từ frontend sang backend
     // Frontend gửi 'week', 'month', 'year' → Backend cần 'thisWeek', 'thisMonth', 'thisYear'
     const periodMap = {
@@ -3329,10 +3347,10 @@ export const getStatistics = async (req, res) => {
     };
     const originalPeriod = period; // Lưu period gốc để dùng cho logic so sánh
     period = periodMap[period] || period; // Chuyển đổi sang key backend
-    
+
     const today = new Date();
     let startDate, endDate;
-    
+
     // Xử lý period custom: lấy startDate và endDate từ query params
     if (originalPeriod === 'custom' && startDateParam && endDateParam) {
       startDate = new Date(startDateParam);
@@ -3344,7 +3362,7 @@ export const getStatistics = async (req, res) => {
       const range = getDateRange(period, req);
       startDate = range.startDate;
       endDate = range.endDate;
-      
+
       // Đảm bảo dates được set đúng cho từng period để lấy đầy đủ dữ liệu
       // Đặc biệt quan trọng: endDate phải là cuối ngày (23:59:59) để bao gồm cả ngày hôm nay
       if (period === 'thisYear' || originalPeriod === 'year') {
@@ -3362,7 +3380,7 @@ export const getStatistics = async (req, res) => {
         const weekStart = new Date(today);
         weekStart.setDate(today.getDate() - today.getDay()); // Về Chủ nhật đầu tuần
         startDate = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), 0, 0, 0, 0);
-        
+
         // Kết thúc ở cuối Thứ 7 của tuần này (6 ngày sau Chủ nhật)
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
@@ -3381,13 +3399,13 @@ export const getStatistics = async (req, res) => {
     // ========== 1. TỔNG BÁC SĨ - So với tháng trước ==========
     // Đếm tổng số bác sĩ đã được xác minh (isVerified = true)
     const totalDoctors = await Doctor.countDocuments({ isVerified: true });
-    
+
     // Tính ngày cuối tháng trước (để so sánh)
     // Thuật toán: new Date(year, month, 0) → trả về ngày cuối cùng của tháng trước
     const previousMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
-    
+
     // Đếm số bác sĩ đã được tạo trước tháng này
-    const previousTotalDoctors = await Doctor.countDocuments({ 
+    const previousTotalDoctors = await Doctor.countDocuments({
       isVerified: true,
       createdAt: { $lte: previousMonthEnd } // Chỉ lấy những bác sĩ được tạo trước hoặc bằng cuối tháng trước
     });
@@ -3397,7 +3415,7 @@ export const getStatistics = async (req, res) => {
     // ========== 2. TỔNG BỆNH NHÂN - So với tuần trước ==========
     // Đếm tổng số bệnh nhân (users có role = 'patient')
     const totalPatients = await User.countDocuments({ role: 'patient' });
-    
+
     // Phân bổ người dùng theo vai trò (role)
     // Thuật toán: Đếm số lượng users theo từng role để tính phần trăm phân bổ
     const totalUsers = await User.countDocuments({});
@@ -3405,7 +3423,7 @@ export const getStatistics = async (req, res) => {
     const doctorUserCount = await User.countDocuments({ role: 'doctor' });
     const patientUserCount = await User.countDocuments({ role: 'patient' });
     const managerCount = await User.countDocuments({ role: 'manager' });
-    
+
     // Tính ngày cuối tuần trước để so sánh
     // Thuật toán: 
     // - today.getDay() trả về 0-6 (0 = Chủ nhật, 1 = Thứ 2, ...)
@@ -3415,9 +3433,9 @@ export const getStatistics = async (req, res) => {
     currentWeekStart.setDate(todayStart.getDate() - todayStart.getDay()); // Đầu tuần này (Chủ nhật)
     const previousWeekEnd = new Date(currentWeekStart);
     previousWeekEnd.setDate(previousWeekEnd.getDate() - 1); // Cuối tuần trước (Thứ 7)
-    
+
     // Đếm số bệnh nhân đã được tạo trước tuần này
-    const previousTotalPatients = await User.countDocuments({ 
+    const previousTotalPatients = await User.countDocuments({
       role: 'patient',
       createdAt: { $lte: previousWeekEnd }
     });
@@ -3427,7 +3445,7 @@ export const getStatistics = async (req, res) => {
     // ========== 3. LỊCH HẸN - Dựa trên period được chọn ==========
     // Đếm tất cả appointments trong khoảng thời gian (không phân biệt status)
     // Lưu ý: Sử dụng scheduledStart (thời gian đặt lịch) thay vì createdAt để đảm bảo tính nhất quán
-    
+
     let appointmentQuery = {};
     if (originalPeriod === 'year') {
       // Nếu period = year: đếm tất cả appointments được lên lịch trong năm hiện tại
@@ -3443,15 +3461,15 @@ export const getStatistics = async (req, res) => {
         scheduledStart: { $gte: startDate, $lte: endDate }
       };
     }
-    
+
     // Đếm số appointments trong khoảng thời gian
     const periodAppointments = await Appointment.countDocuments(appointmentQuery);
 
     // Tính toán kỳ trước để so sánh số lượng appointments
     // Thuật toán: Tùy theo period, tính toán khoảng thời gian tương ứng ở kỳ trước
     let previousPeriodAppointmentsStart, previousPeriodAppointmentsEnd;
-    const periodDurationMs = endDate - startDate; // Độ dài kỳ hiện tại (milliseconds)
-    
+    const periodDurationMsForComparison = endDate - startDate; // Độ dài kỳ hiện tại (milliseconds) - dùng cho so sánh
+
     if (originalPeriod === 'year') {
       // So sánh với năm trước: cùng ngày tháng nhưng năm trước
       previousPeriodAppointmentsStart = new Date(today.getFullYear() - 1, 0, 1, 0, 0, 0, 0);
@@ -3478,11 +3496,11 @@ export const getStatistics = async (req, res) => {
       previousPeriodAppointmentsStart.setHours(0, 0, 0, 0);
     } else if (originalPeriod === 'custom') {
       // So sánh với cùng độ dài trước kỳ custom
-      // Thuật toán: Lấy startDate, trừ 1 ngày để được cuối kỳ trước, sau đó trừ đi periodDurationMs
+      // Thuật toán: Lấy startDate, trừ 1 ngày để được cuối kỳ trước, sau đó trừ đi periodDurationMsForComparison
       previousPeriodAppointmentsEnd = new Date(startDate);
       previousPeriodAppointmentsEnd.setDate(previousPeriodAppointmentsEnd.getDate() - 1);
       previousPeriodAppointmentsEnd.setHours(23, 59, 59, 999);
-      previousPeriodAppointmentsStart = new Date(previousPeriodAppointmentsEnd.getTime() - periodDurationMs);
+      previousPeriodAppointmentsStart = new Date(previousPeriodAppointmentsEnd.getTime() - periodDurationMsForComparison);
       previousPeriodAppointmentsStart.setHours(0, 0, 0, 0);
     } else {
       // Mặc định: so sánh với hôm qua
@@ -3492,13 +3510,13 @@ export const getStatistics = async (req, res) => {
       previousPeriodAppointmentsEnd.setHours(23, 59, 59, 999);
       previousPeriodAppointmentsStart.setHours(0, 0, 0, 0);
     }
-    
+
     const previousPeriodAppointments = await Appointment.countDocuments({
       scheduledStart: { $gte: previousPeriodAppointmentsStart, $lte: previousPeriodAppointmentsEnd }
     });
-    
-    const appointmentsChange = previousPeriodAppointments > 0 
-      ? periodAppointments - previousPeriodAppointments 
+
+    const appointmentsChange = previousPeriodAppointments > 0
+      ? periodAppointments - previousPeriodAppointments
       : periodAppointments;
 
     // ========== 4. DOANH THU - Dựa trên period được chọn ==========
@@ -3509,27 +3527,27 @@ export const getStatistics = async (req, res) => {
       status: { $in: ['captured', 'authorized'] }, // Chỉ lấy payments đã thanh toán thành công
       createdAt: { $gte: startDate, $lte: endDate } // Lọc theo thời gian tạo payment
     });
-    
+
     // Tính tổng doanh thu: duyệt qua tất cả payments, cộng dồn (total - refundAmount)
     // refundAmount là số tiền đã hoàn lại, nên phải trừ đi để có doanh thu thực tế
     const periodRevenue = periodPayments.reduce((sum, payment) => {
       return sum + (payment.total - (payment.refundAmount || 0));
     }, 0);
 
-    // Calculate previous period revenue for comparison
+    // Tính doanh thu kỳ trước để so sánh
     let previousPeriodStart, previousPeriodEnd;
-    const periodDuration = endDate - startDate; // Duration in milliseconds
-    
+    const periodDuration = endDate - startDate; // Thời lượng tính bằng mili giây
+
     if (originalPeriod === 'year') {
-      // Compare with previous year
+      // So sánh với năm trước
       previousPeriodStart = new Date(today.getFullYear() - 1, 0, 1, 0, 0, 0, 0);
       previousPeriodEnd = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate(), 23, 59, 59, 999);
     } else if (originalPeriod === 'month') {
-      // Compare with previous month
+      // So sánh với tháng trước
       previousPeriodStart = new Date(today.getFullYear(), today.getMonth() - 1, 1, 0, 0, 0, 0);
       previousPeriodEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
     } else if (originalPeriod === 'week') {
-      // Compare with previous week
+      // So sánh với tuần trước
       const weekStart = new Date(startDate);
       previousPeriodEnd = new Date(weekStart);
       previousPeriodEnd.setDate(previousPeriodEnd.getDate() - 1);
@@ -3538,25 +3556,25 @@ export const getStatistics = async (req, res) => {
       previousPeriodStart.setDate(previousPeriodStart.getDate() - 6);
       previousPeriodStart.setHours(0, 0, 0, 0);
     } else if (originalPeriod === 'today') {
-      // Compare with yesterday
+      // So sánh với hôm qua
       previousPeriodStart = new Date(startDate);
       previousPeriodStart.setDate(previousPeriodStart.getDate() - 1);
       previousPeriodEnd = new Date(previousPeriodStart);
       previousPeriodEnd.setHours(23, 59, 59, 999);
       previousPeriodStart.setHours(0, 0, 0, 0);
     } else if (originalPeriod === 'custom') {
-      // Compare with same duration before the custom period
+      // So sánh với cùng khoảng thời gian trước kỳ tùy chỉnh
       previousPeriodEnd = new Date(startDate);
       previousPeriodEnd.setDate(previousPeriodEnd.getDate() - 1);
       previousPeriodEnd.setHours(23, 59, 59, 999);
       previousPeriodStart = new Date(previousPeriodEnd.getTime() - periodDuration);
       previousPeriodStart.setHours(0, 0, 0, 0);
     } else {
-      // Default: compare with previous month
+      // Mặc định: so sánh với tháng trước
       previousPeriodStart = new Date(today.getFullYear(), today.getMonth() - 1, 1, 0, 0, 0, 0);
       previousPeriodEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
     }
-    
+
     const previousPeriodPayments = await Payment.find({
       status: { $in: ['captured', 'authorized'] },
       createdAt: { $gte: previousPeriodStart, $lte: previousPeriodEnd }
@@ -3564,175 +3582,200 @@ export const getStatistics = async (req, res) => {
     const previousPeriodRevenue = previousPeriodPayments.reduce((sum, payment) => {
       return sum + (payment.total - (payment.refundAmount || 0));
     }, 0);
-    const revenueChangePercent = previousPeriodRevenue > 0 
+    const revenueChangePercent = previousPeriodRevenue > 0
       ? Math.round(((periodRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100)
       : (periodRevenue > 0 ? 100 : 0);
 
     // ========== 5. TOP 3 BÁC SĨ KHÁM ONLINE NHIỀU NHẤT ==========
-    // Sử dụng cùng logic date range như appointments query để đảm bảo tính nhất quán
-    // Thuật toán MongoDB Aggregation:
-    // 1. $match: Lọc appointments online trong khoảng thời gian, có doctorId hợp lệ
-    // 2. $group: Nhóm theo doctorId, đếm số lượng appointments
-    // 3. $sort: Sắp xếp theo count giảm dần
-    // 4. $limit: Chỉ lấy top 3
-    // 5. $lookup: Join với collection Doctors để lấy thông tin bác sĩ
-    // 6. $unwind: Chuyển array thành object (vì $lookup trả về array)
-    // 7. $lookup: Join với collection Users để lấy tên bác sĩ
-    // 8. $unwind: Chuyển array thành object
-    // 9. $project: Chọn các trường cần thiết (doctorId, name, count)
-    
-    let onlineAppointmentsDateQuery = {};
-    if (originalPeriod === 'year') {
-      const yearStart = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0);
-      const yearEnd = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
-      onlineAppointmentsDateQuery = {
-        scheduledStart: { $gte: yearStart, $lte: yearEnd }
-      };
-    } else {
-      onlineAppointmentsDateQuery = {
-        scheduledStart: { $gte: startDate, $lte: endDate }
-      };
-    }
-    
-    const onlineAppointments = await Appointment.aggregate([
-      {
-        // Bước 1: Lọc appointments
-        $match: {
-          mode: 'online', // Chỉ lấy appointments online
-          ...onlineAppointmentsDateQuery, // Lọc theo khoảng thời gian
-          status: { $in: ['accepted', 'in_progress', 'done', 'pending_doctor', 'no_show'] }, // Chỉ lấy các status hợp lệ
-          doctorId: { $exists: true, $ne: null } // Đảm bảo có doctorId
-        }
-      },
-      {
-        // Bước 2: Nhóm theo doctorId và đếm số lượng
-        $group: {
-          _id: '$doctorId', // Nhóm theo doctorId
-          count: { $sum: 1 } // Đếm số appointments
-        }
-      },
-      {
-        // Bước 3: Sắp xếp theo count giảm dần
-        $sort: { count: -1 }
-      },
-      {
-        // Bước 4: Chỉ lấy top 3
-        $limit: 3
-      },
-      {
-        // Bước 5: Join với collection Doctors
-        $lookup: {
-          from: 'Doctors', // Tên collection trong MongoDB
-          localField: '_id', // Trường từ document hiện tại (doctorId)
-          foreignField: '_id', // Trường trong collection Doctors
-          as: 'doctor' // Tên field chứa kết quả join
-        }
-      },
-      {
-        // Bước 6: Chuyển array thành object (vì $lookup trả về array)
-        $unwind: {
-          path: '$doctor',
-          preserveNullAndEmptyArrays: false // Nếu không tìm thấy doctor, bỏ qua document này
-        }
-      },
-      {
-        // Bước 7: Join với collection Users để lấy tên
-        $lookup: {
-          from: 'Users',
-          localField: 'doctor.userId', // userId từ doctor document
-          foreignField: '_id',
-          as: 'user'
-        }
-      },
-      {
-        // Bước 8: Chuyển array thành object
-        $unwind: {
-          path: '$user',
-          preserveNullAndEmptyArrays: false
-        }
-      },
-      {
-        // Bước 9: Chọn các trường cần thiết
-        $project: {
-          doctorId: '$_id',
-          name: '$user.fullName', // Lấy tên từ User
-          count: 1
-        }
-      }
-    ]);
+    // Logic này giống với trang quản lý hóa đơn của manager - lấy từ payments
+    // Thuật toán:
+    // 1. Lấy tất cả payments thành công (captured/authorized)
+    // 2. Populate appointmentId và appointmentIds để lấy mode và doctorId
+    // 3. Nhóm theo doctorId, đếm số appointments unique có mode = 'online'
+    // 4. Sắp xếp và lấy top 3
+    // 5. Populate thông tin doctor và user để lấy tên
 
-    // 6. Top 3 Bác Sĩ Khám Offline Nhiều Nhất
-    // Use same date range logic as appointments query for consistency
-    let offlineAppointmentsDateQuery = {};
-    if (originalPeriod === 'year') {
-      const yearStart = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0);
-      const yearEnd = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
-      offlineAppointmentsDateQuery = {
-        scheduledStart: { $gte: yearStart, $lte: yearEnd }
-      };
-    } else {
-      offlineAppointmentsDateQuery = {
-        scheduledStart: { $gte: startDate, $lte: endDate }
-      };
+    // Lấy tất cả payments thành công
+    const allSuccessfulPayments = await Payment.find({
+      status: { $in: ['captured', 'authorized'] }
+    })
+      .populate('appointmentId', 'mode doctorId')
+      .populate('appointmentIds', 'mode doctorId')
+      .lean();
+
+    // Thu thập tất cả appointmentIds chưa được populate để query một lần
+    const unpopulatedAppointmentIds = new Set();
+    allSuccessfulPayments.forEach(payment => {
+      if (payment.appointmentIds && Array.isArray(payment.appointmentIds)) {
+        payment.appointmentIds.forEach(apt => {
+          // Nếu chưa được populate (không có _id hoặc mode), thêm vào set để query sau
+          if (!apt._id && !apt.mode) {
+            unpopulatedAppointmentIds.add(apt.toString());
+          }
+        });
+      }
+    });
+
+    // Query tất cả appointments chưa được populate một lần
+    const appointmentMap = new Map();
+    if (unpopulatedAppointmentIds.size > 0) {
+      const appointments = await Appointment.find({
+        _id: { $in: Array.from(unpopulatedAppointmentIds) }
+      })
+        .select('mode doctorId')
+        .lean();
+
+      appointments.forEach(apt => {
+        appointmentMap.set(apt._id.toString(), apt);
+      });
     }
-    
-    const offlineAppointments = await Appointment.aggregate([
-      {
-        $match: {
-          mode: 'offline',
-          ...offlineAppointmentsDateQuery,
-          status: { $in: ['accepted', 'in_progress', 'done', 'pending_doctor', 'no_show'] },
-          doctorId: { $exists: true, $ne: null }
-        }
-      },
-      {
-        $group: {
-          _id: '$doctorId',
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      },
-      {
-        $limit: 3
-      },
-      {
-        $lookup: {
-          from: 'Doctors',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'doctor'
-        }
-      },
-      {
-        $unwind: {
-          path: '$doctor',
-          preserveNullAndEmptyArrays: false
-        }
-      },
-      {
-        $lookup: {
-          from: 'Users',
-          localField: 'doctor.userId',
-          foreignField: '_id',
-          as: 'user'
-        }
-      },
-      {
-        $unwind: {
-          path: '$user',
-          preserveNullAndEmptyArrays: false
-        }
-      },
-      {
-        $project: {
-          doctorId: '$_id',
-          name: '$user.fullName',
-          count: 1
+
+    // Nhóm appointments theo doctorId và mode
+    const doctorMap = new Map(); // doctorId -> { onlineCount: Set, offlineCount: Set }
+
+    // Xử lý payments
+    for (const payment of allSuccessfulPayments) {
+      // Xử lý appointmentId (single appointment)
+      if (payment.appointmentId) {
+        const apt = payment.appointmentId;
+        const doctorId = apt.doctorId?.toString() || apt.doctorId;
+        const mode = apt.mode;
+
+        if (doctorId) {
+          if (!doctorMap.has(doctorId)) {
+            doctorMap.set(doctorId, {
+              onlineAppointments: new Set(),
+              offlineAppointments: new Set()
+            });
+          }
+
+          const aptId = apt._id?.toString() || apt.toString();
+          if (mode === 'online') {
+            doctorMap.get(doctorId).onlineAppointments.add(aptId);
+          } else if (mode === 'offline') {
+            doctorMap.get(doctorId).offlineAppointments.add(aptId);
+          }
         }
       }
-    ]);
+
+      // Xử lý appointmentIds (multiple appointments)
+      if (payment.appointmentIds && Array.isArray(payment.appointmentIds)) {
+        for (const apt of payment.appointmentIds) {
+          // apt có thể là ObjectId hoặc populated object
+          let aptId, mode, doctorId;
+
+          if (apt._id || apt.mode) {
+            // Đã được populate
+            aptId = apt._id?.toString() || apt.toString();
+            mode = apt.mode;
+            doctorId = apt.doctorId?.toString() || apt.doctorId;
+          } else {
+            // Chưa được populate, lấy từ appointmentMap đã query trước
+            aptId = apt.toString();
+            const appointment = appointmentMap.get(aptId);
+            if (appointment) {
+              mode = appointment.mode;
+              doctorId = appointment.doctorId?.toString() || appointment.doctorId;
+            }
+          }
+
+          if (doctorId && mode) {
+            if (!doctorMap.has(doctorId)) {
+              doctorMap.set(doctorId, {
+                onlineAppointments: new Set(),
+                offlineAppointments: new Set()
+              });
+            }
+
+            if (mode === 'online') {
+              doctorMap.get(doctorId).onlineAppointments.add(aptId);
+            } else if (mode === 'offline') {
+              doctorMap.get(doctorId).offlineAppointments.add(aptId);
+            }
+          }
+        }
+      }
+
+      // Xử lý appointmentData (pre-payment flow)
+      if (payment.appointmentData && Array.isArray(payment.appointmentData)) {
+        for (const aptData of payment.appointmentData) {
+          const doctorId = aptData.doctorId?.toString() || aptData.doctorId;
+          const mode = aptData.mode;
+
+          if (doctorId) {
+            if (!doctorMap.has(doctorId)) {
+              doctorMap.set(doctorId, {
+                onlineAppointments: new Set(),
+                offlineAppointments: new Set()
+              });
+            }
+
+            // Với appointmentData, không có appointmentId thực tế, nên dùng payment._id + index làm unique key
+            const uniqueKey = `${payment._id}_${aptData.scheduledStart}`;
+            if (mode === 'online') {
+              doctorMap.get(doctorId).onlineAppointments.add(uniqueKey);
+            } else if (mode === 'offline') {
+              doctorMap.get(doctorId).offlineAppointments.add(uniqueKey);
+            }
+          }
+        }
+      }
+    }
+
+    // Chuyển Map thành array và tính count
+    const doctorsWithCounts = Array.from(doctorMap.entries()).map(([doctorId, data]) => ({
+      doctorId,
+      onlineCount: data.onlineAppointments.size,
+      offlineCount: data.offlineAppointments.size
+    }));
+
+    // Sắp xếp và lấy top 3 online
+    const topDoctorsOnlineArray = doctorsWithCounts
+      .sort((a, b) => b.onlineCount - a.onlineCount)
+      .slice(0, 3);
+
+    // Sắp xếp và lấy top 3 offline
+    const topDoctorsOfflineArray = doctorsWithCounts
+      .sort((a, b) => b.offlineCount - a.offlineCount)
+      .slice(0, 3);
+
+    // Populate thông tin doctor và user cho online
+    const onlineAppointments = await Promise.all(
+      topDoctorsOnlineArray.map(async (item) => {
+        const doctor = await Doctor.findById(item.doctorId).lean();
+        if (!doctor) return null;
+
+        const user = await User.findById(doctor.userId).lean();
+        const doctorName = user?.fullName || doctor.fullName || `Bác sĩ ${item.doctorId}`;
+
+        return {
+          doctorId: item.doctorId,
+          name: doctorName,
+          count: item.onlineCount
+        };
+      })
+    );
+
+    // Populate thông tin doctor và user cho offline
+    const offlineAppointments = await Promise.all(
+      topDoctorsOfflineArray.map(async (item) => {
+        const doctor = await Doctor.findById(item.doctorId).lean();
+        if (!doctor) return null;
+
+        const user = await User.findById(doctor.userId).lean();
+        const doctorName = user?.fullName || doctor.fullName || `Bác sĩ ${item.doctorId}`;
+
+        return {
+          doctorId: item.doctorId,
+          name: doctorName,
+          count: item.offlineCount
+        };
+      })
+    );
+
+    // Filter out nulls
+    const onlineAppointmentsFiltered = onlineAppointments.filter(item => item !== null);
+    const offlineAppointmentsFiltered = offlineAppointments.filter(item => item !== null);
 
     // ========== 7. TOP 3 BỆNH NHÂN ĐẾN KHÁM NHIỀU NHẤT ==========
     // Thuật toán:
@@ -3745,7 +3788,7 @@ export const getStatistics = async (req, res) => {
     //    - totalSpending: tổng chi tiêu (từ paymentMap)
     // 5. Sắp xếp theo visitCount giảm dần, lấy top 3
     // 6. Populate thông tin patient và user để lấy tên
-    
+
     // Sử dụng cùng logic date range như appointments query để đảm bảo tính nhất quán
     let topPatientsDateQuery = {};
     if (originalPeriod === 'year') {
@@ -3759,7 +3802,7 @@ export const getStatistics = async (req, res) => {
         scheduledStart: { $gte: startDate, $lte: endDate }
       };
     }
-    
+
     // Bước 1: Lấy tất cả appointments trong khoảng thời gian
     // Chỉ lấy các trường cần thiết: _id, patientId, scheduledStart, paymentId
     const appointmentsInPeriod = await Appointment.find({
@@ -3770,27 +3813,27 @@ export const getStatistics = async (req, res) => {
 
     // Bước 2: Lấy tất cả payments liên quan đến các appointments này
     const appointmentIds = appointmentsInPeriod.map(apt => apt._id);
-    
+
     // Query TẤT CẢ payments liên quan đến appointments này
     // Một appointment có thể có nhiều payments: booking payment + service payment
     // Cần query qua cả paymentId (từ appointment) và appointmentId/appointmentIds (từ payment)
     let paymentsInPeriod = [];
-    
+
     // Cách 1: Query payments từ paymentId trong appointments (booking payments)
     const paymentIdsFromAppointments = appointmentsInPeriod
       .filter(apt => apt.paymentId)
       .map(apt => apt.paymentId);
-    
+
     if (paymentIdsFromAppointments.length > 0) {
       const paymentsFromPaymentId = await Payment.find({
         _id: { $in: paymentIdsFromAppointments },
         status: { $in: ['captured', 'authorized'] } // Chỉ lấy payments đã thanh toán thành công
       }).lean();
-      
+
       paymentsInPeriod = paymentsFromPaymentId;
       console.log(`📊 Top Patients: Found ${paymentsInPeriod.length} payments via paymentId from appointments`);
     }
-    
+
     // Cách 2: Query payments có appointmentId hoặc appointmentIds (bao gồm cả booking và service payments)
     // QUAN TRỌNG: Một appointment có thể có nhiều payments (booking + service)
     // Cần query tất cả payments, không chỉ paymentId trong appointment
@@ -3802,7 +3845,7 @@ export const getStatistics = async (req, res) => {
         ],
         status: { $in: ['captured', 'authorized'] } // Chỉ lấy payments đã thanh toán thành công
       }).lean();
-      
+
       // Merge với payments đã tìm được (tránh duplicate)
       const existingPaymentIds = new Set(paymentsInPeriod.map(p => p._id.toString()));
       paymentsByAppointmentId.forEach(payment => {
@@ -3810,10 +3853,10 @@ export const getStatistics = async (req, res) => {
           paymentsInPeriod.push(payment);
         }
       });
-      
+
       console.log(`📊 Top Patients: Found ${paymentsByAppointmentId.length} payments via appointmentId/appointmentIds, total: ${paymentsInPeriod.length}`);
     }
-    
+
     // Debug: Log số lượng payments tìm được và chi tiết
     console.log(`📊 Top Patients Debug: Found ${paymentsInPeriod.length} payments for ${appointmentIds.length} appointments`);
     if (paymentsInPeriod.length > 0) {
@@ -3832,27 +3875,27 @@ export const getStatistics = async (req, res) => {
         status: { $in: ['captured', 'authorized'] },
         createdAt: { $gte: startDate, $lte: endDate }
       }).lean();
-      
+
       console.log(`📊 Alternative: Found ${allPaymentsInPeriod.length} payments by createdAt in period`);
       if (allPaymentsInPeriod.length > 0) {
-        const paymentsWithAppointmentId = allPaymentsInPeriod.filter(p => 
+        const paymentsWithAppointmentId = allPaymentsInPeriod.filter(p =>
           p.appointmentId || (p.appointmentIds && Array.isArray(p.appointmentIds) && p.appointmentIds.length > 0)
         );
         console.log(`📊 Payments with appointmentId/appointmentIds: ${paymentsWithAppointmentId.length}`);
-        
+
         // Chỉ lấy payments có appointmentId/appointmentIds và match với appointments trong period
         paymentsInPeriod = paymentsWithAppointmentId.filter(p => {
           if (p.appointmentId) {
             return appointmentIds.some(id => id.toString() === p.appointmentId.toString());
           }
           if (p.appointmentIds && Array.isArray(p.appointmentIds)) {
-            return p.appointmentIds.some(aptId => 
+            return p.appointmentIds.some(aptId =>
               appointmentIds.some(id => id.toString() === aptId.toString())
             );
           }
           return false;
         });
-        
+
         console.log(`📊 Filtered payments matching appointments: ${paymentsInPeriod.length}`);
       }
     }
@@ -3860,19 +3903,19 @@ export const getStatistics = async (req, res) => {
     // Bước 3: Tạo Map để tra cứu nhanh: appointmentId -> payment amount
     // Sử dụng Map thay vì Object để tối ưu hiệu suất
     const paymentMap = new Map();
-    
+
     // Tạo Map: paymentId -> payment để tra cứu nhanh
     const paymentByIdMap = new Map();
     paymentsInPeriod.forEach(payment => {
       paymentByIdMap.set(payment._id.toString(), payment);
     });
-    
+
     // Map TẤT CẢ payments vào appointments
     // QUAN TRỌNG: Một appointment có thể có nhiều payments (booking + service)
     // Cần cộng dồn tất cả payments, không chỉ lấy một payment
     // Sử dụng Set để track payments đã được map qua paymentId (tránh duplicate)
     const paymentsMappedViaPaymentId = new Set();
-    
+
     // Cách 1: Map payments từ appointments thông qua paymentId (ưu tiên - đảm bảo không bỏ sót)
     appointmentsInPeriod.forEach(apt => {
       if (apt.paymentId) {
@@ -3887,7 +3930,7 @@ export const getStatistics = async (req, res) => {
         }
       }
     });
-    
+
     // Cách 2: Map payments từ appointmentId/appointmentIds (bao gồm cả payments không có trong paymentId)
     // QUAN TRỌNG: Một appointment có thể có nhiều payments (booking + service)
     // Cần cộng dồn tất cả payments, không chỉ lấy một payment
@@ -3898,9 +3941,9 @@ export const getStatistics = async (req, res) => {
       if (paymentsMappedViaPaymentId.has(paymentIdStr)) {
         return;
       }
-      
+
       const amount = payment.total - (payment.refundAmount || 0); // Doanh thu thực tế = total - refundAmount
-      
+
       // Xử lý appointmentId (single) - có thể là booking hoặc service payment
       if (payment.appointmentId) {
         const aptIdKey = payment.appointmentId.toString();
@@ -3912,7 +3955,7 @@ export const getStatistics = async (req, res) => {
           console.log(`📊 Payment Map: Added ${amount} VND (${payment.invoiceType}) for appointment ${aptIdKey} via appointmentId (total: ${existing + amount})`);
         }
       }
-      
+
       // Xử lý appointmentIds (array) - chia đều amount cho các appointments
       if (payment.appointmentIds && Array.isArray(payment.appointmentIds) && payment.appointmentIds.length > 0) {
         const amountPerAppointment = amount / payment.appointmentIds.length;
@@ -3928,15 +3971,15 @@ export const getStatistics = async (req, res) => {
         });
       }
     });
-    
-    
+
+
 
     // Bước 4: Nhóm appointments theo patientId
     // Sử dụng Map để nhóm và tính toán thống kê cho mỗi patient
     const patientMap = new Map();
     appointmentsInPeriod.forEach(apt => {
       const patientId = apt.patientId.toString(); // Chuyển sang string để dùng làm key
-      
+
       // Nếu chưa có trong Map, khởi tạo
       if (!patientMap.has(patientId)) {
         patientMap.set(patientId, {
@@ -3947,35 +3990,102 @@ export const getStatistics = async (req, res) => {
           totalSpending: 0 // Tổng chi tiêu
         });
       }
-      
+
       const patient = patientMap.get(patientId);
       patient.visitCount += 1; // Tăng số lần khám
-      
+
       // Cập nhật lần khám gần nhất (nếu appointment này mới hơn)
       if (apt.scheduledStart > patient.lastVisit) {
         patient.lastVisit = apt.scheduledStart;
       }
-      
+
       patient.appointmentIds.push(apt._id); // Lưu appointment ID
-      
+
       // Lấy payment amount từ paymentMap và cộng vào totalSpending
       const aptIdStr = apt._id.toString();
       const paymentAmount = paymentMap.get(aptIdStr) || 0;
       patient.totalSpending += paymentAmount;
-      
+
       // Debug: Log nếu có payment amount
       if (paymentAmount > 0) {
         console.log(`📊 Patient ${patientId}: Added ${paymentAmount} VND for appointment ${aptIdStr} (total spending: ${patient.totalSpending})`);
       }
     });
 
-    // Bước 5: Sắp xếp theo visitCount giảm dần và lấy top 3
-    const topPatientsArray = Array.from(patientMap.values())
-      .sort((a, b) => b.visitCount - a.visitCount) // Sắp xếp giảm dần theo số lần khám
-      .slice(0, 3); // Chỉ lấy 3 bệnh nhân đầu tiên
+    // Bước 5: Tính số lần khám và chi tiêu từ payments cho TẤT CẢ patients (không chỉ trong period)
+    // Sau đó sắp xếp và lấy top 3
+    // Logic này giống với trang quản lý hóa đơn của manager - lấy từ payments
+    const allPatientsWithPaymentData = await Promise.all(
+      Array.from(patientMap.values()).map(async (patient) => {
+        // Tính số lần khám và chi tiêu từ TẤT CẢ payments của patient
+        // Logic này giống với trang quản lý hóa đơn của manager - lấy từ payments
+        const allPatientPayments = await Payment.find({
+          "billTo.patientId": patient.patientId,
+          status: { $in: ['captured', 'authorized'] }
+        })
+          .populate('appointmentId', 'scheduledStart')
+          .populate('appointmentIds', 'scheduledStart')
+          .sort({ createdAt: -1 })
+          .lean();
+
+        // Tính tổng chi tiêu
+        const totalSpending = allPatientPayments.reduce((sum, payment) => {
+          return sum + (payment.total - (payment.refundAmount || 0));
+        }, 0);
+
+        // Tính số lần khám từ appointments unique trong payments
+        // Mỗi appointment unique = 1 lần khám
+        const uniqueAppointmentIds = new Set();
+        allPatientPayments.forEach(payment => {
+          // Xử lý appointmentId (single appointment)
+          if (payment.appointmentId) {
+            const aptId = payment.appointmentId._id?.toString() || payment.appointmentId.toString();
+            uniqueAppointmentIds.add(aptId);
+          }
+          // Xử lý appointmentIds (multiple appointments)
+          if (payment.appointmentIds && Array.isArray(payment.appointmentIds)) {
+            payment.appointmentIds.forEach(apt => {
+              // apt có thể là ObjectId hoặc populated object
+              const aptId = apt._id?.toString() || apt.toString();
+              uniqueAppointmentIds.add(aptId);
+            });
+          }
+        });
+
+        const visitCount = uniqueAppointmentIds.size > 0 ? uniqueAppointmentIds.size : allPatientPayments.length;
+
+        // Lấy lần khám gần nhất từ payments
+        let lastVisitFromPayments = patient.lastVisit;
+        if (allPatientPayments.length > 0) {
+          // Tìm appointment date gần nhất từ payments
+          const appointmentDates = allPatientPayments
+            .map(p => p.appointmentId?.scheduledStart)
+            .filter(date => date)
+            .sort((a, b) => new Date(b) - new Date(a));
+
+          if (appointmentDates.length > 0) {
+            lastVisitFromPayments = new Date(appointmentDates[0]);
+          } else {
+            // Nếu không có appointment date, dùng payment date
+            lastVisitFromPayments = new Date(allPatientPayments[0].createdAt);
+          }
+        }
+
+        return {
+          ...patient,
+          visitCount, // Số lần khám từ payments
+          totalSpending, // Chi tiêu từ payments
+          lastVisit: lastVisitFromPayments // Lần khám gần nhất từ payments
+        };
+      })
+    );
+
+    // Sắp xếp theo visitCount giảm dần và lấy top 5
+    const topPatientsArray = allPatientsWithPaymentData
+      .sort((a, b) => b.visitCount - a.visitCount) // Sắp xếp giảm dần theo số lần khám từ payments
+      .slice(0, 5); // Lấy top 5 bệnh nhân đầu tiên
 
     // Bước 6: Populate thông tin patient và user để lấy tên
-    // Sử dụng patient.fullName trước, nếu không có thì dùng user.fullName
     const topPatients = await Promise.all(
       topPatientsArray.map(async (patient) => {
         const patientDoc = await Patient.findById(patient.patientId).lean();
@@ -3983,7 +4093,7 @@ export const getStatistics = async (req, res) => {
           console.warn(`⚠️ Patient not found: ${patient.patientId}`);
           return null;
         }
-        
+
         // Ưu tiên dùng patient.fullName, nếu không có thì dùng user.fullName
         let patientName = patientDoc.fullName;
         if (!patientName && patientDoc.userId) {
@@ -3992,16 +4102,17 @@ export const getStatistics = async (req, res) => {
             patientName = user.fullName;
           }
         }
-        
+
+        // Sử dụng dữ liệu đã tính từ payments ở Bước 5 (visitCount, totalSpending, lastVisit)
         // Debug: Log thông tin patient
         console.log(`📊 Patient ${patient.patientId}: visits=${patient.visitCount}, spending=${patient.totalSpending}, name=${patientName}`);
-        
+
         return {
           patientId: patient.patientId,
           name: patientName || `Bệnh nhân`,
-          visitCount: patient.visitCount,
-          lastVisit: patient.lastVisit,
-          totalSpending: patient.totalSpending || 0
+          visitCount: patient.visitCount, // Đã tính từ payments ở Bước 5
+          lastVisit: patient.lastVisit, // Đã tính từ payments ở Bước 5
+          totalSpending: patient.totalSpending // Đã tính từ payments ở Bước 5
         };
       })
     );
@@ -4031,7 +4142,7 @@ export const getStatistics = async (req, res) => {
         scheduledStart: { $gte: startDate, $lte: endDate }
       };
     }
-    
+
     const totalAppointmentsInPeriod = await Appointment.countDocuments(appointmentRatioQuery);
     const onlineCount = await Appointment.countDocuments({
       ...appointmentRatioQuery,
@@ -4041,28 +4152,29 @@ export const getStatistics = async (req, res) => {
       ...appointmentRatioQuery,
       mode: 'offline'
     });
-    
-    const onlinePercent = totalAppointmentsInPeriod > 0 
+
+    const onlinePercent = totalAppointmentsInPeriod > 0
       ? Math.round((onlineCount / totalAppointmentsInPeriod) * 100)
       : 0;
-    const offlinePercent = totalAppointmentsInPeriod > 0 
+    const offlinePercent = totalAppointmentsInPeriod > 0
       ? Math.round((offlineCount / totalAppointmentsInPeriod) * 100)
       : 0;
 
     // ========== 9. XU HƯỚNG DOANH THU THEO THỜI GIAN ==========
     // Thuật toán:
-    // - Nếu period = 'today': chia theo giờ (24 điểm dữ liệu)
+    // - Nếu period = "today": chia theo giờ (24 điểm dữ liệu)
     // - Nếu period <= 7 ngày: chia theo ngày
     // - Nếu period > 7 ngày: chia theo tháng
     // Mỗi điểm dữ liệu sẽ có: online revenue, offline revenue, total revenue
     // 
     // Lưu ý: Thay vì query payments theo createdAt, ta query appointments trong khoảng thời gian
     // rồi tìm payments liên quan đến các appointments đó (đảm bảo tính nhất quán với appointment count)
-    
+
     const revenueTrend = [];
+    const periodDurationMs = endDate - startDate; // Độ dài kỳ hiện tại (milliseconds)
     const daysDiff = Math.ceil(periodDurationMs / (1000 * 60 * 60 * 24)); // Tính số ngày trong period
-    
-    if (originalPeriod === 'today') {
+
+    if (originalPeriod === "today") {
       // Xu hướng theo giờ cho hôm nay: duyệt qua 24 giờ
       // Sửa: Query appointments trong khoảng thời gian, rồi lấy payments qua paymentId
       // Đảm bảo payments có liên kết với appointments và có thể lấy được mode
@@ -4071,23 +4183,23 @@ export const getStatistics = async (req, res) => {
         hourStart.setHours(hour, 0, 0, 0);
         const hourEnd = new Date(startDate);
         hourEnd.setHours(hour, 59, 59, 999);
-        
+
         // Query payments được tạo (thanh toán) trong giờ này
         // Đây là thời điểm thanh toán thực tế
         const hourPayments = await Payment.find({
-          status: { $in: ['captured', 'authorized'] },
+          status: { $in: ["captured", "authorized"] },
           createdAt: { $gte: hourStart, $lte: hourEnd }
         }).lean();
-        
+
         // Lấy tất cả paymentIds từ payments (ObjectId)
         const paymentIds = hourPayments.map(p => p._id);
-        
+
         // Query appointments có paymentId trong danh sách payments này
         // Để lấy mode (online/offline) của appointments
         const hourAppointments = await Appointment.find({
           paymentId: { $in: paymentIds }
-        }).select('_id mode paymentId').lean();
-        
+        }).select("_id mode paymentId").lean();
+
         // Tạo map: paymentId -> appointments để lấy mode
         const paymentToAppointmentsMap = new Map();
         hourAppointments.forEach(apt => {
@@ -4099,7 +4211,7 @@ export const getStatistics = async (req, res) => {
             paymentToAppointmentsMap.get(paymentIdStr).push(apt);
           }
         });
-        
+
         // Debug: Log số lượng payments tìm được
         if (hour === 0 || hour === 12) {
           console.log(`📊 Revenue Trend Hour ${hour}: Found ${hourAppointments.length} appointments, ${hourPayments.length} payments`);
@@ -4110,39 +4222,39 @@ export const getStatistics = async (req, res) => {
               total: samplePayment.total,
               paymentId: samplePayment._id.toString(),
               appointmentsCount: sampleAppointments.length,
-              appointmentModes: sampleAppointments.map(apt => apt.mode)
+              appointmentModes: sampleAppointments.map((apt) => apt.mode),
             });
           }
         }
-        
+
         // Tính doanh thu cho từng loại (online/offline)
         let onlineRevenue = 0;
         let offlineRevenue = 0;
-        
+
         hourPayments.forEach(payment => {
           const netAmount = payment.total - (payment.refundAmount || 0);
           const paymentIdStr = payment._id.toString();
           const appointments = paymentToAppointmentsMap.get(paymentIdStr) || [];
-          
+
           if (appointments.length > 0) {
             // Tính doanh thu theo mode của appointments
             appointments.forEach(apt => {
-              if (apt.mode === 'online') {
+              if (apt.mode === "online") {
                 // Chia đều doanh thu nếu có nhiều appointments
                 onlineRevenue += netAmount / appointments.length;
-              } else if (apt.mode === 'offline') {
+              } else if (apt.mode === "offline") {
                 offlineRevenue += netAmount / appointments.length;
               }
             });
           } else {
             // Fallback: nếu không có appointments, thử query từ payment.appointmentId/appointmentIds
             // (giữ lại logic cũ để tương thích)
-            console.warn(`⚠️ Revenue Trend: Payment ${payment._id} has no appointments in map`);
+            console.warn(`⚠️ Revenue Trend: Payment ${payment._id.toString()} has no appointments in map`);
           }
         });
-        
+
         revenueTrend.push({
-          date: `${hour.toString().padStart(2, '0')}:00`,
+          date: `${hour.toString().padStart(2, "0")}:00`,
           online: Math.round(onlineRevenue),
           offline: Math.round(offlineRevenue),
           total: Math.round(onlineRevenue + offlineRevenue)
@@ -4157,19 +4269,19 @@ export const getStatistics = async (req, res) => {
         dayStart.setHours(0, 0, 0, 0);
         const dayEnd = new Date(currentDate);
         dayEnd.setHours(23, 59, 59, 999);
-        
+
         // Query payments được tạo (thanh toán) trong ngày này
         const dayPayments = await Payment.find({
           status: { $in: ['captured', 'authorized'] },
           createdAt: { $gte: dayStart, $lte: dayEnd }
         }).lean();
-        
+
         // Lấy paymentIds và query appointments
         const paymentIds = dayPayments.map(p => p._id);
         const dayAppointments = await Appointment.find({
           paymentId: { $in: paymentIds }
         }).select('_id mode paymentId').lean();
-        
+
         // Tạo map: paymentId -> appointments
         const paymentToAppointmentsMap = new Map();
         dayAppointments.forEach(apt => {
@@ -4181,15 +4293,15 @@ export const getStatistics = async (req, res) => {
             paymentToAppointmentsMap.get(paymentIdStr).push(apt);
           }
         });
-        
+
         let onlineRevenue = 0;
         let offlineRevenue = 0;
-        
-        dayPayments.forEach(payment => {
+
+        for (const payment of dayPayments) {
           const netAmount = payment.total - (payment.refundAmount || 0);
           const paymentIdStr = payment._id.toString();
           const appointments = paymentToAppointmentsMap.get(paymentIdStr) || [];
-          
+
           if (appointments.length > 0) {
             appointments.forEach(apt => {
               if (apt.mode === 'online') {
@@ -4199,8 +4311,8 @@ export const getStatistics = async (req, res) => {
               }
             });
           }
-        });
-        
+        }
+
         const dateStr = `${currentDate.getDate().toString().padStart(2, '0')}/${(currentDate.getMonth() + 1).toString().padStart(2, '0')}`;
         revenueTrend.push({
           date: dateStr,
@@ -4208,7 +4320,7 @@ export const getStatistics = async (req, res) => {
           offline: Math.round(offlineRevenue),
           total: Math.round(onlineRevenue + offlineRevenue)
         });
-        
+
         currentDate.setDate(currentDate.getDate() + 1);
       }
     } else {
@@ -4218,19 +4330,19 @@ export const getStatistics = async (req, res) => {
       while (currentDate <= endDate) {
         const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
         const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
-        
+
         // Query payments được tạo (thanh toán) trong tháng này
         const monthPayments = await Payment.find({
           status: { $in: ['captured', 'authorized'] },
           createdAt: { $gte: monthStart, $lte: monthEnd }
         }).lean();
-        
+
         // Lấy paymentIds và query appointments
         const paymentIds = monthPayments.map(p => p._id);
         const monthAppointments = await Appointment.find({
           paymentId: { $in: paymentIds }
         }).select('_id mode paymentId').lean();
-        
+
         // Tạo map: paymentId -> appointments
         const paymentToAppointmentsMap = new Map();
         monthAppointments.forEach(apt => {
@@ -4242,15 +4354,15 @@ export const getStatistics = async (req, res) => {
             paymentToAppointmentsMap.get(paymentIdStr).push(apt);
           }
         });
-        
+
         let onlineRevenue = 0;
         let offlineRevenue = 0;
-        
-        monthPayments.forEach(payment => {
+
+        for (const payment of monthPayments) {
           const netAmount = payment.total - (payment.refundAmount || 0);
           const paymentIdStr = payment._id.toString();
           const appointments = paymentToAppointmentsMap.get(paymentIdStr) || [];
-          
+
           if (appointments.length > 0) {
             appointments.forEach(apt => {
               if (apt.mode === 'online') {
@@ -4260,15 +4372,15 @@ export const getStatistics = async (req, res) => {
               }
             });
           }
-        });
-        
+        }
+
         revenueTrend.push({
           date: `Th${currentDate.getMonth() + 1}/${currentDate.getFullYear()}`,
           online: Math.round(onlineRevenue),
           offline: Math.round(offlineRevenue),
           total: Math.round(onlineRevenue + offlineRevenue)
         });
-        
+
         currentDate.setMonth(currentDate.getMonth() + 1);
       }
     }
@@ -4290,14 +4402,14 @@ export const getStatistics = async (req, res) => {
       totalDoctors: {
         value: totalDoctors,
         change: doctorsChange,
-        changeLabel: doctorsChange >= 0 
+        changeLabel: doctorsChange >= 0
           ? `+${doctorsChange} so với tháng trước`
           : `${doctorsChange} so với tháng trước`
       },
       totalPatients: {
         value: totalPatients,
         change: patientsChange,
-        changeLabel: patientsChange >= 0 
+        changeLabel: patientsChange >= 0
           ? `+${patientsChange} so với tuần trước`
           : `${patientsChange} so với tuần trước`
       },
@@ -4311,8 +4423,8 @@ export const getStatistics = async (req, res) => {
           else if (originalPeriod === 'week') periodLabel = 'tuần trước';
           else if (originalPeriod === 'today') periodLabel = 'hôm qua';
           else if (originalPeriod === 'custom') periodLabel = 'kỳ trước';
-          
-          return appointmentsChange >= 0 
+
+          return appointmentsChange >= 0
             ? `+${appointmentsChange} so với ${periodLabel}`
             : `${appointmentsChange} so với ${periodLabel}`;
         })()
@@ -4327,18 +4439,18 @@ export const getStatistics = async (req, res) => {
           else if (originalPeriod === 'week') periodLabel = 'tuần trước';
           else if (originalPeriod === 'today') periodLabel = 'hôm qua';
           else if (originalPeriod === 'custom') periodLabel = 'kỳ trước';
-          
-          return revenueChangePercent >= 0 
+
+          return revenueChangePercent >= 0
             ? `+${revenueChangePercent}% so với ${periodLabel}`
             : `${revenueChangePercent}% so với ${periodLabel}`;
         })()
       },
-      topDoctorsOnline: onlineAppointments.map((item, index) => ({
+      topDoctorsOnline: onlineAppointmentsFiltered.map((item, index) => ({
         rank: index + 1,
         name: item.name || `Dr. ${index + 1}`,
         count: item.count
       })),
-      topDoctorsOffline: offlineAppointments.map((item, index) => ({
+      topDoctorsOffline: offlineAppointmentsFiltered.map((item, index) => ({
         rank: index + 1,
         name: item.name || `Dr. ${index + 1}`,
         count: item.count
@@ -4374,6 +4486,77 @@ export const getStatistics = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Lỗi khi tải thống kê"
+    });
+  }
+};
+
+/**
+ * Lấy top 5 bệnh nhân đến khám nhiều nhất
+ * GET /api/admin/patients/top-5-visits
+ */
+export const getTop5PatientsByVisitCount = async (req, res) => {
+  try {
+    // Sử dụng aggregation để đếm số lần khám (appointments với status = "done") theo patientId
+    const topPatients = await Appointment.aggregate([
+      // Lọc chỉ lấy appointments đã hoàn thành
+      {
+        $match: {
+          status: "done",
+          patientId: { $exists: true, $ne: null }
+        }
+      },
+      // Nhóm theo patientId và đếm số lần khám
+      {
+        $group: {
+          _id: "$patientId",
+          visitCount: { $sum: 1 },
+          lastVisit: { $max: "$scheduledStart" }
+        }
+      },
+      // Sắp xếp theo số lần khám giảm dần
+      {
+        $sort: { visitCount: -1 }
+      },
+      // Lấy top 5
+      {
+        $limit: 5
+      }
+    ]);
+
+    // Populate thông tin patient và user
+    const topPatientsWithDetails = await Promise.all(
+      topPatients.map(async (item) => {
+        const patient = await Patient.findById(item._id)
+          .populate("userId", "fullName email phone")
+          .lean();
+
+        if (!patient) {
+          return null;
+        }
+
+        return {
+          patientId: item._id,
+          fullName: patient.fullName || patient.userId?.fullName || "Không có tên",
+          email: patient.email || patient.userId?.email || "",
+          phone: patient.phone || patient.userId?.phone || "",
+          visitCount: item.visitCount,
+          lastVisit: item.lastVisit
+        };
+      })
+    );
+
+    // Lọc bỏ các bệnh nhân không tìm thấy
+    const filteredTopPatients = topPatientsWithDetails.filter(item => item !== null);
+
+    res.json({
+      success: true,
+      data: filteredTopPatients
+    });
+  } catch (error) {
+    console.error("Error fetching top 5 patients by visit count:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi tải danh sách bệnh nhân đến khám nhiều nhất"
     });
   }
 };

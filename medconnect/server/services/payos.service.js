@@ -1,3 +1,23 @@
+/* ============================================================================
+ * PAYOS SERVICE - Service layer cho tích hợp PayOS Payment Gateway
+ * ============================================================================
+ * 
+ * File này chứa tất cả logic nghiệp vụ liên quan đến PayOS:
+ * 1. Tạo link thanh toán (createPayosPaymentLink)
+ * 2. Xử lý webhook từ PayOS (handlePayosWebhook)
+ * 3. Kiểm tra trạng thái thanh toán (checkPaymentStatus)
+ * 4. Hủy link thanh toán (cancelPaymentLink)
+ * 
+ * LUỒNG HOẠT ĐỘNG CHÍNH:
+ * - User request payment → Tạo Payment record → Tạo PayOS link → User thanh toán
+ * - PayOS webhook → Xử lý payment → Tạo appointments → Gửi email/notification
+ * 
+ * HỖ TRỢ 3 LOẠI PAYMENT:
+ * - Single Appointment: appointmentId (flow cũ)
+ * - Multiple Appointments: medicalVisitId (đã tạo appointments)
+ * - Pre-Payment: paymentId (chưa tạo appointments, tạo sau khi thanh toán)
+ * ============================================================================ */
+
 import { PayOS } from "@payos/node";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
@@ -9,41 +29,71 @@ import Clinic from "../models/clinic.model.js";
 import DoctorTimeSlot from "../models/doctorTimeSlot.model.js";
 import { sendMail } from "../utils/email.js";
 
+// Load environment variables
 dotenv.config();
 
+/* ============================================================================
+ * KHỞI TẠO PAYOS CLIENT (Singleton)
+ * ============================================================================ */
 const payos = new PayOS(
   process.env.PAYOS_CLIENT_ID,
   process.env.PAYOS_API_KEY,
   process.env.PAYOS_CHECKSUM_KEY
 );
 
-/**
+/* ============================================================================
+ * FUNCTION: createPayosPaymentLink
+ * ============================================================================
  * Tạo link thanh toán PayOS cho appointment hoặc medical visit
- * @param {string} userId - ID của user
- * @param {object} paymentData - Dữ liệu thanh toán {appointmentId, medicalVisitId, amount, description}
- * @returns {object} - {payUrl, orderCode}
- */
+ * 
+ * @param {string} userId - MongoDB ID của user đang đăng nhập
+ * @param {object} paymentData - Dữ liệu thanh toán
+ * @param {string} paymentData.appointmentId - ID của appointment (flow cũ)
+ * @param {string} paymentData.medicalVisitId - ID của medical visit (multiple appointments)
+ * @param {string} paymentData.paymentId - ID của payment (pre-payment flow)
+ * @param {number} paymentData.amount - Số tiền thanh toán (VND)
+ * @param {string} paymentData.description - Mô tả thanh toán (max 25 chars)
+ * 
+ * @returns {Promise<object>} - {payUrl: string, orderCode: number}
+ * 
+ * @throws {Error} - Nếu userId invalid, thiếu ID, hoặc patient không tồn tại
+ * 
+ * LOGIC:
+ * 1. Validate userId và paymentData
+ * 2. Phân biệt 3 loại flow: paymentId > medicalVisitId > appointmentId
+ * 3. Kiểm tra authorization (appointment/visit phải thuộc về user này)
+ * 4. Generate orderCode (10 số cuối của timestamp)
+ * 5. Tạo returnUrl và cancelUrl
+ * 6. Call PayOS API để tạo payment link
+ * 7. Return payUrl và orderCode
+ * ============================================================================ */
 export const createPayosPaymentLink = async (userId, paymentData) => {
+  // Validate userId format
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error("Invalid User ID");
   }
 
+  // Destructure payment data
   const {
-    appointmentId,
-    medicalVisitId,
-    paymentId,
+    appointmentId,    // Single appointment (flow cũ)
+    medicalVisitId,   // Multiple appointments (đã tạo)
+    paymentId,        // Pre-payment (chưa tạo appointments)
     amount,
     description = "Payment for appointment",
   } = paymentData || {};
 
-  // Validate: must have either appointmentId OR medicalVisitId OR paymentId
+  /* ------------------------------------
+   * VALIDATE INPUT
+   * ------------------------------------ */
+  
+  // Phải có ít nhất 1 trong 3 IDs
   if (!appointmentId && !medicalVisitId && !paymentId) {
     throw new Error(
       "Appointment ID, Medical Visit ID, hoặc Payment ID không được trống"
     );
   }
 
-  // Count how many IDs are provided
+  // Chỉ được cung cấp 1 ID (không được mix)
   const idCount = [appointmentId, medicalVisitId, paymentId].filter(
     Boolean
   ).length;
@@ -53,53 +103,88 @@ export const createPayosPaymentLink = async (userId, paymentData) => {
     );
   }
 
+  // Validate amount
   if (!amount || amount <= 0) throw new Error("Số tiền không hợp lệ");
 
-  // Kiểm tra patient
+  /* ------------------------------------
+   * KIỂM TRA PATIENT
+   * ------------------------------------ */
+  
+  // Lấy patient của user này để xác thực ownership
   const patient = await Patient.findOne({ userId: userId }).populate("userId");
   if (!patient) throw new Error("Patient not found");
 
-  let orderCode;
-  let returnUrl;
-  let cancelUrl;
+  let orderCode;    // Mã đơn hàng (10 số cuối của timestamp)
+  let returnUrl;    // URL để redirect sau khi thanh toán thành công
+  let cancelUrl;    // URL để redirect khi user hủy thanh toán
 
+  /* ============================================================================
+   * FLOW 1: PRE-PAYMENT (paymentId) - ƯU TIÊN CAO NHẤT
+   * ============================================================================
+   * Flow mới: Payment đã được tạo trước, nhưng appointments chưa tạo
+   * Appointments sẽ được tạo sau khi thanh toán thành công (trong webhook)
+   * ============================================================================ */
   if (paymentId) {
-    // Pre-payment flow: Payment created before visit/appointments (NEW)
+    // Lấy payment record từ database
     const payment = await Payment.findById(paymentId);
     if (!payment) throw new Error("Payment not found");
 
-    // Check if payment belongs to this user or their family member
-    // Get the patient from payment.billTo.patientId
+    /* ------------------------------------
+     * KIỂM TRA AUTHORIZATION
+     * ------------------------------------ */
+    
+    // Lấy patient từ payment để kiểm tra ownership
     const paymentPatient = await Patient.findById(payment.billTo.patientId);
     if (!paymentPatient) {
       throw new Error("Payment patient not found");
     }
 
-    // Check if payment patient belongs to this user (either self or family member)
-    // All family members share the same userId
+    // Verify payment thuộc về user này (hoặc family member của user này)
+    // Tất cả family members share cùng userId
     if (paymentPatient.userId.toString() !== userId.toString()) {
       throw new Error("Unauthorized: Payment does not belong to this user");
     }
 
-    // Check if already paid
+    /* ------------------------------------
+     * KIỂM TRA TRẠNG THÁI PAYMENT
+     * ------------------------------------ */
+    
+    // Không cho phép tạo link nếu đã thanh toán rồi
     if (payment.status === "captured") {
       throw new Error("Payment already captured");
     }
 
-    // Use orderCode from payment
+    /* ------------------------------------
+     * XỬ LÝ ORDER CODE
+     * ------------------------------------ */
+    
+    // Sử dụng orderCode đã có (nếu có) hoặc generate mới
     if (payment.orderCode) {
       orderCode = payment.orderCode;
     } else {
-      // Generate new orderCode if not exists
+      // Generate orderCode mới: 10 số cuối của timestamp
       orderCode = Number(String(Date.now()).slice(-10));
       payment.orderCode = orderCode;
       payment.pendingOrderCode = orderCode;
       await payment.save();
     }
 
+    /* ------------------------------------
+     * TẠO RETURN URLs
+     * ------------------------------------ */
+    
+    // URLs cho pre-payment flow (có type=visit)
     returnUrl = `${process.env.FRONTEND_URL}/dat-lich/payment-result?status=success&orderCode=${orderCode}&type=visit`;
     cancelUrl = `${process.env.FRONTEND_URL}/dat-lich/payment-result?status=failed&cancel=true&orderCode=${orderCode}&type=visit`;
-  } else if (medicalVisitId) {
+  } 
+  
+  /* ============================================================================
+   * FLOW 2: MULTIPLE APPOINTMENTS (medicalVisitId)
+   * ============================================================================
+   * Medical visit đã tồn tại, appointments đã được tạo
+   * Chỉ cần tạo payment link và update payment status
+   * ============================================================================ */
+  else if (medicalVisitId) {
     // Multiple appointments payment (medical visit - existing flow)
     const MedicalVisit = (await import("../models/medicalVisit.model.js"))
       .default;
@@ -217,12 +302,35 @@ export const createPayosPaymentLink = async (userId, paymentData) => {
   };
 };
 
-/**
- * Xử lý webhook từ PayOS
- * @param {object} webhookBody - Dữ liệu webhook từ PayOS
- * @param {boolean} skipVerification - Bỏ qua verify chữ ký (cho fallback manual)
- * @returns {object} - Kết quả xử lý
- */
+/* ============================================================================
+ * FUNCTION: handlePayosWebhook
+ * ============================================================================
+ * Xử lý webhook từ PayOS khi thanh toán thành công/thất bại
+ * 
+ * ĐÂY LÀ HÀM QUAN TRỌNG NHẤT - "Trái tim" của hệ thống thanh toán!
+ * 
+ * @param {object} webhookBody - Payload từ PayOS webhook
+ * @param {boolean} skipVerification - Bỏ qua verify signature (cho fallback manual)
+ * 
+ * @returns {Promise<object>} - Kết quả xử lý
+ * 
+ * LUỒNG XỬ LÝ:
+ * 1. Verify webhook signature từ PayOS (security)
+ * 2. Parse orderCode và description
+ * 3. Phân biệt loại payment: Booking vs Service (dựa vào description)
+ * 4. Tìm Payment/Appointment record
+ * 5. Kiểm tra isPaid (code === "00")
+ * 6. Nếu thanh toán thành công:
+ *    - Service Payment: Update payment status, appointment status, gửi email
+ *    - Booking Payment:
+ *      + Pre-Payment Flow: TẠO appointments từ appointmentData, gửi notification
+ *      + Existing Flow: Update payment/appointment status
+ * 7. Nếu thanh toán thất bại:
+ *    - Service Payment: Mark as failed
+ *    - Booking Payment: Delete appointment, release slot
+ * 
+ * IDEMPOTENCY: Hàm này có thể được gọi nhiều lần (PayOS retry) → Phải idempotent!
+ * ============================================================================ */
 export const handlePayosWebhook = async (
   webhookBody,
   skipVerification = false
@@ -230,10 +338,18 @@ export const handlePayosWebhook = async (
   try {
     console.log(`🔔 Webhook received from PayOS`);
 
-    // Verify chữ ký - throws nếu sai (trừ khi skipVerification = true)
+    /* ------------------------------------
+     * BƯỚC 1: VERIFY WEBHOOK SIGNATURE
+     * ------------------------------------ */
+    
+    // Verify chữ ký từ PayOS để đảm bảo webhook là thật (không phải giả mạo)
+    // Throws error nếu signature không hợp lệ
+    // skipVerification = true chỉ dùng cho fallback manual (development/testing)
     const verified = skipVerification
       ? webhookBody
       : await payos.webhooks.verify(webhookBody);
+    
+    // Parse webhook data
     const { data } = verified || {};
     const { orderCode, description, code, amount } = data || {};
 
@@ -245,10 +361,19 @@ export const handlePayosWebhook = async (
       hasData: !!data,
     });
 
+    // Validate orderCode existence
     if (!orderCode) throw new Error("Missing orderCode in webhook data");
 
-    // Chỉ xử lý payment cho appointment (check cả "MedConnect", "MC Apt", "MC Visit" và "MC Service")
+    /* ------------------------------------
+     * BƯỚC 2: PHÂN BIỆT LOẠI PAYMENT
+     * ------------------------------------ */
+    
+    // Parse description để xác định loại payment
+    // Description format:
+    // - Booking: "MedConnect ...", "MC Apt ...", "MC Visit ..."
+    // - Service: "MC Service ...", "Service ..."
     const desc = String(description || "").toLowerCase();
+    
     console.log(`🔔 Webhook description check:`, {
       description: description,
       descLowerCase: desc,
@@ -258,7 +383,7 @@ export const handlePayosWebhook = async (
       includesMCService: desc.includes("mc service"),
     });
 
-    // Check if this is an appointment/visit payment (not service payment)
+    // Xác định loại payment dựa vào description
     const isAppointmentPayment =
       desc.includes("medconnect") ||
       desc.includes("mc apt") ||
@@ -266,6 +391,7 @@ export const handlePayosWebhook = async (
     const isServicePayment =
       desc.includes("mc service") || desc.includes("service");
 
+    // Ignore webhook nếu không phải appointment/service payment
     if (!isAppointmentPayment && !isServicePayment) {
       console.log(`⚠️ Webhook ignored: Not an appointment or service payment`);
       return {
@@ -274,10 +400,7 @@ export const handlePayosWebhook = async (
       };
     }
 
-    // Phân biệt booking payment và service payment
-    // Booking payment: orderCode lưu trong appointment.pendingOrderCode hoặc payment, description: "MedConnect ...", "MC Apt ...", "MC Visit ..."
-    // Service payment: orderCode lưu trong payment.pendingOrderCode, description: "MC Service ..." hoặc "MedConnect Service ..."
-    // Note: isServicePayment và isAppointmentPayment đã được xác định ở trên
+    // Log payment type được detect
     console.log(`🔔 Payment type detected:`, {
       isServicePayment,
       isAppointmentPayment,
@@ -285,16 +408,24 @@ export const handlePayosWebhook = async (
       description: description,
     });
 
-    let appointment = null;
-    let existingPayment = null;
-    let invoiceType = "booking";
+    /* ------------------------------------
+     * BƯỚC 3: TÌM PAYMENT/APPOINTMENT RECORD
+     * ------------------------------------ */
+    
+    let appointment = null;        // Appointment object (nếu có)
+    let existingPayment = null;    // Payment record từ DB
+    let invoiceType = "booking";   // Default invoice type
 
+    /* ============================================================================
+     * XỬ LÝ SERVICE PAYMENT WEBHOOK
+     * ============================================================================ */
     if (isServicePayment) {
       console.log(
         `🔔 Processing service payment webhook for orderCode: ${orderCode}`
       );
 
-      // Service payment: tìm payment bằng pendingOrderCode
+      // Tìm payment record bằng pendingOrderCode
+      // Service payment: orderCode lưu trong pendingOrderCode (chưa finalize)
       existingPayment = await Payment.findOne({
         pendingOrderCode: orderCode,
         invoiceType: "service",

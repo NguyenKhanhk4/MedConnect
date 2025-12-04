@@ -793,14 +793,18 @@ const NguoiDung = () => {
           <Form.Item
             label="Vai trò"
             name="role"
-            rules={[{ required: true, message: "Vui lòng chọn vai trò" }]}
           >
-            <Select placeholder="Chọn vai trò" disabled>
-              <Select.Option value="patient">Bệnh nhân</Select.Option>
-              <Select.Option value="doctor">Bác sĩ</Select.Option>
-              <Select.Option value="admin">Quản trị viên</Select.Option>
-              <Select.Option value="manager">Quản lý</Select.Option>
-            </Select>
+            <Form.Item noStyle shouldUpdate>
+              {({ getFieldValue }) => {
+                const roleValue = getFieldValue("role");
+                return (
+                  <Input 
+                    disabled={true}
+                    value={roleValue ? getRoleTag(roleValue).text : ""}
+                  />
+                );
+              }}
+            </Form.Item>
           </Form.Item>
 
           <Form.Item

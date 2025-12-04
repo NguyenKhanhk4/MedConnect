@@ -65,6 +65,11 @@ export default function ChiTietLichHen({ appointmentId, onBack }) {
           label: "Đã xác nhận",
           className: "bg-green-100 text-green-700",
         };
+      case "checkin":
+        return {
+          label: "Đã checkin",
+          className: "bg-green-100 text-green-700",
+        };
       case "rejected":
         return { label: "Đã từ chối", className: "bg-red-100 text-red-700" };
       case "completed":

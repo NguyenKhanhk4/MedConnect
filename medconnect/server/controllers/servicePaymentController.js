@@ -1,7 +1,21 @@
-/* =======================================================
- * CONTROLLER: ServicePaymentController
- *  Tạo hóa đơn dịch vụ cho appointment offline đã hoàn thành
- * ======================================================= */
+/* ============================================================================
+ * SERVICE PAYMENT CONTROLLER
+ * ============================================================================
+ * 
+ * Controller này xử lý THANH TOÁN DỊCH VỤ (Service Payment)
+ * Dành cho các dịch vụ bổ sung trong quá trình khám (xét nghiệm, thuốc, v.v.)
+ * 
+ * KHÁC BIỆT VỚI BOOKING PAYMENT:
+ * - Booking Payment: Phí đặt lịch (trả TRƯỚC khi khám)
+ * - Service Payment: Phí dịch vụ khám (trả SAU khi bác sĩ chỉ định dịch vụ)
+ * 
+ * ĐẶC ĐIỂM SERVICE PAYMENT:
+ * - CHỈ dành cho offline appointments
+ * - Appointment phải ở trạng thái "in_progress" hoặc "done"
+ * - Bác sĩ chọn services trong quá trình khám
+ * - Payment được tạo với status = "pending_manager"
+ * - Manager xử lý: Chọn thanh toán tiền mặt HOẶC chuyển khoản
+ * ============================================================================ */
 
 import Appointment from "../models/appointment.model.js";
 import Payment from "../models/payment.model.js";
@@ -12,13 +26,47 @@ import User from "../models/user.model.js";
 import { ok, fail } from "../utils/response.js";
 import { ERROR_CODES } from "../constants/index.js";
 
-/**
- * Create service payment link for completed offline appointment
- * POST /api/doctors/me/appointments/:appointmentId/service-payment
- * body: { serviceIds: [], amount }
- */
+/* ============================================================================
+ * FUNCTION: createServicePayment
+ * ============================================================================
+ * Tạo yêu cầu thanh toán dịch vụ cho appointment offline
+ * 
+ * Endpoint: POST /api/doctors/me/appointments/:appointmentId/service-payment
+ * Auth: Required (Doctor role)
+ * 
+ * Params:
+ * - appointmentId: string (MongoDB ObjectId)
+ * 
+ * Request Body:
+ * - serviceIds: string[] (Array of ServicePrice IDs)
+ * - amount: number (tổng tiền, phải khớp với tổng giá services)
+ * 
+ * Response:
+ * - payment: object (Payment record)
+ * - message: string
+ * 
+ * LUỒNG XỬ LÝ:
+ * 1. Validate doctor ownership (appointment phải thuộc bác sĩ này)
+ * 2. Validate appointment status (phải "in_progress" hoặc "done")
+ * 3. Validate appointment mode (phải "offline")
+ * 4. Kiểm tra chưa có service payment (tránh duplicate)
+ * 5. Lấy services từ DB và tính tổng tiền
+ * 6. Validate amount khớp với calculated total
+ * 7. Tạo Payment record với status = "pending_manager"
+ * 8. Gửi notification cho manager
+ * 9. Return payment info
+ * 
+ * SAU ĐÓ:
+ * Manager sẽ xử lý payment request:
+ * - Option 1: Thanh toán tiền mặt (processCashPayment)
+ * - Option 2: Thanh toán chuyển khoản (createBankTransferPayment)
+ * ============================================================================ */
 export async function createServicePayment(req, res) {
   try {
+    /* ------------------------------------
+     * BƯỚC 1: PARSE REQUEST
+     * ------------------------------------ */
+    
     const { appointmentId } = req.params;
     const { serviceIds, amount } = req.body;
     const userId = req.user?.app_user_id || req.user?.uid;
@@ -27,7 +75,10 @@ export async function createServicePayment(req, res) {
       return fail(res, 401, ERROR_CODES.UNAUTHORIZED, "User ID not found");
     }
 
-    // Validate input
+    /* ------------------------------------
+     * BƯỚC 2: VALIDATE INPUT
+     * ------------------------------------ */
+    
     if (!appointmentId) {
       return fail(
         res,
@@ -37,6 +88,7 @@ export async function createServicePayment(req, res) {
       );
     }
 
+    // Services phải là array không rỗng
     if (!serviceIds || !Array.isArray(serviceIds) || serviceIds.length === 0) {
       return fail(
         res,
@@ -46,6 +98,7 @@ export async function createServicePayment(req, res) {
       );
     }
 
+    // Amount phải là số nguyên dương
     if (!amount || amount <= 0 || !Number.isInteger(Number(amount))) {
       return fail(
         res,

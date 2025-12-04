@@ -105,6 +105,7 @@ const LichHen = () => {
       auto_cancelled: { color: "red", text: "Tự động hủy" },
       done: { color: "green", text: "Hoàn thành" },
       no_show: { color: "gray", text: "Không đến" },
+      checkin: { color: "green", text: "checkin" },
     };
     return statusConfig[status] || { color: "default", text: status };
   };

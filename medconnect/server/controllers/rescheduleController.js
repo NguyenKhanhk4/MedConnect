@@ -656,7 +656,64 @@ export async function getPatientRescheduleRequests(req, res) {
 }
 
 /**
- * Helper function: Send reschedule confirmation email to patient
+ * ================================================================
+ * HÀM GỬI EMAIL XÁC NHẬN DỜI LỊCH THÀNH CÔNG
+ * ================================================================
+ * 
+ * Gửi email thông báo cho bệnh nhân khi bác sĩ chấp thuận yêu cầu dời lịch.
+ * Email so sánh thời gian cũ (đã hủy) và thời gian mới (đã xác nhận).
+ * 
+ * @param {object} originalAppointment - Appointment gốc (thời gian cũ)
+ * @param {object} originalAppointment._id - ID của appointment gốc
+ * @param {object} originalAppointment.patientId - Thông tin bệnh nhân (có thể populate)
+ * @param {object} originalAppointment.scheduledStart - Thời gian bắt đầu cũ
+ * @param {object} originalAppointment.scheduledEnd - Thời gian kết thúc cũ
+ * @param {string} originalAppointment.mode - Hình thức khám (online/offline)
+ * @param {string} originalAppointment.reason - Lý do khám
+ * 
+ * @param {object} newAppointment - Appointment mới (thời gian mới)
+ * @param {object} newAppointment._id - ID của appointment mới
+ * @param {Date} newAppointment.scheduledStart - Thời gian bắt đầu mới
+ * @param {Date} newAppointment.scheduledEnd - Thời gian kết thúc mới
+ * @param {string} newAppointment.mode - Hình thức khám mới
+ * 
+ * @param {string} reason - Lý do dời lịch do bệnh nhân cung cấp
+ * 
+ * @param {object} doctor - Thông tin bác sĩ
+ * @param {string} doctor.fullName - Tên bác sĩ
+ * 
+ * @returns {Promise<void>} - Không trả về giá trị
+ * 
+ * @description
+ * LOGIC XỬ LÝ EMAIL:
+ * 1. Lấy email từ patient.userId (hỗ trợ cả populated và ObjectId)
+ * 2. Nếu không có email → return sớm (không gửi)
+ * 3. Format thời gian theo locale "vi-VN"
+ * 4. Tạo HTML email với 3 phần chính:
+ *    - Thông tin bác sĩ
+ *    - Thời gian cũ (background đỏ - đã hủy)
+ *    - Thời gian mới (background xanh - đã xác nhận)
+ *    - Lý do dời lịch (nếu có)
+ * 5. Gửi email với cả HTML và text format
+ * 6. Error được catch và log, không throw
+ * 
+ * @email_content
+ * - Tiêu đề: "Lịch hẹn của bạn đã được dời thành công - MedConnect"
+ * - Màu sắc: Xanh cho success (#059669), Đỏ cho cancelled (#dc2626)
+ * - Style: Inline CSS để đảm bảo hiển thị đúng trên mọi email client
+ * 
+ * @error_handling
+ * - Không throw error để không ảnh hưởng flow chính
+ * - Log chi tiết để debug
+ * - Email là non-critical operation
+ * 
+ * @example
+ * await sendAppointmentRescheduledEmail(
+ *   oldAppointment,
+ *   newAppointment,
+ *   "Có việc đột xuất",
+ *   doctorInfo
+ * );
  */
 export async function sendAppointmentRescheduledEmail(
   originalAppointment,
@@ -671,7 +728,14 @@ export async function sendAppointmentRescheduledEmail(
       patientEmail: originalAppointment?.patientId?.userId?.email,
     });
 
-    // Lấy email từ Patient userId
+    /**
+     * BƯỚC 1: LẤY EMAIL CỦA BỆNH NHÂN
+     * 
+     * Xử lý nhiều trường hợp:
+     * - userId đã được populate (object có email)
+     * - userId là ObjectId (cần query User)
+     * - Không tìm thấy email → return sớm
+     */
     let patientEmail = null;
 
     if (
@@ -904,7 +968,71 @@ MedConnect
 }
 
 /**
- * Helper function: Send reschedule rejection email to patient
+ * ================================================================
+ * HÀM GỬI EMAIL TỪ CHỐI DỜI LỊCH
+ * ================================================================
+ * 
+ * Gửi email thông báo cho bệnh nhân khi bác sĩ từ chối yêu cầu dời lịch.
+ * Email nhấn mạnh lịch hẹn gốc VẪN CÒN HIỆU LỰC.
+ * 
+ * @param {object} originalAppointment - Appointment gốc (vẫn còn hiệu lực)
+ * @param {object} originalAppointment._id - ID của appointment
+ * @param {object} originalAppointment.patientId - Thông tin bệnh nhân
+ * @param {Date} originalAppointment.scheduledStart - Thời gian bắt đầu
+ * @param {Date} originalAppointment.scheduledEnd - Thời gian kết thúc
+ * @param {string} originalAppointment.mode - Hình thức khám (online/offline)
+ * @param {string} originalAppointment.reason - Lý do khám
+ * 
+ * @param {object} request - RescheduleRequest object
+ * @param {object} request._id - ID của reschedule request
+ * @param {Date} request.newDateTime - Thời gian mới được yêu cầu (đã bị từ chối)
+ * @param {string} request.reason - Lý do bệnh nhân muốn dời lịch
+ * 
+ * @param {object} doctor - Thông tin bác sĩ
+ * @param {string} doctor.fullName - Tên bác sĩ
+ * 
+ * @param {string} reviewNotes - Lý do bác sĩ từ chối (do bác sĩ nhập)
+ * 
+ * @returns {Promise<void>} - Không trả về giá trị
+ * 
+ * @description
+ * LOGIC XỬ LÝ EMAIL:
+ * 1. Lấy email từ patient.userId
+ * 2. Nếu không có email → return sớm
+ * 3. Format thời gian theo locale "vi-VN"
+ * 4. Tạo HTML email với các phần:
+ *    - Thông tin bác sĩ
+ *    - Lịch hẹn hiện tại (background xanh - VẪN CÒN HIỆU LỰC)
+ *    - Thời gian yêu cầu dời (background đỏ - ĐÃ BỊ TỪ CHỐI)
+ *    - Lý do bệnh nhân yêu cầu dời (nếu có)
+ *    - Lý do bác sĩ từ chối (nếu có)
+ *    - Lưu ý: Lịch hẹn ban đầu vẫn còn hiệu lực
+ * 5. Gửi email với cả HTML và text format
+ * 6. Error được catch và log, không throw
+ * 
+ * @important_notes
+ * - ⚠️ LƯU Ý QUAN TRỌNG: Lịch hẹn gốc VẪN CÒN HIỆU LỰC
+ * - Bệnh nhân cần đến khám đúng giờ hẹn ban đầu
+ * - Sau khi bị từ chối, bệnh nhân KHÔNG THỂ dời lịch lại (chỉ được 1 lần)
+ * - Nếu không thể đến, cần hủy lịch trước 24 giờ
+ * 
+ * @email_content
+ * - Tiêu đề: "Yêu cầu dời lịch của bạn đã bị từ chối - MedConnect"
+ * - Màu sắc: Đỏ cho rejected (#dc2626), Xanh cho active (#059669)
+ * - Tone: Lịch sự, giải thích rõ ràng, nhấn mạnh lịch cũ vẫn hiệu lực
+ * 
+ * @error_handling
+ * - Không throw error để không ảnh hưởng flow chính
+ * - Log chi tiết để debug
+ * - Email là non-critical operation
+ * 
+ * @example
+ * await sendAppointmentRescheduleRejectedEmail(
+ *   originalAppointment,
+ *   rescheduleRequest,
+ *   doctorInfo,
+ *   "Lịch khám của tôi đã đầy trong thời gian bạn yêu cầu"
+ * );
  */
 export async function sendAppointmentRescheduleRejectedEmail(
   originalAppointment,
@@ -919,7 +1047,11 @@ export async function sendAppointmentRescheduleRejectedEmail(
       patientEmail: originalAppointment?.patientId?.userId?.email,
     });
 
-    // Lấy email từ Patient userId
+    /**
+     * BƯỚC 1: LẤY EMAIL CỦA BỆNH NHÂN
+     * 
+     * Xử lý tương tự như hàm sendAppointmentRescheduledEmail
+     */
     let patientEmail = null;
 
     if (

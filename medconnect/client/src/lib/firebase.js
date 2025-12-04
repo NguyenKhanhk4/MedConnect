@@ -26,7 +26,12 @@ console.log(
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-setPersistence(auth, indexedDBLocalPersistence);
+
+// Set persistence with error handling to prevent onboarding.js errors
+setPersistence(auth, indexedDBLocalPersistence).catch((error) => {
+  console.warn('Failed to set Firebase persistence:', error);
+  // Continue anyway - auth will work with session persistence
+});
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });

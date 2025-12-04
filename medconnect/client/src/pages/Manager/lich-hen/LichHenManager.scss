@@ -1,0 +1,303 @@
+.appointment-management {
+    padding: 24px;
+    background-color: #f5f5f5;
+    min-height: 100vh;
+
+    .page-header {
+        margin-bottom: 24px;
+
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1f2937;
+            margin: 0 0 8px 0;
+        }
+
+        p {
+            font-size: 16px;
+            color: #6b7280;
+            margin: 0;
+        }
+    }
+
+    .stats-row {
+        margin-bottom: 24px;
+
+        .ant-card {
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+            .ant-statistic {
+                .ant-statistic-title {
+                    font-size: 14px;
+                    color: #6b7280;
+                    margin-bottom: 8px;
+                }
+
+                .ant-statistic-content {
+                    font-size: 24px;
+                    font-weight: 600;
+                }
+            }
+        }
+    }
+
+    .filters-card {
+        margin-bottom: 24px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+        .ant-row {
+            align-items: center;
+        }
+    }
+
+    .ant-table {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+        .ant-table-thead>tr>th {
+            background-color: #f8fafc;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .ant-table-tbody>tr>td {
+            border-bottom: 1px solid #f3f4f6;
+            padding: 16px;
+        }
+
+        .ant-table-tbody>tr:hover>td {
+            background-color: #f9fafb;
+        }
+
+        .patient-name,
+        .doctor-name {
+            font-weight: 500;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .patient-email,
+        .doctor-specialty {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 2px;
+        }
+
+        .patient-phone,
+        .doctor-license,
+        .doctor-experience {
+            font-size: 11px;
+            color: #52c41a;
+            font-weight: 500;
+        }
+
+        .appointment-date {
+            font-weight: 500;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .appointment-time {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .ant-btn {
+            border-radius: 6px;
+
+            &.ant-btn-text {
+                padding: 4px 8px;
+
+                &:hover {
+                    background-color: #f3f4f6;
+                }
+            }
+        }
+
+        .overtime-row {
+            background-color: #fff1f0;
+
+            &:hover>td {
+                background-color: #ffccc7 !important;
+            }
+        }
+    }
+
+    .appointment-details {
+        .detail-section {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #1890ff;
+
+            h4 {
+                margin: 0 0 12px 0;
+                color: #1890ff;
+                font-size: 16px;
+                font-weight: 600;
+            }
+        }
+
+        .detail-item {
+            margin-bottom: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid #f3f4f6;
+
+            &:last-child {
+                border-bottom: none;
+            }
+
+            strong {
+                color: #374151;
+                margin-right: 8px;
+            }
+
+            .ant-tag {
+                margin-left: 8px;
+            }
+        }
+    }
+
+    .ant-modal {
+        .ant-modal-header {
+            border-bottom: 1px solid #e5e7eb;
+
+            .ant-modal-title {
+                font-weight: 600;
+                color: #1f2937;
+            }
+        }
+
+        .ant-modal-body {
+            padding: 24px;
+        }
+
+        .ant-modal-footer {
+            border-top: 1px solid #e5e7eb;
+            padding: 16px 24px;
+        }
+    }
+
+    .ant-card {
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+        .ant-card-head {
+            border-bottom: 1px solid #e5e7eb;
+
+            .ant-card-head-title {
+                font-weight: 600;
+                color: #1f2937;
+            }
+        }
+    }
+
+    .ant-select,
+    .ant-picker {
+        border-radius: 6px;
+
+        &:hover,
+        &:focus {
+            border-color: #3b82f6;
+        }
+    }
+
+    .ant-btn-primary {
+        background-color: #3b82f6;
+        border-color: #3b82f6;
+        border-radius: 6px;
+
+        &:hover {
+            background-color: #2563eb;
+            border-color: #2563eb;
+        }
+    }
+
+    .ant-tag {
+        border-radius: 4px;
+        font-size: 12px;
+        padding: 2px 8px;
+    }
+
+    .ant-pagination {
+        margin-top: 16px;
+        text-align: center;
+
+        .ant-pagination-item {
+            border-radius: 6px;
+
+            &.ant-pagination-item-active {
+                background-color: #3b82f6;
+                border-color: #3b82f6;
+
+                a {
+                    color: white;
+                }
+            }
+        }
+
+        .ant-pagination-prev,
+        .ant-pagination-next {
+            border-radius: 6px;
+        }
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .appointment-management {
+        padding: 16px;
+
+        .page-header {
+            margin-bottom: 20px;
+
+            h1 {
+                font-size: 22px;
+            }
+
+            p {
+                font-size: 14px;
+            }
+        }
+
+        .stats-row {
+            margin-bottom: 16px;
+
+            .ant-col {
+                margin-bottom: 12px;
+            }
+        }
+
+        .filters-card {
+            margin-bottom: 16px;
+
+            .ant-row {
+                flex-direction: column;
+                gap: 12px;
+
+                .ant-col {
+                    width: 100%;
+                }
+            }
+        }
+
+        .ant-table {
+            font-size: 12px;
+
+            .ant-table-thead>tr>th {
+                padding: 8px;
+                font-size: 12px;
+            }
+
+            .ant-table-tbody>tr>td {
+                padding: 12px 8px;
+                font-size: 12px;
+            }
+        }
+    }
+}

@@ -517,3 +517,13 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4) !important;
 }
+
+/* Custom DatePicker Popup Styles */
+.custom-date-picker-popup .ant-picker-cell:not(.ant-picker-cell-in-view):not(.ant-picker-cell-disabled) .ant-picker-cell-inner {
+  color: rgba(0, 0, 0, 0.88) !important; /* Make text black like normal dates */
+  background-color: transparent;
+}
+
+.custom-date-picker-popup .ant-picker-cell:not(.ant-picker-cell-in-view):not(.ant-picker-cell-disabled):hover .ant-picker-cell-inner {
+  background-color: #f5f5f5; /* Add hover effect */
+}
